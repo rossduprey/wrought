@@ -106,6 +106,25 @@ int main() {
         ves = throw_pot(body);
     }
 
+    // -- 4a. Where the whole ratchet actually lives --------------------------
+    // Not between generations. Between "raw dirt" and "one minute of standing
+    // water", because sand is the only thing coarse enough to blur a pan and
+    // sand is the first thing to fall.
+    std::printf("\nwhat the pot is made of, and what the pan it becomes is worth:\n");
+    const double vr = free_velocity(MAGNETITE, SAND) / free_velocity(QUARTZ, SAND);
+    auto rate = [&](const char* n, const Substance& b) {
+        const SeparatorParams p = fire_pan(b);
+        std::printf("  %-38s grit %8.1f um  sigma %.4f  enrich %.2fx\n",
+                    n, grit_diameter(b) * 1e6, p.sharpness, std::pow(vr, 1.0 / p.sharpness));
+    };
+    std::printf("  %-38s %17s  sigma %.4f  enrich %.2fx\n", "cupped hands (no pot at all)", "",
+                HANDS.sharpness, std::pow(vr, 1.0 / HANDS.sharpness));
+    rate("pot from raw dirt, stones and all", dirt);
+    rate("pot from stone-picked dirt", screen(dirt, HAND_COB).undersize);
+    rate("pot from a 1-minute decant", decant(screen(dirt, HAND_COB).undersize, HOLLOW, 60.0).liquor);
+    rate("pot from a 1-hour decant", decant(dirt, HOLLOW, 3600.0).liquor);
+    rate("pot from a 4-hour decant", decant(dirt, HOLLOW, 14400.0).liquor);
+
     // -- 4b. Where the grade ceiling comes from -----------------------------
     // Nowhere in the tool. It is arithmetic on the deposit's clay bin, because
     // clay-sized quartz and clay-sized kaolinite fall at the same speed.

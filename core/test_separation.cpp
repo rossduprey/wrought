@@ -670,6 +670,17 @@ int main() {
         std::printf("        (sigma: raw %.4f -> gen0 %.4f -> gen1 %.4f -> gen2 %.4f)\n",
                     raw.sharpness, sig[0], sig[1], sig[2]);
 
+        // And the one rung is one minute tall. Sand is the only thing coarse
+        // enough to blur a pan, and sand is the first thing to fall out of
+        // standing water. Everything after that is a rounding error.
+        const Substance cobbed = screen(dirt, HAND_COB).undersize;
+        const double s_minute = fire_pan(decant(cobbed, HOLLOW, 60.0).liquor).sharpness;
+        const double s_day    = fire_pan(decant(dirt, HOLLOW, 14400.0).liquor).sharpness;
+        check(s_minute - s_day < 1e-3 && fire_pan(cobbed).sharpness > 1.5 * s_minute,
+              "one minute of standing water is worth as much to a pan as four hours");
+        std::printf("        (stone-picked dirt %.4f -> 60 s %.4f -> 4 h %.4f)\n",
+                    fire_pan(cobbed).sharpness, s_minute, s_day);
+
         // Because the grade ceiling was never a property of the tool.
         double cb = 0.0;
         for (int p = 0; p < N_PHASE; ++p) cb += dirt.freegrain[p][CLAY];

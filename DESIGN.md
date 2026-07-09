@@ -545,6 +545,76 @@ And it is a *bad* pan — barely better than cupped hands. This is the point:
 That strange loop is the engine of the entire game. It starts in a mud puddle,
 and nobody invented it — it is the actual history of technology.
 
+*(Measured 2026-07-09 by `core/ratchet.cpp`, which is Phase A step 2, whose entire
+purpose was to run this paragraph rather than admire it. **The middle clause is
+false, and the loop does not turn.** This is the largest correction the document
+has taken, and it is at the centre of it.)*
+
+The claim requires that a pan fired from finer clay be a sharper separator. A
+pan's sharpness is the blur in its cut, and the physical route from clay to blur
+is grit: a grain standing proud of the floor makes the water move faster over it
+than beside it, so the pan has not one cut but a spread of them, and the spread
+adds to the wrist's own in quadrature. Run the numbers and the route is not
+merely weak, it is three orders of magnitude short. **To blur a pan by ten
+percent you need 267 µm of grit, against a skin 1061 µm deep. The coarsest thing
+a decant can carry over is clay-sized: 0.88 µm.**
+
+So iterating does nothing. Levigate in the hollow, fire a pot, levigate in the
+pot, fire another — the sharpness is 0.5500 at every generation, to four decimal
+places, forever. There is no purity spiral. There is one step:
+
+| the pot you fired from | grit | σ | enrichment |
+|---|---|---|---|
+| raw dirt, stones and all | 1852 µm | 1.83 | 1.44× |
+| *cupped hands, for comparison* | — | *1.20* | *1.75×* |
+| stone-picked dirt | 944 µm | 1.05 | 1.89× |
+| **a one-minute decant** | 11.6 µm | **0.5501** | **3.37×** |
+| a one-hour decant | 0.9 µm | 0.5500 | 3.37× |
+| a four-hour decant | 0.9 µm | 0.5500 | 3.37× |
+
+Two things in that table are worth the whole of step 2.
+
+**A pot pinched from dirt you did not levigate is a worse separator than your
+bare hands.** Not marginally — 1.44× against 1.75×. The first pot is a
+*downgrade*, and the only thing that makes pottery worth inventing is the
+levigation, not the firing. That is a real and slightly funny fact and nobody
+designed it.
+
+**And the ratchet is one minute long.** Sand is the only thing coarse enough to
+blur a pan. Sand settles two hundred and sixty times faster than silt. So sixty
+seconds of standing water takes the pan from 1.89× to 3.37×, and the next
+forty-five hours of patience change it by one part in ten thousand. Every gram of
+narrative weight this document placed on *"how finely you levigate"* is carried by
+the first minute, and there is nothing left over to spend on a spiral.
+
+**Where the loop actually runs.** It runs through recovery, not purity. The
+pourable fraction of a vessel is set by how much of it the sediment fills, so a
+bigger pot returns more clay per charge — 4.8% in the hollow, 68% in a large pot,
+at a matched wait. That is throughput, and §2a says in as many words that
+progression here is purity and *not* throughput. The one loop we found is
+running along the axis the design forbids.
+
+**And the grade ceiling was never a property of the tool at all.** Every vessel,
+at every wait, lands on the same clay: 0.843 kaolinite, 8% quartz, and it cannot
+be improved by any amount of settling. It is simply the composition of the
+*deposit's clay-sized fraction*, because clay-sized quartz and clay-sized
+kaolinite fall through water at speeds that differ by **1.031×** — and that is the
+same 1.03× that makes magnetite indistinguishable from hematite and put the
+lodestone in Era 0. **Era 1 has a lodestone-shaped hole.** The tool that fills it
+is real, it is what every potter on earth actually does, and it separates on
+surface chemistry rather than on settling velocity: **deflocculation**. Stir clay
+into water with a little wood ash and the platelets repel each other and stay up;
+the quartz does not care and falls. We do not model it, `settling.h` says so out
+loud, and it is now the most valuable unbuilt thing in Era 1.
+
+So the paragraph above survives only as its last sentence — *every tool is made
+from something you separated* — which is true, and load-bearing, and is a **gate**
+rather than an engine. What replaces the engine is not a loop but a staircase:
+hands, pan, sluice, jig, each a different mechanism with its own irreducible
+sharpness (the wrist; the steadiness of the flow; the pulse), and you climb it by
+inventing the next mechanism, not by refining the last one. That is also the
+actual history of technology. Nobody perfected the pan. They built a sluice.
+
 ### The lodestone — the one tool the world gives you
 
 *(Resolved 2026-07-09, Ross: it stays. A **found** tool, never a crafted one.)*
@@ -1224,6 +1294,44 @@ Deliverable, in order, in a console harness with no UE editor and no renderer:
    With the cut on settling velocity, size is already inside the partition
    function. The ratchet can now be derived rather than declared, and if it cannot,
    we will find out, which is the whole point.
+
+   *(Done 2026-07-09. `core/levigate.h`, `core/fire.h`, `core/ratchet.cpp`.
+   **It could not, and we found out.** See Era 1 above, where the correction is
+   recorded next to the sentence it replaces. The ratchet turns exactly once and
+   the turn is sixty seconds long.)*
+
+   Two things had to be fixed before the question could even be posed, and both
+   were defects the design had shipped:
+
+   - **The model could not levigate.** `FINES` ran from 3.9 µm to 62.5 µm with one
+     representative diameter of 15.6 µm — which is *silt*. Clay and silt are
+     precisely the two things levigation separates, and they were the same bin. The
+     document's own corrected settling table (above, dated the same day) computes
+     clay at 2 µm falling 0.10 m in **9.1 hours**; the code drained its entire
+     fines bin out of that column in **520 seconds**. We had published a table
+     `core/` could not reproduce, and nothing noticed until something tried to use
+     it. Splitting the bin at Wentworth's 3.9 µm — a boundary already sitting in
+     `SIZE_BOUNDS` — cost no new citation, and **all 41 existing assertions passed
+     unchanged**, which is what `phase_table.h` promises: the tests assert
+     relationships, not the fixture.
+
+   - **Levigation authors nothing, and this was worth finding.** A batch decant's
+     partition function can be written down exactly: fill to depth `h`, stir, wait
+     `t`, and a species falling at `v` has dropped `v·t`, so what you pour off is
+     `(clear − v·t)/h`. It is a *ramp* in velocity, not a logistic, it terminates,
+     and its imperfection is **exactly 3.0** for every vessel, every charge and
+     every wait. There is no sharpness to invent. Even the pour fraction is
+     derived, from how much of the vessel the sediment fills. The second separator
+     in the project turned out to be the one with no free parameters at all.
+
+   Two comments in `levigate.h` were written from an argument and then disproved by
+   the program inside the hour — that depth cancels out of the pour fraction (it
+   does not; the clay is settling too, and a deep jar beats a flat pan of equal
+   volume, 19.5% recovery against 4.8%), and that re-decanting collapses recovery
+   (it does not; it is a tax of +0.0001 grade and −4.5% recovery per pass, because
+   **no velocity separator can divide a single velocity class** — which is the same
+   law that once made "even the gentlest pan enriches" a test passing for the wrong
+   reason). Both are preserved in the file, next to what replaced them.
 3. **Then** smelt: slag falls out of a bloomery, and the ledger balances.
 
 If it isn't interesting to reason about here, more art won't save it.
