@@ -12,7 +12,7 @@ pan_game: pan.cpp $(HEADERS)
 ratchet: ratchet.cpp $(HEADERS)
 	$(CXX) $(CXXFLAGS) -o $@ ratchet.cpp
 
-.PHONY: test pan clean
+.PHONY: test pan ratchet-run clean
 test: test_separation
 	./test_separation
 

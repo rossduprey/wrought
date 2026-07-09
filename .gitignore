@@ -1,6 +1,7 @@
 .DS_Store
 core/test_separation
 core/pan_game
+core/ratchet
 Binaries/
 Intermediate/
 Saved/
