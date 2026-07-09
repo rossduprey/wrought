@@ -58,7 +58,9 @@ Three things, as far as we can tell, do not exist anywhere:
 
 This costs one column and it is what converts *"we claim realism"* into *"here is where we got it."* It means a metallurgy student can trust the table and use it in something that isn't a game. It means we can never quietly balance a number — to change it you must change the citation, and there isn't one, because reality does not negotiate.
 
-**The design document currently contains several `UNVERIFIED` numbers**, written from a language model's memory. Correcting them with a source is the most useful thing you could do here today.
+**The design document and `core/phase_table.h` currently contain nothing but `UNVERIFIED` numbers**, written from a language model's memory. Correcting them with a source is the most useful thing you could do here today, and [they are all filed as issues](https://github.com/rossduprey/wrought/issues).
+
+Some of them **cannot** be closed with a citation, and those are tagged [`authored-number`](https://github.com/rossduprey/wrought/labels/authored-number) rather than [`unverified-number`](https://github.com/rossduprey/wrought/labels/unverified-number). They are numbers we invented — the grade of a composite grain, the efficiency of a screen, the sharpness of a pan. No reference exists to look them up in, because they are stand-ins for physics we chose not to model. Calling those `UNVERIFIED` would imply somebody could go and check, and that would be the more comfortable lie.
 
 ## What we want from you
 

@@ -1279,7 +1279,8 @@ a primary source for Era 0 → Era 2:
   *(Specific videos are deliberately not cited by title here. Naming an episode
   from memory is exactly the kind of confident recall §1a exists to distrust. The
   channel is the citation; mapping individual processes to individual videos, with
-  timestamps, is work nobody has done yet, and it is a tracked issue.)*
+  timestamps, is work nobody has done yet. It is
+  [issue #9](https://github.com/rossduprey/wrought/issues/9).)*
 
 What none of them do — and what this project is actually *for*:
 
