@@ -163,6 +163,9 @@ static double bin_mass(const Substance& s, int bin) {
     for (int p = 0; p < N_PHASE; ++p) m += s.freegrain[p][bin] + s.composite[p][bin];
     return m;
 }
+// What a panner calls mud. He cannot see the 3.9 um line and does not care where
+// it is; the pan cannot separate across it either. Only levigation can.
+static double mud_mass(const Substance& s) { return bin_mass(s, CLAY) + bin_mass(s, SILT); }
 static double black_frac(const Substance& s) {
     const double m = s.total_mass();
     return m > 1e-9 ? black_mass(s) / m : 0.0;
@@ -210,15 +213,27 @@ struct ScoopBuilder {
     }
 };
 
+// Kaolinite is the one phase whose size is not free to be anything. A clay
+// mineral is a platelet a micron across; that is what makes it clay, and it is
+// why levigation exists. Every other phase is distributed across the bins by
+// what the river did to it. Quartz that happens to be clay-sized is the grit you
+// will never wash out of your pot.
+static const double CLAY_PSD[N_SIZE]  = {0.90, 0.10, 0.00, 0.00};
+
 static Substance river_sand() {
     ScoopBuilder b;
     auto row = [&](int p, double frac, double lf, double ls, double lg) {
-        const double m[N_SIZE] = {2.0*frac*0.15, 2.0*frac*0.75, 2.0*frac*0.10};
-        const double l[N_SIZE] = {lf, ls, lg};
+        const double m[N_SIZE] = {2.0*frac*0.03, 2.0*frac*0.12, 2.0*frac*0.75, 2.0*frac*0.10};
+        const double l[N_SIZE] = {lf, lf, ls, lg};
+        b.put(p, m, l);
+    };
+    auto clay_row = [&](int p, double frac) {
+        double m[N_SIZE]; const double l[N_SIZE] = {1.0, 1.0, 1.0, 1.0};
+        for (int k = 0; k < N_SIZE; ++k) m[k] = 2.0 * frac * CLAY_PSD[k];
         b.put(p, m, l);
     };
     row(FELDSPAR,  0.100, 0.95, 0.90, 0.75);
-    row(KAOLINITE, 0.040, 1.00, 0.90, 0.60);
+    clay_row(KAOLINITE, 0.040);
     row(MAGNETITE, 0.080, 0.95, 0.88, 0.55);
     row(HEMATITE,  0.010, 0.90, 0.80, 0.50);
     row(GOETHITE,  0.020, 0.90, 0.80, 0.50);
@@ -232,8 +247,8 @@ static Substance river_sand() {
 static Substance black_sand_bar() {
     ScoopBuilder b;
     auto row = [&](int p, double frac, double lf, double ls, double lg) {
-        const double m[N_SIZE] = {2.0*frac*0.10, 2.0*frac*0.88, 2.0*frac*0.02};
-        const double l[N_SIZE] = {lf, ls, lg};
+        const double m[N_SIZE] = {2.0*frac*0.01, 2.0*frac*0.09, 2.0*frac*0.88, 2.0*frac*0.02};
+        const double l[N_SIZE] = {lf, lf, ls, lg};
         b.put(p, m, l);
     };
     row(MAGNETITE, 0.220, 0.97, 0.95, 0.70);
@@ -246,10 +261,10 @@ static Substance black_sand_bar() {
 
 static Substance weathered_outcrop() {
     ScoopBuilder b;
-    const double q[N_SIZE] = {0.04, 0.30, 1.06}, ql[N_SIZE] = {1, 1, 1};
-    const double f[N_SIZE] = {0.01, 0.06, 0.20}, fl[N_SIZE] = {0.90, 0.60, 0.30};
-    const double m[N_SIZE] = {0.004, 0.03, 0.26}, ml[N_SIZE] = {0.85, 0.35, 0.10};
-    const double h[N_SIZE] = {0.002, 0.01, 0.024}, hl[N_SIZE] = {0.80, 0.30, 0.10};
+    const double q[N_SIZE] = {0.008, 0.032, 0.30, 1.06}, ql[N_SIZE] = {1, 1, 1, 1};
+    const double f[N_SIZE] = {0.002, 0.008, 0.06, 0.20}, fl[N_SIZE] = {0.90, 0.90, 0.60, 0.30};
+    const double m[N_SIZE] = {0.0008, 0.0032, 0.03, 0.26}, ml[N_SIZE] = {0.85, 0.85, 0.35, 0.10};
+    const double h[N_SIZE] = {0.0004, 0.0016, 0.01, 0.024}, hl[N_SIZE] = {0.80, 0.80, 0.30, 0.10};
     b.put(FELDSPAR, f, fl); b.put(MAGNETITE, m, ml); b.put(HEMATITE, h, hl); b.put(QUARTZ, q, ql);
     return b.build();
 }
@@ -392,7 +407,7 @@ static void draw(const Substance& pan, const Substance& origin, const Assay& ass
     const double m  = pan.total_mass();
     const double bf = black_frac(pan);
     const double gr = m > 1e-9 ? bin_mass(pan, GRAVEL) / m : 0.0;
-    const double fn = m > 1e-9 ? bin_mass(pan, FINES) / m : 0.0;
+    const double fn = m > 1e-9 ? mud_mass(pan) / m : 0.0;
 
     std::printf("\n   %-46s  %2d:%02d\n\n", ambient ? ambient : "", (int)t / 60, (int)t % 60);
 
@@ -536,7 +551,7 @@ int main() {
         // accumulate the plume over a fifth of a second so it is visible
         plume_acc_m += lost.total_mass();
         plume_acc_b += black_mass(lost);
-        plume_acc_f += bin_mass(lost, FINES);
+        plume_acc_f += mud_mass(lost);
         plume_t += DT;
         if (plume_t >= 0.20) {
             plume[plume_head] = {plume_acc_m,

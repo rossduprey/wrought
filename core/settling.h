@@ -28,8 +28,28 @@ inline constexpr double WATER_VISCOSITY = 1.138e-3; // Pa*s     UNVERIFIED
 inline constexpr double GRAVITY         = 9.80665;  // m/s^2    defined, not measured
 
 // Wentworth (1922) grade-scale boundaries, in metres. UNVERIFIED.
-// FINES spans clay and silt; GRAVEL spans granule through cobble.
+// GRAVEL spans granule through cobble.
+//
+// The Wentworth clay class has no lower bound — it is "everything finer than
+// 3.9 um". A bin needs one, because `bin_diameter` takes a geometric mean, so
+// **0.2 um is AUTHORED** and it is the single most load-bearing invented number
+// in the file: it sets `bin_diameter(CLAY)` to 0.88 um, and settling velocity
+// goes as d^2, so halving it would quadruple every levigation time in the game.
+// It is roughly the coarse end of the kaolinite platelet range. It is a stand-in
+// for a size distribution we do not carry, and it should be a tracked issue and
+// not a fact.
+//
+// What is *not* authored is the consequence: quartz at 0.88 um falls 0.10 m in
+// about 45 hours, and at 15.6 um in about nine minutes. That three-hundred-fold
+// gap is the whole of levigation, and nobody chose it.
+//
+// Not modelled: flocculation. A real clay suspension's settling behaviour is
+// governed as much by surface chemistry as by Stokes — potters deflocculate to
+// keep clay up and flocculate to drop it, and a floc settles as one big particle.
+// We model bare grains. This makes our levigation harder than the real thing,
+// which is the safe direction to be wrong in, but it is a direction.
 inline constexpr double SIZE_BOUNDS[N_SIZE][2] = {
+    {0.2e-6,  3.9e-6},
     {3.9e-6,  62.5e-6},
     {62.5e-6, 2.0e-3},
     {2.0e-3,  64.0e-3},

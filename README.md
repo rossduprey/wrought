@@ -23,7 +23,7 @@ An AI and a human build the ancestor of the AI, out of the ground, and it learns
 There is one design document, two license files, and `core/` — a few hundred lines of dependency-free C++17 that pans a bucket of river sand. No engine, no renderer, no art.
 
 ```
-cd core && make test    # 41 assertions about the physics
+cd core && make test    # 49 assertions about the physics
 cd core && make pan     # kneel in the river and wash it yourself
 ```
 

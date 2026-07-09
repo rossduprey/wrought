@@ -164,7 +164,7 @@ inline Substance exposed(const Substance& pan, double v_mix, double skin) {
 //
 // `cut_bin` is the finest bin that reports oversize. Two screens matter, and both
 // are Era 0: scalping (cut_bin = GRAVEL, take the pebbles out) and desliming
-// (cut_bin = SAND, wash the mud off). A gravity separator needs both, because it
+// (cut_bin = SAND, wash the mud — clay and silt both — off). A gravity separator needs both, because it
 // obeys the grade/recovery law only within one size class. `separate()` will
 // happily concentrate a pebble.
 //
@@ -217,7 +217,10 @@ inline Substance crush(const Substance& in, double intensity) {
     constexpr double f = COMPOSITE_TARGET_FRACTION;
 
     // Ascending, so mass moved into a finer bin is not moved again this blow.
-    for (int s = SAND; s <= GRAVEL; ++s) {
+    // Everything above the finest bin; the finest has nowhere to go. This used
+    // to read `s = SAND`, which meant the same thing only while there were three
+    // bins and SAND was the second of them.
+    for (int s = 1; s < N_SIZE; ++s) {
         const int finer = s - 1;
         for (int p = 0; p < N_PHASE; ++p) {
             // Breakage liberates. The composite's two halves become free grains.

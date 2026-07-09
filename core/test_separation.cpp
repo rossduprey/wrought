@@ -26,7 +26,7 @@
 #include <algorithm>
 #include <initializer_list>
 
-#include "separate.h"
+#include "fire.h"
 
 using namespace wrought;
 
@@ -37,7 +37,9 @@ static void check(bool ok, const char* what) {
     if (!ok) ++failures;
 }
 
-static const char* sz(int s) { return s == FINES ? "fines" : s == SAND ? "sand" : "gravel"; }
+static const char* sz(int s) {
+    return s == CLAY ? "clay" : s == SILT ? "silt" : s == SAND ? "sand" : "gravel";
+}
 
 // Author a scoop by phase mass and liberation; the struct stores particles.
 // Composites drag gangue, so the gangue they carry is deducted from free quartz.
@@ -73,8 +75,8 @@ struct ScoopBuilder {
 static Substance river_sand() {
     ScoopBuilder b;
     auto row = [&](int p, double frac, double lf, double ls, double lg) {
-        const double m[N_SIZE] = {10.0*frac*0.15, 10.0*frac*0.75, 10.0*frac*0.10};
-        const double l[N_SIZE] = {lf, ls, lg};
+        const double m[N_SIZE] = {10.0*frac*0.03, 10.0*frac*0.12, 10.0*frac*0.75, 10.0*frac*0.10};
+        const double l[N_SIZE] = {lf, lf, ls, lg};
         b.put(p, m, l);
     };
     row(FELDSPAR,  0.100, 0.95, 0.90, 0.75);
@@ -92,10 +94,10 @@ static Substance river_sand() {
 // A struck outcrop. Iron is here, and almost none of it is free.
 static Substance weathered_outcrop() {
     ScoopBuilder b;
-    const double q[N_SIZE] = {0.20, 1.50, 5.30}, ql[N_SIZE] = {1, 1, 1};
-    const double f[N_SIZE] = {0.05, 0.30, 1.00}, fl[N_SIZE] = {0.90, 0.60, 0.30};
-    const double m[N_SIZE] = {0.02, 0.15, 1.30}, ml[N_SIZE] = {0.85, 0.35, 0.10};
-    const double h[N_SIZE] = {0.01, 0.05, 0.12}, hl[N_SIZE] = {0.80, 0.30, 0.10};
+    const double q[N_SIZE] = {0.04, 0.16, 1.50, 5.30}, ql[N_SIZE] = {1, 1, 1, 1};
+    const double f[N_SIZE] = {0.01, 0.04, 0.30, 1.00}, fl[N_SIZE] = {0.90, 0.90, 0.60, 0.30};
+    const double m[N_SIZE] = {0.004, 0.016, 0.15, 1.30}, ml[N_SIZE] = {0.85, 0.85, 0.35, 0.10};
+    const double h[N_SIZE] = {0.002, 0.008, 0.05, 0.12}, hl[N_SIZE] = {0.80, 0.80, 0.30, 0.10};
     b.put(FELDSPAR, f, fl); b.put(MAGNETITE, m, ml); b.put(HEMATITE, h, hl); b.put(QUARTZ, q, ql);
     return b.build();
 }
@@ -142,8 +144,8 @@ static double peak_grade_over_passes(const Substance& s, const SeparatorParams& 
 static Substance with_magnetite_liberation(double L) {
     ScoopBuilder b;
     auto row = [&](int p, double frac, double lf, double ls, double lg) {
-        const double m[N_SIZE] = {10.0*frac*0.15, 10.0*frac*0.75, 10.0*frac*0.10};
-        const double l[N_SIZE] = {lf, ls, lg};
+        const double m[N_SIZE] = {10.0*frac*0.03, 10.0*frac*0.12, 10.0*frac*0.75, 10.0*frac*0.10};
+        const double l[N_SIZE] = {lf, lf, ls, lg};
         b.put(p, m, l);
     };
     row(FELDSPAR,  0.100, 0.95, 0.90, 0.75);
@@ -176,12 +178,13 @@ int main() {
     // consequence of a force balance, and none of it can be tuned.
     {
         bool stokes_fines = true;
-        for (int p = 0; p < N_PHASE; ++p) {
-            const double d = bin_diameter(FINES);
-            const double g = settling_velocity(PHASES[p].density, d), s = stokes_velocity(PHASES[p].density, d);
-            if (std::fabs(s / g - 1.0) > 0.01) stokes_fines = false;
-        }
-        check(stokes_fines, "on fines, the drag solve agrees with Stokes' law to within 1%");
+        for (int p = 0; p < N_PHASE; ++p)
+            for (int b : {CLAY, SILT}) {
+                const double d = bin_diameter(b);
+                const double g = settling_velocity(PHASES[p].density, d), s = stokes_velocity(PHASES[p].density, d);
+                if (std::fabs(s / g - 1.0) > 0.01) stokes_fines = false;
+            }
+        check(stokes_fines, "on clay and silt, the drag solve agrees with Stokes' law to within 1%");
 
         const double d_sand = bin_diameter(SAND), d_grav = bin_diameter(GRAVEL);
         const double r_sand = stokes_velocity(PHASES[QUARTZ].density, d_sand) / settling_velocity(PHASES[QUARTZ].density, d_sand);
@@ -190,7 +193,7 @@ int main() {
               "on sand and gravel Stokes is not merely imprecise, it is the wrong law");
         std::printf("        (Stokes overstates quartz by %.2fx in sand, %.0fx in gravel)\n", r_sand, r_grav);
 
-        check(reynolds(settling_velocity(PHASES[QUARTZ].density, bin_diameter(FINES)), bin_diameter(FINES)) < 1.0 &&
+        check(reynolds(settling_velocity(PHASES[QUARTZ].density, bin_diameter(CLAY)), bin_diameter(CLAY)) < 1.0 &&
               reynolds(settling_velocity(PHASES[QUARTZ].density, d_grav), d_grav) > 1000.0,
               "the bins straddle the creeping-flow and Newton regimes: one correlation cannot be skipped");
 
@@ -463,8 +466,8 @@ int main() {
         // screen efficiency, and no number in this project can be tuned to make
         // it false.
         ScoopBuilder pb;
-        const double q[N_SIZE]  = {1.05, 5.25, 0.70}, ql[N_SIZE] = {1.0, 1.0, 1.0};
-        const double mg[N_SIZE] = {0.12, 0.60, 0.08}, mgl[N_SIZE] = {0.95, 0.95, 0.95};
+        const double q[N_SIZE]  = {0.21, 0.84, 5.25, 0.70}, ql[N_SIZE] = {1.0, 1.0, 1.0, 1.0};
+        const double mg[N_SIZE] = {0.024, 0.096, 0.60, 0.08}, mgl[N_SIZE] = {0.95, 0.95, 0.95, 0.95};
         pb.put(MAGNETITE, mg, mgl); pb.put(QUARTZ, q, ql);
         const Substance placer = pb.build();
 
@@ -572,11 +575,125 @@ int main() {
               "with a bed, a gentler hand beats a harder one at every matched recovery");
     }
 
+    // ---- 9. Levigation, and the ratchet that is not one ---------------------
+    // Era 1's separator shares nothing with Era 0's but the velocity it reads.
+    // Everything here is a consequence of `poured(v) = (clear - v*t)/h`, which
+    // has no sharpness in it, and none of it can be tuned.
+    {
+        // The bank, dug for clay rather than for iron.
+        Substance dirt;
+        {
+            const double clayish[N_SIZE] = {0.90, 0.10, 0.00, 0.00};
+            const double sandy[N_SIZE]   = {0.04, 0.16, 0.60, 0.20};
+            const double silty[N_SIZE]   = {0.10, 0.55, 0.35, 0.00};
+            auto put = [&](int p, double frac, const double psd[N_SIZE]) {
+                for (int k = 0; k < N_SIZE; ++k) dirt.freegrain[p][k] = 10.0 * frac * psd[k];
+            };
+            put(KAOLINITE, 0.25, clayish); put(QUARTZ, 0.55, sandy);
+            put(FELDSPAR, 0.15, silty);    put(CALCITE, 0.05, silty);
+        }
+
+        // A batch decant is a ramp in velocity, so its quartile ratio is 3, for
+        // every vessel, every charge and every wait. A pan's imperfection is a
+        // number we authored; levigation's is a number we cannot reach.
+        bool imperf_three = true;
+        for (const Vessel& v : {HOLLOW, Vessel{0.30, 0.15, "pot"}, Vessel{0.02, 0.60, "puddle"}})
+            for (double t : {600.0, 3600.0, 14400.0}) {
+                const double clear = clear_depth(dirt, v, t);
+                if (clear <= 0.0) continue;
+                const double p0 = poured_fraction(0.0, clear, v.depth, t);
+                if (p0 <= 0.0) continue;
+                // v at which the ramp has fallen to 3/4 and 1/4 of its peak.
+                const double v75 = 0.25 * clear / t, v25 = 0.75 * clear / t;
+                const double r75 = poured_fraction(v75, clear, v.depth, t) / p0;
+                const double r25 = poured_fraction(v25, clear, v.depth, t) / p0;
+                if (std::fabs(r75 - 0.75) > 1e-9 || std::fabs(r25 - 0.25) > 1e-9) imperf_three = false;
+                if (std::fabs(v25 / v75 - 3.0) > 1e-9) imperf_three = false;
+            }
+        check(imperf_three, "a batch decant's imperfection is exactly 3, and there is no dial on it");
+
+        // Patience buys grade. It cannot buy recovery.
+        bool grade_up = true, rec_down = true;
+        double pg = -1.0, pr = 2.0;
+        for (double t : {60.0, 300.0, 1200.0, 3600.0, 10800.0}) {
+            const Substance liq = decant(dirt, HOLLOW, t).liquor;
+            if (liq.total_mass() < 1e-9) break;
+            const double g = liq.grade(KAOLINITE), r = recovery(dirt, liq, KAOLINITE);
+            if (g < pg - 1e-9) grade_up = false;
+            if (r > pr + 1e-9) rec_down = false;
+            pg = g; pr = r;
+        }
+        check(grade_up && rec_down, "levigation: waiting longer raises grade and lowers recovery, always");
+
+        const Substance liq1h = decant(dirt, HOLLOW, 3600.0).liquor;
+        double coarse = 0.0;
+        for (int p = 0; p < N_PHASE; ++p) coarse += liq1h.freegrain[p][SAND] + liq1h.freegrain[p][GRAVEL];
+        check(liq1h.grade(KAOLINITE) > 3.0 * dirt.grade(KAOLINITE) && coarse < 1e-9,
+              "one hour in a hole rejects every grain of sand and triples the clay grade");
+
+        // Volume buys recovery -- and so does depth, which the algebra says it
+        // should not, until you remember the clay is falling too.
+        const Vessel flat{0.05, 0.20, "flat"}, deep{0.20, 0.10, "deep"};   // equal volume
+        const double r_flat = recovery(dirt, decant(dirt, flat, 14400.0).liquor, KAOLINITE);
+        const double r_deep = recovery(dirt, decant(dirt, deep, 14400.0).liquor, KAOLINITE);
+        check(std::fabs(flat.volume() - deep.volume()) < 1e-9 && r_deep > 3.0 * r_flat,
+              "at equal volume a deep vessel beats a shallow one: the clay is settling too");
+        std::printf("        (equal %.1f L: deep recovers %.3f, flat %.3f)\n",
+                    flat.volume() * 1000, r_deep, r_flat);
+
+        // A second decant cannot separate a single velocity class. It only taxes it.
+        Substance stage = decant(dirt, HOLLOW, 3600.0).liquor;
+        const double g0 = stage.grade(KAOLINITE), r0 = recovery(dirt, stage, KAOLINITE);
+        for (int i = 0; i < 3; ++i) stage = decant(stage, HOLLOW, 3600.0).liquor;
+        const double g3 = stage.grade(KAOLINITE), r3 = recovery(dirt, stage, KAOLINITE);
+        check(g3 - g0 < 1e-3 && r3 < 0.90 * r0,
+              "re-decanting the liquor is a tax: it cannot divide one velocity class");
+        std::printf("        (3 more decants: grade %.6f -> %.6f, recovery %.4f -> %.4f)\n",
+                    g0, g3, r0, r3);
+
+        // The ratchet. It has exactly one rung.
+        const SeparatorParams raw = fire_pan(dirt);
+        check(raw.sharpness > HANDS.sharpness,
+              "a pot pinched from unlevigated dirt is a WORSE separator than cupped hands");
+        std::printf("        (unlevigated pot sigma %.3f, imperfection %.1f; hands %.2f, %.1f)\n",
+                    raw.sharpness, imperfection(raw), HANDS.sharpness, imperfection(HANDS));
+
+        Vessel ves = HOLLOW; double sig[3] = {0, 0, 0};
+        for (int gen = 0; gen < 3; ++gen) {
+            const Substance body = decant(dirt, ves, 14400.0).liquor;
+            sig[gen] = fire_pan(body).sharpness;
+            ves = throw_pot(body);
+        }
+        check(sig[0] < 0.51 * raw.sharpness && std::fabs(sig[1] - sig[0]) < 1e-6
+                                            && std::fabs(sig[2] - sig[1]) < 1e-6,
+              "and then it stops: generation 1's pan is generation 0's pan, to six places");
+        std::printf("        (sigma: raw %.4f -> gen0 %.4f -> gen1 %.4f -> gen2 %.4f)\n",
+                    raw.sharpness, sig[0], sig[1], sig[2]);
+
+        // Because the grade ceiling was never a property of the tool.
+        double cb = 0.0;
+        for (int p = 0; p < N_PHASE; ++p) cb += dirt.freegrain[p][CLAY];
+        const double ceiling = dirt.freegrain[KAOLINITE][CLAY] / cb;
+        bool pinned = true;
+        for (const Vessel& v : {HOLLOW, Vessel{0.30, 0.15, "pot"}, Vessel{0.40, 0.30, "vat"}})
+            for (double t : {3600.0, 14400.0}) {
+                const Substance liq = decant(dirt, v, t).liquor;
+                if (liq.total_mass() > 1e-9 && std::fabs(liq.grade(KAOLINITE) - ceiling) > 0.01) pinned = false;
+            }
+        check(pinned, "every vessel and every wait lands on the same grade: the dirt's own clay bin");
+        std::printf("        (ceiling %.4f; kaolinite/quartz velocity ratio in clay is %.3fx --\n"
+                    "         the same 1.03x that makes magnetite indistinguishable from hematite)\n",
+                    ceiling, free_velocity(QUARTZ, CLAY) / free_velocity(KAOLINITE, CLAY));
+    }
+
     // ---- The picture -------------------------------------------------------
-    std::printf("\n  settling velocity, m/s (free grains)\n  %-10s %10s %10s %10s\n", "phase", sz(0), sz(1), sz(2));
-    for (int p : {CARBON, QUARTZ, GOETHITE, MAGNETITE, HEMATITE})
-        std::printf("  %-10s %10.3e %10.3e %10.3e\n", PHASES[p].id,
-                    free_velocity(p, FINES), free_velocity(p, SAND), free_velocity(p, GRAVEL));
+    std::printf("\n  settling velocity, m/s (free grains)\n  %-10s %10s %10s %10s %10s\n",
+                "phase", sz(0), sz(1), sz(2), sz(3));
+    for (int p : {CARBON, QUARTZ, GOETHITE, MAGNETITE, HEMATITE}) {
+        std::printf("  %-10s", PHASES[p].id);
+        for (int s = 0; s < N_SIZE; ++s) std::printf(" %10.3e", free_velocity(p, s));
+        std::printf("\n");
+    }
 
     std::printf("\n  grade/recovery, magnetite from sized river sand (feed grade %.3f)\n", feed.grade(MAGNETITE));
     std::printf("  %-8s %6s %10s %10s %8s\n", "tool", "9^sig", "cut m/s", "recovery", "grade");

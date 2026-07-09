@@ -23,9 +23,21 @@ enum PhaseId {
     N_PHASE
 };
 
-// Particle-size bins. The boundaries are what a pan actually distinguishes:
-// fines wash over the lip, sand stratifies, gravel is picked off by hand.
-enum SizeBin { FINES, SAND, GRAVEL, N_SIZE };
+// Particle-size bins.
+//
+// These were once three, and the coarsest three are still the ones a *pan*
+// distinguishes: mud washes over the lip, sand stratifies, gravel is picked off
+// by hand. The pan cannot tell clay from silt and does not need to.
+//
+// Levigation can, and must. *(Split 2026-07-09.)* The old `FINES` bin ran from
+// 3.9 um to 62.5 um and stood for "clay and silt" — but clay and silt are
+// exactly the two things levigation separates, and one bin has one settling
+// velocity, so the model could not perform the process the design's own ratchet
+// is built on. It stalled at 60% kaolinite forever. The boundary that fixes it
+// is 3.9 um, which was already in the code as the bottom edge of `FINES`, and
+// which is the same Wentworth scale everything else here comes from. No new
+// citation was needed to see it; only something that tried to use it.
+enum SizeBin { CLAY, SILT, SAND, GRAVEL, N_SIZE };
 
 struct Phase {
     const char* id;
