@@ -1,0 +1,40 @@
+name: "A number is wrong (with a source)"
+description: "The most valuable issue you can open here. An uncited number is a bug."
+title: "[number] "
+labels: ["source", "correctness"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Every physical number in this project is supposed to carry a citation. Several currently don't — they're marked `UNVERIFIED` and were written from a language model's memory. Those are bugs, and this is the form that fixes them.
+
+        **A correction without a source is an opinion.** We'll take it, but we can't act on it.
+  - type: input
+    id: claim
+    attributes:
+      label: What does the document currently claim?
+      description: Quote it, and say where. A line number or section heading is plenty.
+      placeholder: 'DESIGN.md, Era 4: "Konrad Zuse''s Z3 (1941) was built from roughly two thousand relays."'
+    validations:
+      required: true
+  - type: input
+    id: correction
+    attributes:
+      label: What is actually true?
+      placeholder: "The Z3 used ~2,600 relays: ~1,400 for memory, ~600 for arithmetic."
+    validations:
+      required: true
+  - type: textarea
+    id: source
+    attributes:
+      label: Source
+      description: "Paper, book, standard, handbook, dataset, or a page from someone who does this for a living. A link is fine. A citation is better."
+    validations:
+      required: true
+  - type: textarea
+    id: consequence
+    attributes:
+      label: Does anything downstream change?
+      description: "Optional. If getting this number right changes a process envelope, a tech-tree dependency, or an argument in the doc, say so — that's more useful than the number itself."
+    validations:
+      required: false

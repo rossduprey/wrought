@@ -1,0 +1,43 @@
+name: "Prior art we missed"
+description: "Someone already built this, or part of it. We would rather learn that than build it twice."
+title: "[prior-art] "
+labels: ["prior-art"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        We already know about Vintage Story, Factorio, Satisfactory, and Dwarf Fortress, and we say so in the README. We are certain there is more.
+
+        **Telling us this already exists is a gift, not an insult.** The mission does not require that this project finish — only that the useful parts be correct and free. If someone already made them correct and free, that is the mission succeeding.
+  - type: input
+    id: what
+    attributes:
+      label: What is it?
+      placeholder: "Game, paper, library, dataset, mod, thesis, forum thread from 2009"
+    validations:
+      required: true
+  - type: input
+    id: link
+    attributes:
+      label: Link
+    validations:
+      required: true
+  - type: dropdown
+    id: which-claim
+    attributes:
+      label: Which of our three claims does it undercut?
+      options:
+        - "1. Substance as a composition vector over mineral phases (not a discrete ore item)"
+        - "2. Grade/recovery as the progression axis"
+        - "3. A co-labouring AI actor whose memory is built in the world"
+        - "None of the three — it overlaps the crafting-chain surface, which we already concede is crowded"
+        - "Something else entirely"
+    validations:
+      required: true
+  - type: textarea
+    id: how-close
+    attributes:
+      label: How close is it, really?
+      description: "The three claims are the whole project. If one of them is already done, we would like to know today rather than in a year."
+    validations:
+      required: false

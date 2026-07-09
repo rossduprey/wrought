@@ -1,0 +1,40 @@
+name: "No craftsman would recognise this"
+description: "You do this for real — smelting, ceramics, mineral processing, metalwork — and we described it wrong."
+title: "[process] "
+labels: ["process-fidelity"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This project's entire claim is that the *method* is true. If you have actually run a bloomery, thrown a pot, panned a stream, or worked in a mill, you know things that are not written down anywhere we can find them.
+
+        You do not need a citation for this one. **Your hands are the citation.**
+  - type: input
+    id: process
+    attributes:
+      label: Which process?
+      placeholder: "Levigation / bloomery smelt / panning / charcoal burn / pit firing"
+    validations:
+      required: true
+  - type: textarea
+    id: wrong
+    attributes:
+      label: What did we get wrong?
+      description: "Be as blunt as you like. 'That is not how any of this works' is a complete and welcome sentence."
+    validations:
+      required: true
+  - type: textarea
+    id: real
+    attributes:
+      label: How does it actually go?
+      description: "Especially: where are the real decision points? The moments where it can go wrong and a person has to make a call. Those are what we simulate; the rest we compress."
+    validations:
+      required: false
+  - type: input
+    id: standing
+    attributes:
+      label: How do you know? (optional)
+      description: "Not gatekeeping — it helps us weigh two contradictory answers."
+      placeholder: "I've run a bloomery twice a year for a decade."
+    validations:
+      required: false
