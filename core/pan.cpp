@@ -458,8 +458,8 @@ int main() {
         "   you scoop up is quartz. It always will be.\n\n"
         "   Swirling is not a keypress. It is a motion you keep up. Tap [space]\n"
         "   over and over to hold the water moving; the moment you stop, it dies,\n"
-        "   and a still pan separates nothing. Tap fast to wash hard. Tap slowly\n"
-        "   to wash gently -- and gently is how you keep what you came for.\n\n"
+        "   and a still pan separates nothing. How fast you tap is how hard the\n"
+        "   water runs. What that is worth, nobody is going to tell you.\n\n"
         "   [press any key]\n");
     std::fflush(stdout);
     raw_tty();
