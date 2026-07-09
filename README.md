@@ -23,15 +23,23 @@ An AI and a human build the ancestor of the AI, out of the ground, and it learns
 There is one design document, two license files, and `core/` — a few hundred lines of dependency-free C++17 that pans a bucket of river sand. No engine, no renderer, no art.
 
 ```
-cd core && make test    # 34 assertions about the physics
+cd core && make test    # 41 assertions about the physics
 cd core && make pan     # kneel in the river and wash it yourself
 ```
 
-`make pan` is the same physics with nothing added but *legibility*. You get a knob and a pair of eyes, and no numbers at all until you tip the pan into the poke. It exists because the one question the test suite cannot answer by passing is whether any of this is worth doing for twenty minutes on a Tuesday.
+`make pan` is the same physics with nothing added but *legibility*. It exists because the one question the test suite cannot answer by passing is whether any of this is worth doing for twenty minutes on a Tuesday.
+
+The pan shows you its own composition vector, live, one row per mineral, changing under your hands as you wash. That was not the original design — the original design showed you a picture of a pan and no numbers, on the theory that there is no assay laboratory in a river. But a *score* and a *state* are not the same thing, and only the first one is a lie. A player given one number with an arrow pointing up will optimise it instead of playing; a player given the composition of what is in front of him is being given the thing this project claims is its central novelty, and hiding it made the novelty invisible. The panner has no assay. **The panner is not alone** — claim #3 below is a co-labouring AI, and asking it what is in the dirt is not cheating, it is the relationship. Grade and recovery are always shown together, because either one alone is a score again.
+
+What it does *not* show you is the strategy. Nothing in the game tells you that a gentle hand keeps what you came for. It only tells you which key swirls the water.
 
 It exists to answer one question: does the data model survive contact? It did not. **On its first run it found three errors in the design document** — the substance struct (twice), a missing verb, and a claim that a tradeoff was free when it has to be bought — and it produced a better argument for one of the design's own set pieces than the one that had been written.
 
 Then we acted on one of our own open issues — a suspicion that the model separated on the wrong variable — **and it found four more.** Two tests had been passing for the wrong reason. The grade/recovery law turned out to hold only within a single particle-size class. Stokes' law, which the design proposed to derive its settling numbers from, is wrong by a factor of 136 on gravel. And levigation's "clay stays suspended for an hour" is not a fact about clay; it is a fact about how deep you dug the hole.
+
+Then a human played it for twenty minutes, and **it found one more, which no test could have.** Watching the live composition drain away, he could see that a pan washed for a minute keeps 3% of its black sand. That is false; a real panner does not throw away 97% of his gold. The model had every particle in the pan seeing the same moving water. Real grains stratify — they settle at their own terminal velocity while the swirl stirs them back up, and the equilibrium between those two is the same exponential profile that sets the density of the atmosphere with height. Only the top skin of the pan is in the water. Everything under it is a bed, and a bed cannot be washed away.
+
+The fix added **no new state**. The fraction of a grain population in the exposed skin is `exp(-v/v_mix)`, a function of settling velocity and nothing else; and `v_mix`, the mixing scale, is the shear velocity, which is the cut — the number already on the screen. The pan needs no vertical dimension. What fell out of it, unasked: while the quartz lies on top of the magnetite the magnetite is buried and cannot leave the pan at any cut, so a gentle hand beats a hard one at *every* matched recovery. Patience became a strategy the moment the bed existed, and it was not a strategy the day before. Nobody put it there.
 
 Those corrections are now in the document, dated, next to the sentences they replaced.
 

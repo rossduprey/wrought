@@ -1156,6 +1156,63 @@ Deliverable, in order, in a console harness with no UE editor and no renderer:
    *falls*, because the last few grams of stone outrun every grain of sand and no
    amount of water lifts them over the lip. Stop too late and you have polished
    gravel. That decision was not designed. It fell out of a force balance.
+
+   *(1.5 — three defects found by playing, 2026-07-09. Each one was in the model,
+   not the presentation, which is the argument for a playable core.)*
+
+   - **The assay.** The pan showed weight and colour and no composition, on the
+     stated grounds that "there is no laboratory in a river." That sentence was
+     two claims wearing one coat. A **score** — one number with an arrow pointing
+     up — is a thing the player optimises instead of playing, and refusing to show
+     one was right. But the composition vector is not a score, it is the **state**,
+     and it is claim #1 of this entire project. A simulation that conceals its
+     state is a video with a keyboard attached. And the panner is not alone: the
+     companion is claim #3, and asking it what is in the dirt is the relationship,
+     not a cheat. Grade and recovery are now shown **together**, per phase, live —
+     either alone would be a score again.
+
+   - **The bed.** *(This is the important one.)* With the composition on screen it
+     was immediately visible that a pan washed for a minute keeps 3% of its black
+     sand, which is false. `separate()` assumed every particle in the pan sees the
+     same moving water. Grains settle at terminal velocity while the swirl stirs
+     them back up, and that equilibrium is the exponential (**Rouse**) profile that
+     also sets the density of the atmosphere with height. Only the skin is in the
+     water; below it is a bed, and a bed cannot be washed away.
+
+     The fix required **no new state.** The fraction of a population in the skin is
+     `exp(-v/v_mix)` — settling velocity and nothing else — and `v_mix` is the
+     shear velocity, which *is* the cut, the number already on the screen. The pan
+     needs no vertical dimension, exactly as `liberation` needs no field. Three
+     numbers were authored: the pan's radius, the skin depth in grain diameters,
+     and the bulk density of wet sand. All three are things a person could go and
+     measure with a ruler and a bucket.
+
+     What it bought was not realism. It was the game. Saturation appeared in the
+     normalisation, unasked: while the quartz lies on top of the magnetite the
+     magnetite is buried and cannot leave at *any* cut, so it becomes available to
+     be lost only as the quartz departs. Therefore **a gentle hand beats a hard one
+     at every matched recovery** — at 60% recovery, grade 0.584 gentle against
+     0.255 hard. Before the bed, the same comparison gave 0.260 against 0.211: a
+     spread so thin that washing hard cost nothing, which is precisely why the game
+     had felt like a timer rather than a skill. Patience became a strategy the day
+     the bed existed and was not one the day before, and nobody balanced it.
+
+   - **Teaching the verb — and the first defect here that is not physics.** A swirl
+     is a motion you sustain; a terminal cannot report a held key; so the verb was
+     encoded as an impulse with decay, and the encoding *lied about what the hand
+     was doing*. The player tapped space once per wash for two sessions and the
+     game gave him every signal that he was doing it right. No better `Substance`
+     fixes this. It is the **input device**, and it is the first thing found by
+     playing that a better model cannot repair — which is the clearest signal yet
+     of when the engine stops being a distraction and starts being the work.
+
+     The repair is words, for now, and it draws a line this project will hit at
+     every verb from here to the bloomery: **teach the tool, never the wisdom.**
+     The intro says which key moves the water and how the tempo maps to the wash.
+     It does *not* say that a gentle hand keeps what you came for. That is the
+     lesson, and it is the lesson he is here to discover. A game that states its
+     own conclusion has taught nobody anything. (Ross: *"instructions on how to use
+     the tool, not the learned wisdom that comes from using the tool."*)
 2. **Walk Era 0 → Era 1.** Dig, puddle, decant, get clay. Fire a pan. Show that
    the pan's grade/recovery curve is a function of the clay's fineness — i.e.
    prove the ratchet.
