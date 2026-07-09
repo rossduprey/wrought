@@ -30,6 +30,12 @@ We are publishing all of it unfinished, because the idea is the deliverable and 
 
 It is not a pitch. It's the working document, published whole: the internal reasoning, the LAN hardware it was designed against, the places the model was wrong and got corrected, and the numbers we have not yet verified. Nothing is scrubbed. A sanitised version would hide exactly the material a critic needs.
 
+## Where this comes from
+
+**[Primitive Technology](https://www.youtube.com/@primitivetechnology9550)** — John Plant, alone in a forest, levigating clay out of dirt, firing it in an open pit, burning charcoal in a mound, and smelting iron through a tuyère he made from the same clay. No narration. Nothing skipped. If you want to know what this project is trying to be a simulation *of*, watch an hour of that channel and skip the rest of this document.
+
+He is cited for **method**, not for numbers. The videos show sequence, technique, and where the work actually goes wrong — which is the hard part and the part games always fake. They cannot tell you the reduction temperature of hematite, and we do not pretend they can. Those are two different kinds of evidence and we keep them apart.
+
 ## Three claims
 
 Most of this project's surface is not new. **[Vintage Story](https://www.vintagestory.at/) already ships clay forming, pit kilns, ore panning, and a working bloomery.** Factorio and Satisfactory own automation. Dwarf Fortress owns emergent depth. If you are looking for a survival crafting game, several excellent ones exist and you should go play them.

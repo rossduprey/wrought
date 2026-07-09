@@ -1254,6 +1254,33 @@ Honest survey, so the novel part gets defended instead of assumed:
 - **Factorio, Satisfactory, Foundry** own systemic fidelity and automation.
 - **Dwarf Fortress** owns deep simulation and emergent narrative.
 
+And one reference that is not a game, and is the closest thing this project has to
+a primary source for Era 0 → Era 2:
+
+- **Primitive Technology** — John Plant, <https://www.youtube.com/@primitivetechnology9550>.
+  A man in a forest, with his hands, building the ratchet: levigating clay from
+  dirt, firing pots in an open pit, burning charcoal in a mound, forcing air
+  through a fired-clay tuyère, and smelting iron. No narration, no commentary,
+  nothing skipped. **Cited here as inspiration and as a demonstration of method.**
+
+  Be precise about what it is evidence *for*, because §1a demands it. It shows
+  **sequence, technique, and what the work costs** — which vessel you need before
+  which fire, how many days a burn tends, where a process goes wrong and what it
+  looks like when it does. That is exactly the content of `attention_profile`
+  (§2a): the decision points, at their real offsets, from someone who actually had
+  to make them. It is a *far* better source for that column than a paper.
+
+  It is **not** a source for the `source` column. No thermometer appears; no mass
+  is weighed. A video cannot tell you the reduction temperature of hematite, and
+  citing it as though it could would be precisely the substitution of a beautiful
+  claim for a true one that this document exists to refuse. Two different columns,
+  two different kinds of evidence, and it is worth keeping them apart.
+
+  *(Specific videos are deliberately not cited by title here. Naming an episode
+  from memory is exactly the kind of confident recall §1a exists to distrust. The
+  channel is the citation; mapping individual processes to individual videos, with
+  timestamps, is work nobody has done yet, and it is a tracked issue.)*
+
 What none of them do — and what this project is actually *for*:
 
 1. **Substance as a composition vector over mineral phases, not a discrete ore
