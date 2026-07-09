@@ -8,9 +8,15 @@ There is ground. You take a scoop of it, and what's in it is what's actually in 
 
 So the scarce thing here is never "iron." It's the triple **(mineral, liberation, grade)**. That is what a deposit is, and it is what prospecting is for.
 
-You start with hands. Hands are not *no tool* — they are the worst point on every curve. You dig, you crush a rock against a rock, you wash a handful in a hollow. Eventually you levigate clay out of dirt, pinch it into a bowl, and fire it, and now you have a pan. The pan is bad. How finely you levigated the clay determined how densely it fired, which determines its grade/recovery curve, which determines the purity of your next concentrate — **including your next batch of clay.**
+You start with hands. Hands are not *no tool* — they are the worst point on every curve. You dig, you crush a rock against a rock, you wash a handful in a hollow. Eventually you levigate clay out of dirt, pinch it into a bowl, and fire it, and now you have a pan.
 
-That ratchet is the whole game. Nobody invented it. It is the actual history of technology, and it starts in a mud puddle.
+Every tool you will ever hold is made out of something you separated, and you cannot separate anything without a tool. That gate is the whole game. Nobody invented it — it is the actual history of technology, and it starts in a mud puddle.
+
+What the gate is *not* is a spiral. This document used to claim that a finer levigation fires a denser pan, whose better curve yields a purer concentrate, and therefore a finer clay, and round again forever. We wrote the loop, ran it, and **it turns exactly once.** The pan's sharpness is identical at generation one and generation five, to four decimal places, because the only thing coarse enough to blur a pan is sand — and sand is the first thing to fall out of standing water. Sixty seconds of patience buys the entire improvement. The next forty-five hours buy one part in ten thousand.
+
+So progression is a **staircase, not a ratchet.** Hands, pan, sluice, jig: each is a different *mechanism*, and each has an irreducible sharpness set by its own physics — the wrist, the steadiness of the flow, the pulse. You climb it by inventing the next mechanism, never by refining the last one. That is also the actual history of technology. Nobody perfected the pan. They built a sluice.
+
+And it turns out the first step of the staircase runs *downhill*. A pot pinched from dirt you did not levigate is a **worse** separator than your bare hands — 1.44× enrichment against 1.75×. The clay, not the fire, is what makes pottery worth inventing. We did not design that. We found it.
 
 At the far end, past the bloomery and the drawn copper wire, you build a relay. Then a few thousand of them, which is why automation exists. We simulate relay logic honestly, so **the machine you built actually computes.** A perceptron is weights, a sum, and a threshold; Rosenblatt's was electromechanical. It is buildable from relays and potentiometers made from dirt.
 
@@ -23,8 +29,9 @@ An AI and a human build the ancestor of the AI, out of the ground, and it learns
 There is one design document, two license files, and `core/` — a few hundred lines of dependency-free C++17 that pans a bucket of river sand. No engine, no renderer, no art.
 
 ```
-cd core && make test    # 49 assertions about the physics
-cd core && make pan     # kneel in the river and wash it yourself
+cd core && make test        # 50 assertions about the physics
+cd core && make pan         # kneel in the river and wash it yourself
+cd core && make ratchet-run # watch the design document lose an argument
 ```
 
 `make pan` is the same physics with nothing added but *legibility*. It exists because the one question the test suite cannot answer by passing is whether any of this is worth doing for twenty minutes on a Tuesday.
@@ -41,7 +48,13 @@ Then a human played it for twenty minutes, and **it found one more, which no tes
 
 The fix added **no new state**. The fraction of a grain population in the exposed skin is `exp(-v/v_mix)`, a function of settling velocity and nothing else; and `v_mix`, the mixing scale, is the shear velocity, which is the cut — the number already on the screen. The pan needs no vertical dimension. What fell out of it, unasked: while the quartz lies on top of the magnetite the magnetite is buried and cannot leave the pan at any cut, so a gentle hand beats a hard one at *every* matched recovery. Patience became a strategy the moment the bed existed, and it was not a strategy the day before. Nobody put it there.
 
-Those corrections are now in the document, dated, next to the sentences they replaced.
+Then we built the ratchet in order to prove it, **and it broke the design's central claim.** Two defects had to be fixed before the question could even be asked. The model could not levigate at all: its finest size bin ran from 3.9 µm to 62.5 µm and stood for "clay and silt," which are precisely the two things levigation separates. Its representative diameter, 15.6 µm, *is silt*. The design document had published a settling table — clay takes 9.1 hours to fall through 0.10 m — that `core/` could not reproduce, and drained the whole bin out of that column in 520 seconds instead. Nothing noticed until something tried to use it.
+
+And levigation, once written, authors nothing. A batch decant's partition function can be derived exactly: fill to depth `h`, stir, wait `t`, and a grain falling at `v` has dropped `v·t`, so what you pour off is `(clear − v·t)/h`. It is a ramp in velocity rather than a sigmoid, it terminates, and its imperfection is **exactly 3.0** for every vessel, every charge, and every wait. There is no sharpness to invent. The second separator in the project has no free parameters at all.
+
+With that in hand the loop ran, and did not turn. The clay grade pins at 0.843 in every vessel at every wait, because it was never a property of the tool — it is the composition of the deposit's clay-sized fraction, and clay-sized quartz and clay-sized kaolinite fall at speeds differing by **1.031×**. That is the same 1.03× that makes magnetite indistinguishable from hematite and put the lodestone in Era 0. So Era 1 has a lodestone-shaped hole, and the tool that fills it is real: **deflocculation**, which separates on surface chemistry instead of settling velocity, which every potter on earth does with a handful of wood ash, and which we do not model.
+
+Those corrections are now in the document, dated, next to the sentences they replaced. Including the one on the front page of this file.
 
 We are publishing all of it unfinished, because the idea is the deliverable and because we need people who are not us to look at it. See *What we want from you*.
 

@@ -140,7 +140,6 @@ int main() {
 
     // -- 5. So what would a better pan actually take? ------------------------
     std::printf("\nwhat sharpness is worth what, magnetite over quartz in sand:\n");
-    const double vr = free_velocity(MAGNETITE, SAND) / free_velocity(QUARTZ, SAND);
     for (double sig : {1.20, 0.64, 0.56, 0.55, 0.22})
         std::printf("  sigma %.2f   imperfection %6.2f   enrichment %6.2fx\n",
                     sig, std::pow(9.0, sig), std::pow(vr, 1.0 / sig));
