@@ -1,6 +1,8 @@
 # Contributing
 
-There is no code yet, so there is nothing to build, nothing to test, and no style guide to follow. What there is, is a document making claims about how the physical world works. Those claims can be wrong, and finding out that they are is currently the whole job.
+There is now a little code. It is six headers and three programs in `core/`, it needs nothing but `g++` and `make`, and `make test` runs in under a second. `RUNBOOK.md` says how it is built and how it is worked on.
+
+But the code is not the point and is not where the risk is. What this project mostly is, is a document making claims about how the physical world works. Those claims can be wrong, and finding out that they are is still the whole job. The code exists to make some of them checkable — and the first time it was pointed at the design document's central mechanism, the mechanism failed. That is the intended use.
 
 ## The one rule
 
@@ -10,7 +12,9 @@ Every physical quantity in this project carries a `source`. Reduction temperatur
 
 This is not pedantry. It is the difference between a project a metallurgy student can use and a project that merely says the word "realism" a lot. It also means **we cannot quietly balance a number** — to change one you have to change its citation, and there isn't one, because reality does not negotiate.
 
-Several `UNVERIFIED` numbers currently sit in `DESIGN.md`, written from a language model's memory. Replacing one with a source is the most valuable thing anyone can do here today.
+Several `UNVERIFIED` numbers sit in `DESIGN.md` and in `core/phase_table.h`, written from a language model's memory. Replacing one with a source is the most valuable thing anyone can do here today.
+
+There is a second kind, and the code distinguishes them. An **unverified** number has a right answer somebody could look up — the density of ilmenite, the viscosity of water. An **authored** number does not: it was chosen by a human because it felt right, like the blur of a wrist or the wall thickness a pinch pot can hold. Both are tracked issues, labelled `unverified-number` and `authored-number`. An authored number cannot be sourced, so the useful contribution is to show that a *finding* depends on it — and to say which way the finding moves if it changes.
 
 ## What is most useful, in order
 
@@ -34,4 +38,4 @@ Be as blunt as the argument requires. Do not be cruel to people. The document is
 
 ## Licence
 
-Contributions to documentation and data are under [CC-BY-4.0](LICENSE-docs); contributions to code, when code exists, are under [Apache-2.0](LICENSE). By opening a pull request you agree your contribution ships under those terms.
+Contributions to documentation and data are under [CC-BY-4.0](LICENSE-docs); contributions to code are under [Apache-2.0](LICENSE). By opening a pull request you agree your contribution ships under those terms.
