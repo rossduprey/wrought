@@ -34,10 +34,44 @@
 // authored numbers traded for one, which is the same trade the settling-velocity
 // rewrite made, and it is starting to look like a law.
 //
-// The player is shown weight, colour, and what leaves the pan. He is never shown
-// a grade. Grade is an assay, and there is no laboratory in a river. Put a live
-// percentage on the screen and he will optimise the percentage and never look at
-// the sand again.
+// -- The third version, and why. --------------------------------------------
+//
+// The second version showed weight, colour, and what left the pan, and nothing
+// else. The comment that used to sit here said: "He is never shown a grade.
+// Grade is an assay, and there is no laboratory in a river. Put a live
+// percentage on the screen and he will optimise the percentage and never look
+// at the sand again."
+//
+// That was two claims wearing one coat, and only one of them was true.
+//
+// The true one: a *score* — one number, with an arrow pointing up — is a thing
+// the player optimises instead of playing. That danger is real and it is why
+// there is still no score in here, no target, and no win.
+//
+// The false one: that the composition of the pan is a score. It is not. It is
+// the **state**, and the state is the whole claim this project makes. There is
+// no `iron ore` item; there is a vector over mineral phases, and if we hide it
+// then the one thing that distinguishes this from every other panning minigame
+// ever shipped is invisible to the person we built it for. A simulation that
+// conceals its state is a video with a keyboard attached.
+//
+// And "there is no laboratory in a river" was answering a question nobody asked.
+// The panner has no assay. The panner is not alone. README claim #3 is a
+// co-labouring AI that stands next to you and knows things, and *what is in this
+// dirt* is precisely the kind of thing it is for. Asking it is not cheating. It
+// is the relationship.
+//
+// So: the assay panel is live, it is always on, and it shows grade and recovery
+// **together**, for every phase, because those are the two halves of the law and
+// showing one without the other is what a score would be. Grade rises. Recovery
+// only ever falls. Watching those two columns move in opposite directions, in
+// real time, under your own hand, is the entire lesson of Era 0 and it took
+// eleven lines of printf.
+//
+//   (Ross, having played v2: "i do not see the contents of the sand, and this is
+//   probably the most important part. like asking you for the details of an
+//   object... as i pan, the percentages of the minerals should change right in
+//   front of me.")
 //
 // Build: make pan   (needs a terminal; it reads single keypresses)
 
@@ -46,6 +80,8 @@
 #include <cmath>
 #include <csignal>
 #include <ctime>
+#include <cstdarg>
+#include <initializer_list>
 #include <string>
 #include <termios.h>
 #include <unistd.h>
@@ -126,6 +162,18 @@ static double bin_mass(const Substance& s, int bin) {
 static double black_frac(const Substance& s) {
     const double m = s.total_mass();
     return m > 1e-9 ? black_mass(s) / m : 0.0;
+}
+
+// Iron that is glued to quartz. It is in the pan, it will not come out, and no
+// amount of washing will change that -- only a rock will. This is the grade
+// ceiling, and it is the only number in the panel that argues for a verb the
+// player does not have yet.
+static double locked_black(const Substance& s) {
+    constexpr double f = COMPOSITE_TARGET_FRACTION;
+    double t = 0.0;
+    for (int p : {MAGNETITE, HEMATITE, ILMENITE})
+        for (int b = 0; b < N_SIZE; ++b) t += f * s.composite[p][b];
+    return t;
 }
 
 static const char* colour_word(double bf) {
@@ -247,7 +295,73 @@ static void nap(double seconds) {
 // The bottom of the pan fills with '#' as the black sand concentrates. That is a
 // live grade readout that never says a number, and it is the only one he gets.
 
-static const int PAN_W = 34;
+static const int PAN_W = 30;
+static const int PANEL_COL = 42;
+
+// Which phases this scoop actually contains, heaviest first. Fixed at the moment
+// you dig, and never re-sorted -- a table whose rows swap places while you read
+// them is a table you cannot read. The order is information too: it is what the
+// ground gave you, and it does not change just because you washed it.
+struct Assay {
+    int order[N_PHASE];
+    int n = 0;
+};
+
+static Assay assay_of(const Substance& s) {
+    Assay a;
+    for (int p = 0; p < N_PHASE; ++p)
+        if (s.phase_mass(p) > 1e-6) a.order[a.n++] = p;
+    for (int i = 1; i < a.n; ++i) {
+        const int k = a.order[i];
+        int j = i - 1;
+        while (j >= 0 && s.phase_mass(a.order[j]) < s.phase_mass(k)) { a.order[j+1] = a.order[j]; --j; }
+        a.order[j+1] = k;
+    }
+    return a;
+}
+
+// Grade and recovery, side by side, one row per mineral. Neither column is a
+// score, because they move in opposite directions and you cannot have both. That
+// sentence is the design of the whole game and here it is as two columns of
+// printf.
+static void draw_assay(const Substance& pan, const Substance& origin,
+                       const Assay& a, const char* arrow) {
+    const double m = pan.total_mass();
+    int row = 2;
+    auto line = [&](const char* fmt, ...) {
+        std::printf("\033[%d;%dH", row++, PANEL_COL);
+        va_list ap; va_start(ap, fmt); std::vprintf(fmt, ap); va_end(ap);
+    };
+
+    line("what the pan holds");
+    line("%-10s %6s %7s %6s", "", "grams", "grade", "kept");
+    line("%s", "----------------------------------");
+
+    for (int i = 0; i < a.n; ++i) {
+        const int p = a.order[i];
+        const double mp = pan.phase_mass(p);
+        const double o  = origin.phase_mass(p);
+        if (mp * 1000.0 < 0.05 && o > 1e-6) {
+            line("%-10s %6s %7s %6s %c", PHASES[p].id, "-", "-", "gone", ' ');
+            continue;
+        }
+        line("%-10s %6.1f %6.1f%% %5.0f%% %c",
+             PHASES[p].id, mp * 1000.0,
+             m > 1e-9 ? 100.0 * mp / m : 0.0,
+             o > 1e-9 ? 100.0 * mp / o : 0.0,
+             arrow[p]);
+    }
+
+    const double blk = black_mass(pan), blk0 = black_mass(origin);
+    const double lok = locked_black(pan);
+    line("%s", "----------------------------------");
+    line("%-10s %6.1f %6.1f%% %5.0f%%", "black sand", blk * 1000.0,
+         m > 1e-9 ? 100.0 * blk / m : 0.0,
+         blk0 > 1e-9 ? 100.0 * blk / blk0 : 0.0);
+    if (lok * 1000.0 > 0.05)
+        line("  %.1f g of it is locked in quartz", lok * 1000.0);
+    line("  washed away: %.0f g", (origin.total_mass() - m) * 1000.0);
+}
 
 static const char* AMBIENT[] = {
     "a bird you do not know the name of says the same thing four times",
@@ -265,7 +379,8 @@ static const int N_AMBIENT = (int)(sizeof(AMBIENT) / sizeof(AMBIENT[0]));
 
 struct Plume { double mass, black, fines; };
 
-static void draw(const Substance& pan, double cut, double t,
+static void draw(const Substance& pan, const Substance& origin, const Assay& assay,
+                 const char* arrow, double cut, double t,
                  const Plume plume[], int plume_n, int plume_head,
                  const char* ambient, const char* nag) {
     std::printf("\033[H\033[J");
@@ -316,7 +431,10 @@ static void draw(const Substance& pan, double cut, double t,
     if (gr > 0.10) std::printf("   there are stones in it.\n");
 
     std::printf("\n   %s\n", nag ? nag : "");
-    std::printf("\n   [space] swirl   [p] pick a stone out   [k] keep it   [n] new pan   [q] quit\n");
+    std::printf("\n   [space] swirl   [p] pick a stone   [k] keep it   [n] new pan   [q] quit\n");
+
+    draw_assay(pan, origin, assay, arrow);
+    std::printf("\033[23;1H");
     std::fflush(stdout);
 }
 
@@ -344,6 +462,13 @@ int main() {
     double cut = 0.0, t = 0.0;
     int deposit = 0;
 
+    // Is this mineral's share of the pan rising or falling right now? Sampled on
+    // a slow clock, because an arrow that flickers is an arrow nobody reads.
+    Assay assay = assay_of(origin);
+    char arrow[N_PHASE] = {};
+    double grade_was[N_PHASE] = {}, arrow_t = 0.0;
+    for (int p = 0; p < N_PHASE; ++p) { arrow[p] = ' '; grade_was[p] = origin.grade(p); }
+
     Plume plume[3] = {};
     int plume_head = 0;
     double plume_acc_m = 0, plume_acc_b = 0, plume_acc_f = 0, plume_t = 0;
@@ -363,6 +488,8 @@ int main() {
                 deposit = (deposit + 1) % 3;
                 pan = deposit == 0 ? river_sand() : deposit == 1 ? black_sand_bar() : weathered_outcrop();
                 origin = pan; cut = 0;
+                assay = assay_of(origin);
+                for (int p = 0; p < N_PHASE; ++p) { arrow[p] = ' '; grade_was[p] = origin.grade(p); }
                 nag = deposit == 0 ? "You scoop up river sand."
                     : deposit == 1 ? "You dig into the inside of the bend, where the sand is dark."
                                    : "You break a lump off the outcrop and drop it in the pan.";
@@ -409,10 +536,20 @@ int main() {
             plume_acc_m = plume_acc_b = plume_acc_f = plume_t = 0;
         }
 
+        if (t >= arrow_t) {
+            for (int p = 0; p < N_PHASE; ++p) {
+                const double g = pan.grade(p), d = g - grade_was[p];
+                arrow[p] = d > 1e-4 ? '^' : d < -1e-4 ? 'v' : ' ';
+                grade_was[p] = g;
+            }
+            arrow_t = t + 0.5;
+        }
+
         if (t > ambient_t) { ambient = AMBIENT[(int)(t / 37) % N_AMBIENT]; ambient_t = t + 37; }
         if (t > nag_t) nag.clear();
 
-        draw(pan, cut, t, plume, 3, plume_head, ambient, nag.empty() ? nullptr : nag.c_str());
+        draw(pan, origin, assay, arrow, cut, t, plume, 3, plume_head,
+             ambient, nag.empty() ? nullptr : nag.c_str());
         nap(DT);
     }
 
