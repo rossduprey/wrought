@@ -695,6 +695,25 @@ int main() {
         std::printf("        (ceiling %.4f; kaolinite/quartz velocity ratio in clay is %.3fx --\n"
                     "         the same 1.03x that makes magnetite indistinguishable from hematite)\n",
                     ceiling, free_velocity(QUARTZ, CLAY) / free_velocity(KAOLINITE, CLAY));
+
+        // Grade pinned + recovery raised = the curve moved OUTWARD. A bigger pot
+        // is a better tool by this project's own definition, and it is not
+        // throughput: it digs no more dirt, it loses less of the clay in what it
+        // has. Throughput would be a bigger shovel, and a bigger shovel moves
+        // nothing. That distinction is one the README got wrong for an hour.
+        const Vessel pot{0.30, 0.15, "pot"};
+        const Substance lh = decant(dirt, HOLLOW, 14400.0).liquor;
+        const Substance lp = decant(dirt, pot,    14400.0).liquor;
+        const double rec_h = recovery(dirt, lh, KAOLINITE), rec_p = recovery(dirt, lp, KAOLINITE);
+        check(std::fabs(lp.grade(KAOLINITE) - lh.grade(KAOLINITE)) < 0.01 && rec_p > 10.0 * rec_h,
+              "a bigger pot moves the curve outward: same grade, an order more recovery");
+
+        Substance big = dirt; big.add(dirt);   // a bigger shovel: twice the charge
+        const Substance lb = decant(big, HOLLOW, 14400.0).liquor;
+        check(recovery(big, lb, KAOLINITE) < rec_h,
+              "and a bigger shovel moves nothing outward: that is what throughput is");
+        std::printf("        (recovery: hollow %.4f, pot %.4f, hollow with a double charge %.4f)\n",
+                    rec_h, rec_p, recovery(big, lb, KAOLINITE));
     }
 
     // ---- The picture -------------------------------------------------------

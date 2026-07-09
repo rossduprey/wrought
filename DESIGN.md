@@ -587,12 +587,24 @@ forty-five hours of patience change it by one part in ten thousand. Every gram o
 narrative weight this document placed on *"how finely you levigate"* is carried by
 the first minute, and there is nothing left over to spend on a spiral.
 
-**Where the loop actually runs.** It runs through recovery, not purity. The
-pourable fraction of a vessel is set by how much of it the sediment fills, so a
-bigger pot returns more clay per charge — 4.8% in the hollow, 68% in a large pot,
-at a matched wait. That is throughput, and §2a says in as many words that
-progression here is purity and *not* throughput. The one loop we found is
-running along the axis the design forbids.
+**Where the loop actually runs.** It runs through recovery. The pourable fraction
+of a vessel is set by how much of it the sediment fills, so a bigger pot returns
+more clay per charge — 4.8% in the hollow, 68% in a large pot, **at an identical
+grade of 0.843.**
+
+*(This paragraph first read: "That is throughput, and §2a forbids throughput as a
+progression axis, so the one loop we found runs along the axis the design forbids."
+That was wrong, and it was wrong in a way worth keeping. Better recovery at matched
+grade is the grade/recovery curve **moving outward** — it is the law of §2a, not a
+violation of it. **Throughput is a bigger shovel:** more dirt per hour, same curve.
+A bigger pot digs no more dirt; it loses less of the clay in the dirt it already
+has. The word doing the damage was "purity", which we had been using as shorthand
+for a two-axis law, and which quietly demoted half of it. Corrected here and on the
+front page.)*
+
+So the vessel *is* a better tool, by the project's own definition, and Era 1 does
+earn its progression. What it does not do is feed that progression back into the
+pan, which is the loop the ratchet claimed and the measurement denies.
 
 **And the grade ceiling was never a property of the tool at all.** Every vessel,
 at every wait, lands on the same clay: 0.843 kaolinite, 8% quartz, and it cannot

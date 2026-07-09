@@ -29,7 +29,7 @@ An AI and a human build the ancestor of the AI, out of the ground, and it learns
 There is one design document, two license files, and `core/` — a few hundred lines of dependency-free C++17 that pans a bucket of river sand. No engine, no renderer, no art.
 
 ```
-cd core && make test        # 50 assertions about the physics
+cd core && make test        # 52 assertions about the physics
 cd core && make pan         # kneel in the river and wash it yourself
 cd core && make ratchet-run # watch the design document lose an argument
 ```
@@ -76,7 +76,9 @@ Three things, as far as we can tell, do not exist anywhere:
 
 1. **Substance as a composition vector over mineral phases, not a discrete ore item.** Every other game has `iron ore` in the inventory with a stack count. Here there is only ground, and whatever you managed to get out of it. The finished bar carries the composition of the scoop it descends from — it cracks under the hammer because there was pyrite in the sand, not because a `quality` float rolled low.
 
-2. **Grade/recovery as the progression axis.** Grade trades against recovery, always: pan hard and what's left is clean but half of it went over the lip; pan gently and you keep everything, including the quartz you will pay for later in slag. This is the central law of mineral processing and it has been measured ten thousand times. A better tool does not make more iron appear — **it moves the curve.** No game has been built on this. Progression is purity, not throughput.
+2. **Grade/recovery as the progression axis.** Grade trades against recovery, always: pan hard and what's left is clean but half of it went over the lip; pan gently and you keep everything, including the quartz you will pay for later in slag. This is the central law of mineral processing and it has been measured ten thousand times. A better tool does not make more iron appear — **it moves the curve.** No game has been built on this.
+
+   Progression is **the curve**, which has two axes: better grade at a matched recovery, or better recovery at a matched grade. It is never mass per hour. *(This sentence used to read "progression is purity, not throughput," and step 2 caught it. A fired pot returns 68% of the clay in a charge where a scraped hollow returns 4.8%, at an identical grade of 0.843 — that is the recovery axis moving outward, and for an hour we mistook it for throughput and thought we had contradicted ourselves. We had not. **Throughput is a bigger shovel:** more dirt per hour, same curve, no progression. A bigger pot digs no more dirt. It loses less of the clay in the dirt it already has.)*
 
    We do not author that curve, because a curve you author is a curve you balance. A separator is a partition function: the probability a particle reports to the concentrate, given the speed at which it falls through water — which is its density and its size, together, solved from a force balance rather than looked up. The operator picks the cut; the tool sets how sharp it is. The curve is the *output*.
 
