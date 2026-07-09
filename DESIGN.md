@@ -1114,6 +1114,48 @@ Deliverable, in order, in a console harness with no UE editor and no renderer:
 
    If a number in `phase_table.h` is corrected and a test outcome changes, the
    test was measuring the fixture instead of the model, and the test is wrong.
+
+   **1.5. Play the pan.** *(Added 2026-07-09 — `make pan`. Ross: "if this is not
+   fun then it fails," and no test can report on that.)* A test suite cannot tell
+   you whether the grade/recovery tradeoff is a game or a spreadsheet. Somebody
+   has to kneel in the river. Two versions, and the first one was wrong in a way
+   worth recording:
+
+   - v1 was a **command parser**. You typed `wash 3` and it called `separate()`
+     once, at a cut chosen from a table of seven. Played, it produced: *"learning
+     the interface was most of the work… I am more interested in what actions I
+     need to take to win the game than to learn what this is teaching me… there
+     was no persistent display showing me data that changed as I worked the pan,
+     so I wasn't seeing the consequences of my actions in realtime."*
+   - That was a defect in the **model**, not the presentation. A wash is not one
+     call to `separate()` at an operator-chosen cut. **The cut is the
+     instantaneous speed of the water**; it changes continuously as the hands
+     move; and the only decision a panner makes is *when to stop*, which he makes
+     over and over, with his eyes, while it is happening. v1 simulated the outcome
+     and asked the player to type it, so of course he optimised the outcome.
+   - v2 calls `separate()` every tick at whatever cut the hand is producing, and
+     redraws the pan. The table of seven cuts was **deleted** and replaced by one
+     time constant, which provably cannot move the tradeoff curve — retention
+     depends on time only through `t/τ`, so `τ` sets how fast your hands are and
+     nothing else. Seven authored numbers traded for one that cannot lie. This is
+     the third time a fidelity increase has *shrunk* the model, and it has stopped
+     looking like a coincidence.
+
+   And playing it found a defect no test had: **a screen has two misplacements,
+   not one.** `screen()` took a single efficiency and used it in both directions,
+   so picking pebbles out of a pan by hand cost 15% of the sand per pick. It does
+   not. A real screen's Tromp curve reports the two independently; hand-cobbing
+   misses 40% of the stones and drops under 1% of the sand, and a one-parameter
+   screen **cannot represent that verb at all**. The Era 0 verb the design had
+   named for three eras was unimplementable in the model that was supposed to
+   contain it, and only a person trying to play it noticed.
+
+   *What it is for:* the grade/recovery law is now something you feel in your
+   hands. The interior optimum in wash time is real and nobody put it there —
+   grade climbs 0.12 → 0.67 over about a minute of gentle swirling and then
+   *falls*, because the last few grams of stone outrun every grain of sand and no
+   amount of water lifts them over the lip. Stop too late and you have polished
+   gravel. That decision was not designed. It fell out of a force balance.
 2. **Walk Era 0 → Era 1.** Dig, puddle, decant, get clay. Fire a pan. Show that
    the pan's grade/recovery curve is a function of the clay's fineness — i.e.
    prove the ratchet.

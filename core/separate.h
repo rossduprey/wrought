@@ -95,16 +95,27 @@ inline SeparationResult separate(const Substance& in, const SeparatorParams& sp)
 // obeys the grade/recovery law only within one size class. `separate()` will
 // happily concentrate a pebble.
 //
-// `efficiency` is the fraction of each particle that reports where it belongs;
-// the remainder is misplaced. AUTHORED, UNVERIFIED. A perfect screen is 1.0 and
-// does not exist.
+// A separator has **two** misplacements, not one.
+//
+// *(Corrected 2026-07-09, found by playing `make pan` rather than by a test.)*
+// This used to take a single `efficiency` and use it in both directions: coarse
+// reported oversize with probability e, and fine was misplaced oversize with
+// probability 1-e. That is a symmetric special case with no reason to be true,
+// and it makes hand-picking pebbles out of a pan cost 15% of your sand per pick.
+// It does not. A real screen's Tromp curve reports the two independently, and so
+// do we now. The old one-argument call survives as the symmetric case.
+struct ScreenParams {
+    double coarse_to_oversize;  // recovery of what belongs on top
+    double fine_to_oversize;    // misplacement of what belongs below
+    int    cut_bin;             // finest bin that belongs on top
+};
 struct ScreenResult { Substance oversize, undersize; };
 
-inline ScreenResult screen(const Substance& in, double efficiency, int cut_bin = GRAVEL) {
+inline ScreenResult screen(const Substance& in, const ScreenParams& sp) {
     ScreenResult out;
     for (int p = 0; p < N_PHASE; ++p)
         for (int s = 0; s < N_SIZE; ++s) {
-            const double to_over = (s >= cut_bin) ? efficiency : (1.0 - efficiency);
+            const double to_over = (s >= sp.cut_bin) ? sp.coarse_to_oversize : sp.fine_to_oversize;
             out.oversize.freegrain[p][s]  = in.freegrain[p][s] * to_over;
             out.undersize.freegrain[p][s] = in.freegrain[p][s] * (1.0 - to_over);
             out.oversize.composite[p][s]  = in.composite[p][s] * to_over;
@@ -112,6 +123,18 @@ inline ScreenResult screen(const Substance& in, double efficiency, int cut_bin =
         }
     return out;
 }
+
+inline ScreenResult screen(const Substance& in, double efficiency, int cut_bin = GRAVEL) {
+    return screen(in, ScreenParams{efficiency, 1.0 - efficiency, cut_bin});
+}
+
+// Cobbing: picking stones out of a pan with your fingers. DESIGN.md Era 0 calls
+// it "high grade, near-zero throughput, coarse liberated material only." Those
+// are exactly the two numbers above and they are nothing like each other. You
+// miss a lot of pebbles; you drop almost no sand. AUTHORED, UNVERIFIED — and
+// note that a single-efficiency screen *cannot represent this verb at all*,
+// which is how the defect was found.
+inline constexpr ScreenParams HAND_COB = {0.60, 0.008, GRAVEL};
 
 // Crushing does two things with one blow: it breaks composites, freeing what was
 // locked inside them, and it drives mass into finer bins where a pan cannot hold
