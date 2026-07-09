@@ -130,17 +130,21 @@ static Substance wash_tick(Substance& pan, double cut, Substance& out_lost) {
     sp.cut_velocity = (cut < 1e-9) ? 1e-9 : cut;
     const double e = DT / PASS_TAU;
 
-    Substance stay, gone;
+    // Only the skin is in the water. The rest is bed, and the bed is safe. The
+    // mixing scale is the cut itself: how hard you are swirling is how deep you
+    // are stirring. Nothing else about the pan's geometry enters the wash.
+    const Substance top = exposed(pan, cut, skin_mass());
+
+    Substance gone;
     for (int p = 0; p < N_PHASE; ++p)
         for (int s = 0; s < N_SIZE; ++s) {
             const double rf = std::pow(partition(free_velocity(p, s), sp), e);
             const double rc = std::pow(partition(composite_velocity(p, s), sp), e);
-            stay.freegrain[p][s] = pan.freegrain[p][s] * rf;
-            gone.freegrain[p][s] = pan.freegrain[p][s] * (1.0 - rf);
-            stay.composite[p][s] = pan.composite[p][s] * rc;
-            gone.composite[p][s] = pan.composite[p][s] * (1.0 - rc);
+            gone.freegrain[p][s] = top.freegrain[p][s] * (1.0 - rf);
+            gone.composite[p][s] = top.composite[p][s] * (1.0 - rc);
+            pan.freegrain[p][s] -= gone.freegrain[p][s];
+            pan.composite[p][s] -= gone.composite[p][s];
         }
-    pan = stay;
     out_lost = gone;
     return gone;
 }

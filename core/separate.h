@@ -86,6 +86,79 @@ inline SeparationResult separate(const Substance& in, const SeparatorParams& sp)
     return out;
 }
 
+// The bed.
+//
+// separate() above assumes every particle in the pan sees the same water. It does
+// not. Grains settle at their terminal velocity and the swirl stirs them back up,
+// and the equilibrium between those two is the same one that sets the density of
+// the atmosphere with height: an exponential profile,
+//
+//     c(z) proportional to exp(-v*z/D)
+//
+// with D the shear-induced diffusivity. Sediment transport calls this the Rouse
+// profile and has been measuring it since 1937. Only the top of the pan is in the
+// moving water; everything under it is a bed, and a bed cannot be washed away.
+//
+// So the fraction of a grain population sitting in the exposed skin is a Boltzmann
+// factor in settling velocity, exp(-v/v_mix), where v_mix = D/h absorbs the skin
+// depth. **The pan needs no vertical dimension.** The vertical dimension is
+// derived from velocity, exactly as liberation is derived from the free/composite
+// split and never stored.
+//
+// v_mix is not a free parameter either. D ~ u* h, so v_mix ~ u*, the shear
+// velocity -- which is the cut. Swirl hard and everything mixes and everything is
+// exposed; swirl gently and the magnetite hides underneath the quartz. It is the
+// number already on the screen. Nothing is authored here but the geometry of the
+// pan itself.
+//
+// This is why a real panner does not lose his gold. While 1900 g of quartz lies on
+// top of the magnetite, the magnetite is buried and cannot leave the pan at any
+// cut. It becomes exposed only as the quartz departs. The saturation is in the
+// normalisation, and nobody put it there.
+//
+// *(Added 2026-07-09. Found by watching a live recovery column drain to 3% on a
+// pan that had been washed for a minute -- which is false, and which the test
+// suite could not see, because a test calls separate() a fixed number of times.)*
+
+// A pan is about 30 cm across; the water strips a skin a few grain diameters
+// deep; wet sand packs at roughly 1600 kg/m^3. AUTHORED, and each factor is a
+// thing a person could go and measure with a ruler and a bucket.
+inline constexpr double PAN_RADIUS   = 0.15;   // m
+inline constexpr double SKIN_GRAINS  = 3.0;    // skin depth, in sand-grain diameters
+inline constexpr double BULK_DENSITY = 1600.0; // kg/m^3, packed wet sand. UNVERIFIED.
+
+inline double skin_mass() {
+    return M_PI * PAN_RADIUS * PAN_RADIUS * SKIN_GRAINS * bin_diameter(SAND) * BULK_DENSITY;
+}
+
+// The part of the pan the water can actually reach, this instant, at this cut.
+// Still water reaches nothing: as v_mix -> 0 every weight underflows and the bed
+// is the whole pan. That is the same physical statement as the cut clamp in
+// pan.cpp, arrived at from the other side.
+inline Substance exposed(const Substance& pan, double v_mix, double skin) {
+    Substance top;
+    if (v_mix <= 0.0 || skin <= 0.0) return top;
+
+    double w[N_PHASE][N_SIZE][2], total = 0.0;
+    for (int p = 0; p < N_PHASE; ++p)
+        for (int s = 0; s < N_SIZE; ++s) {
+            w[p][s][0] = std::exp(-free_velocity(p, s) / v_mix);
+            w[p][s][1] = std::exp(-composite_velocity(p, s) / v_mix);
+            total += pan.freegrain[p][s] * w[p][s][0] + pan.composite[p][s] * w[p][s][1];
+        }
+    if (total <= 0.0) return top;
+
+    // Fill the skin. A cell cannot contribute more than it has, which is what
+    // caps the whole pan being in the skin once the pan is smaller than one.
+    const double k = skin / total;
+    for (int p = 0; p < N_PHASE; ++p)
+        for (int s = 0; s < N_SIZE; ++s) {
+            top.freegrain[p][s] = pan.freegrain[p][s] * std::fmin(1.0, w[p][s][0] * k);
+            top.composite[p][s] = pan.composite[p][s] * std::fmin(1.0, w[p][s][1] * k);
+        }
+    return top;
+}
+
 // A screen is a separation by size and nothing else. It is the verb that makes
 // crushing worth doing, and Era 0 in DESIGN.md did not have it.
 //

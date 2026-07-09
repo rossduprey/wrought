@@ -496,6 +496,82 @@ int main() {
         std::printf("        (locked outcrop, screen 0.50: recovery %.3f uncrushed -> %.3f at intensity %.2f)\n", r0, br, bi);
     }
 
+    // ---- 8. The bed, and why a gentle hand beats a hard one -----------------
+    // separate() washes every particle in the pan. A real pan washes only its
+    // skin, because the heavies stratify underneath and a bed cannot be carried
+    // off. exposed() is that skin, and it is derived: an exponential (Rouse)
+    // concentration profile in settling velocity, normalised to the skin's mass.
+    //
+    // The consequence is not a small correction. Without a bed, how hard you swirl
+    // barely changes the concentrate you can reach at a given recovery — the only
+    // decision is when to stop, which a player feels as a timer. With a bed, a
+    // gentle hand keeps the magnetite buried while the quartz walks off the top,
+    // and patience becomes a strategy the physics rewards. Nobody balanced that.
+    {
+        const double skin = skin_mass();
+
+        // A skin is part of the pan, and it is not bigger than the pan.
+        bool subset = true, capped = true;
+        for (double v : {0.010, 0.045, 0.200, 5.0}) {
+            const Substance top = exposed(feed, v, skin);
+            if (top.total_mass() > skin + 1e-12) capped = false;
+            for (int p = 0; p < N_PHASE; ++p)
+                for (int s = 0; s < N_SIZE; ++s)
+                    if (top.freegrain[p][s] > feed.freegrain[p][s] + 1e-12 ||
+                        top.composite[p][s] > feed.composite[p][s] + 1e-12) subset = false;
+        }
+        check(subset, "the exposed skin is a subset of the pan, cell by cell");
+        check(capped, "and it never holds more than the skin's own mass");
+
+        check(exposed(feed, 0.0, skin).total_mass() < 1e-12,
+              "still water reaches nothing: with no mixing the whole pan is bed");
+
+        // The skin is what the water sees, so the skin is poor in the heavy stuff.
+        // This one inequality is the entire mechanism.
+        const Substance top = exposed(feed, 0.045, skin);
+        check(top.grade(MAGNETITE) < feed.grade(MAGNETITE),
+              "the skin is depleted in the fastest-settling phase: that is what a bed IS");
+        std::printf("        (skin %.0f g of %.0f g; magnetite %.3f in the pan, %.3f in the skin)\n",
+                    skin * 1000.0, feed.total_mass() * 1000.0, feed.grade(MAGNETITE), top.grade(MAGNETITE));
+
+        // Swirl hard enough and the profile flattens: the skin is a fair sample of
+        // the pan, and the bed stops protecting anything. The limit is the old model.
+        const Substance stirred = exposed(feed, 1e6, skin);
+        check(std::fabs(stirred.grade(MAGNETITE) / feed.grade(MAGNETITE) - 1.0) < 1e-3,
+              "swirl hard enough and stratification vanishes: the skin samples the pan");
+
+        // The law itself. Wash a picked pan continuously at three cuts, stop each
+        // at the same recovery, and compare the concentrates. Gentle must win at
+        // every matched recovery, exactly as a sharper tool does.
+        auto wash_to = [&](double cut, double target_rec) {
+            Substance pan = feed;
+            const double b0 = pan.phase_mass(MAGNETITE);
+            SeparatorParams sp = PAN; sp.cut_velocity = cut;
+            const double e = 0.05 / 1.50;
+            for (int i = 0; i < 400000; ++i) {
+                const Substance sk = exposed(pan, cut, skin);
+                for (int p = 0; p < N_PHASE; ++p)
+                    for (int s = 0; s < N_SIZE; ++s) {
+                        pan.freegrain[p][s] -= sk.freegrain[p][s] * (1.0 - std::pow(partition(free_velocity(p, s), sp), e));
+                        pan.composite[p][s] -= sk.composite[p][s] * (1.0 - std::pow(partition(composite_velocity(p, s), sp), e));
+                    }
+                if (pan.phase_mass(MAGNETITE) <= target_rec * b0) break;
+            }
+            return pan.grade(MAGNETITE);
+        };
+
+        bool patience_pays = true; int compared = 0;
+        for (double rec : {0.60, 0.40, 0.20}) {
+            const double gentle = wash_to(0.030, rec), medium = wash_to(0.045, rec), hard = wash_to(0.070, rec);
+            ++compared;
+            if (!(gentle > medium && medium > hard)) patience_pays = false;
+            std::printf("        (stop at %.0f%% recovery: gentle %.3f > medium %.3f > hard %.3f)\n",
+                        100.0 * rec, gentle, medium, hard);
+        }
+        check(compared == 3 && patience_pays,
+              "with a bed, a gentler hand beats a harder one at every matched recovery");
+    }
+
     // ---- The picture -------------------------------------------------------
     std::printf("\n  settling velocity, m/s (free grains)\n  %-10s %10s %10s %10s\n", "phase", sz(0), sz(1), sz(2));
     for (int p : {CARBON, QUARTZ, GOETHITE, MAGNETITE, HEMATITE})
