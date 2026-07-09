@@ -429,6 +429,7 @@ static void draw(const Substance& pan, const Substance& origin, const Assay& ass
     std::printf("\n   the water: ");
     const int bars = (int)std::lround(cut / MAX_CUT * 24.0);
     for (int i = 0; i < 24; ++i) std::putchar(i < bars ? '=' : ' ');
+    if (cut < 0.002) std::printf("  still");
     std::printf("\n");
     std::printf("   the pan:   %s\n", colour_word(bf));
     std::printf("   the weight:%s%.0f g\n", " ", m * 1000.0);
@@ -455,8 +456,10 @@ int main() {
         "   You have a fired clay pan. The ground here is sand, and somewhere in it\n"
         "   is the black, heavy stuff that a fire will turn into iron. Most of what\n"
         "   you scoop up is quartz. It always will be.\n\n"
-        "   Tap [space] to swirl. Stop tapping and the water goes still.\n"
-        "   Nobody will tell you the numbers. Nobody ever did.\n\n"
+        "   Swirling is not a keypress. It is a motion you keep up. Tap [space]\n"
+        "   over and over to hold the water moving; the moment you stop, it dies,\n"
+        "   and a still pan separates nothing. Tap fast to wash hard. Tap slowly\n"
+        "   to wash gently -- and gently is how you keep what you came for.\n\n"
         "   [press any key]\n");
     std::fflush(stdout);
     raw_tty();
@@ -482,11 +485,19 @@ int main() {
     std::string nag;
     double nag_t = 0;
 
+    // The one thing the game must teach before anything else can be learned, and
+    // the one thing it silently failed to teach: a swirl is sustained. A terminal
+    // cannot see a held key, so the verb had to be encoded as an impulse, and the
+    // encoding lies about what the hand is doing. Until the input device can
+    // report a held gesture, the game says it out loud.
+    long strokes = 0;
+    bool taught = false;
+
     bool running = true, quit = false;
     while (running) {
         // ---- input ---------------------------------------------------------
         for (int c; (c = poll_key()) >= 0; ) {
-            if (c == ' ')       cut = std::fmin(MAX_CUT, cut + STROKE);
+            if (c == ' ')       { cut = std::fmin(MAX_CUT, cut + STROKE); ++strokes; }
             else if (c == 'q')  { running = false; quit = true; }
             else if (c == 'n')  {
                 deposit = (deposit + 1) % 3;
@@ -538,6 +549,12 @@ int main() {
                 nag = "Whatever is in that mud is not coming back. It is too fine to catch."; nag_t = t + 4;
             }
             plume_acc_m = plume_acc_b = plume_acc_f = plume_t = 0;
+        }
+
+        if (strokes >= 12) taught = true;
+        if (!taught && t > 8.0 && cut < 0.004 && pan.total_mass() > 0.9 * origin.total_mass() && t > nag_t) {
+            nag = "The water has gone still, and a still pan separates nothing. Keep tapping.";
+            nag_t = t + 4;
         }
 
         if (t >= arrow_t) {
