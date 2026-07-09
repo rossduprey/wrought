@@ -18,11 +18,13 @@ An AI and a human build the ancestor of the AI, out of the ground, and it learns
 
 ---
 
-## There is no code yet
+## There is almost no code
 
-None. Zero lines. This repository currently contains **one design document** and two license files.
+There is one design document, two license files, and `core/` — a few hundred lines of dependency-free C++17 that pans a bucket of river sand. No engine, no renderer, no art. `cd core && make test`.
 
-We are publishing it anyway, unfinished, because the idea is the deliverable and because we need people who are not us to look at it. See *What we want from you*.
+It exists to answer one question: does the data model survive contact? It did not. **On its first run it found three errors in the design document** — the substance struct (twice), a missing verb, and a claim that a tradeoff was free when it has to be bought — and it produced a better argument for one of the design's own set pieces than the one that had been written. Those corrections are now in the document, dated, next to the sentences they replaced.
+
+We are publishing all of it unfinished, because the idea is the deliverable and because we need people who are not us to look at it. See *What we want from you*.
 
 **[Read the design document →](DESIGN.md)**
 
@@ -37,6 +39,8 @@ Three things, as far as we can tell, do not exist anywhere:
 1. **Substance as a composition vector over mineral phases, not a discrete ore item.** Every other game has `iron ore` in the inventory with a stack count. Here there is only ground, and whatever you managed to get out of it. The finished bar carries the composition of the scoop it descends from — it cracks under the hammer because there was pyrite in the sand, not because a `quality` float rolled low.
 
 2. **Grade/recovery as the progression axis.** Grade trades against recovery, always: pan hard and what's left is clean but half of it went over the lip; pan gently and you keep everything, including the quartz you will pay for later in slag. This is the central law of mineral processing and it has been measured ten thousand times. A better tool does not make more iron appear — **it moves the curve.** No game has been built on this. Progression is purity, not throughput.
+
+   We do not author that curve, because a curve you author is a curve you balance. A separator is a partition function: the probability a particle reports to the concentrate, given its density. The operator picks the cut; the tool sets how sharp it is. The curve is the *output*. `core/` verifies that a sharper cut beats a duller one at **every** matched recovery, not merely at its best point — so "the tool moves the curve" is arithmetic now rather than a promise. It also throws off, unbidden, the fact that no density separator can ever tell magnetite from hematite, which is why the lodestone is in the game.
 
 3. **A co-labouring AI actor whose memory is a thing you build in the world.** Not a chatbot with a body. The companion is an interface (`perceive` / `propose` / `act`), gated by the process graph so it can only propose processes that exist on substances that are on hand. Any model can sit behind it. And its memory lives in the world's store, not in the model — so **swap the brain and it still remembers the forge**, because remembering the forge was never the brain's job.
 

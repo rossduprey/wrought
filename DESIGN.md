@@ -175,26 +175,58 @@ That triple is what a deposit *is*. It is what prospecting is *for*.
 
 ### The substance model
 
-A substance instance is a **bag of mineral phases**, not a single material id:
+*(Rewritten 2026-07-09. The first two versions of this section were both wrong,
+and `core/` caught both. The record of how is kept below, because this document's
+whole discipline is that a correction is worth more than a claim.)*
+
+A substance instance is a **bag of mineral phases**, not a single material id.
+The first draft said:
+
+> `composition` (~10 floats) + `psd` (3 floats) + `liberation` (one scalar)
+
+That cannot express the thing over-processing is supposed to teach. Liberation is
+not a property of a scoop; it is a property of **a phase at a size**. Magnetite in
+a placer is free in the sand and locked in the gravel, and one scalar cannot say
+so. The obvious repair — `mass[phase][size]` with `liberation[phase][size]` — is
+*also* wrong, and it is wrong in the place the design depends on most. If
+liberation is a fraction of a cell, then each phase's mass moves through a
+separator independently, and a locked magnetite grain arrives in the concentrate
+**without the quartz it is physically glued to.** Measured against the corrected
+model, that overstated concentrate grade by ~13% at a liberation of 0.5. The grade
+ceiling this design rests on was not being enforced. It was being asserted.
+
+So a composite grain is a **particle**, not a fraction. It has a mass, it travels
+at its own density, and when it reports to the concentrate it brings its gangue
+with it:
 
 | Field | Shape | Notes |
 |---|---|---|
-| `composition` | ~10 floats, mass fractions, sums to 1 | over the phase table |
-| `psd` | 3 floats | particle-size bins: fines / sand / gravel |
-| `liberation` | scalar 0–1 | are grains free, or locked in host rock |
-| `mass` | float | conserved, always |
+| `freegrain` | `[phase][size]`, mass | pure grains of that phase |
+| `composite` | `[phase][size]`, mass | grains of that phase locked to gangue; **total particle mass** |
 | `temperature`, `moisture` | floats | process state |
+
+`liberation` is no longer stored. It is `freegrain / (freegrain + f·composite)` —
+a ratio you compute, which is what it always was. `mass` is not stored either: it
+is the sum, and it is conserved because nothing else can happen to an array you
+only ever move between two buckets.
 
 Roughly ten phases carry the whole early game: **quartz, feldspar, kaolinite
 (clay), magnetite, hematite, goethite, ilmenite, calcite, olivine/pyroxene,
 carbon/organics** — plus **pyrite**, which is the sulfur curse and the reason a
 bar cracks under the hammer.
 
-You never simulate ninety elements, and you never simulate particles. Element
-composition is derivable from phases if it's ever needed. A substance instance is
-a ~40-float struct. It costs nothing. **This is what makes the whole idea fit
-inside our computational budget** — the fidelity is in *which* numbers, not *how
-many*.
+You never simulate ninety elements, and you never simulate particles *individually*
+— you simulate particle **populations**, of which there are `phases × sizes × 2`.
+Element composition is derivable from phases if it's ever needed. A substance
+instance is a ~60-float struct. It costs nothing. **This is what makes the whole
+idea fit inside our computational budget** — the fidelity is in *which* numbers,
+not *how many*.
+
+One thing the corrected model buys immediately, which the doc had asserted without
+being able to enforce: **a fully locked phase has a hard grade ceiling equal to the
+composite's own grade.** Every particle of it is half gangue by mass, so no cut, no
+tool, and no number of passes can produce a concentrate richer than that. This is a
+test in `core/`, and it passes for every tool at every cut.
 
 ### The law: grade trades against recovery, always
 
@@ -220,10 +252,57 @@ Three consequences, and they are the design:
    grain nobody could see. The `provenance` field (§3) stops being flavour and
    becomes load-bearing: **an item remembers the composition of the scoop it came
    from**, all the way down.
-3. **Over-processing is a real failure.** Crushing raises `liberation` — but it
-   also drives mass into the `fines` bin, and fines wash away in a pan. Grind too
-   far and you make slimes you cannot separate. A day-one tradeoff with no
-   arbitrary numbers in it.
+3. **Over-processing is a real failure — but not for the reason stated here
+   originally, and it is not free.** *(Corrected 2026-07-09 by `core/`. The
+   original text read: "Grind too far and you make slimes you cannot separate. A
+   day-one tradeoff with no arbitrary numbers in it." Half of that is true, and
+   the false half is more interesting.)*
+
+   Crushing raises liberation and drives mass into the `fines` bin in the same
+   blow, because they are the same act. But an interior optimum — a *right amount*
+   of grinding — **does not emerge from that.** Measured: behind a perfect screen,
+   grinding harder is monotonically better, forever. Behind a good screen (75%
+   efficient) it is *still* monotonically better. The optimum only appears once the
+   screen is bad enough to send already-finished material back into the mill: it
+   shows up at 50% efficiency, peaking at intensity 0.60, and moves to 0.30 at 25%.
+
+   **The failure mode is the recirculating load, not the fines bin.** That is why
+   closed-circuit grinding exists, and it means screen efficiency is an *authored
+   number* on which the whole tradeoff hangs. Over-processing is bought, not given.
+   The doc no longer claims otherwise.
+
+   Two things survive with no arbitrary numbers in them at all, and they are the
+   ones worth teaching:
+
+   - **Crushing an already-liberated ore only ever destroys recovery.** It has
+     nothing left to liberate; it only makes fines. True at every screen
+     efficiency, and no number in this project can be tuned to make it false. The
+     river already ground your placer. Do not grind it again.
+   - **Over-grinding is not a separate failure mode.** Past the recovery optimum,
+     grade *keeps climbing* as recovery is spent. It is the grade/recovery law
+     again, expressed on the size axis instead of the density axis. We implemented
+     the law once and got it twice.
+
+### What the law does when you stop looking at it
+
+*(Added 2026-07-09 from `core/`. None of this was designed. It was found, by
+sweeping parameters on the model above and reading what came out.)*
+
+**The law reappears across cleaning stages.** Re-pan a concentrate and grade rises
+while recovery falls, exactly as it does when you raise the cut. Over eight passes
+the magnetite grade climbs from 0.17 to 0.60 and recovery collapses from 0.60 to
+0.17. Nobody wrote that twice. It is the same partition function, applied again.
+
+**A density separator converges on the densest phase present, and that phase is
+probably not the one you want.** Panned forever, the concentrate does not converge
+on magnetite — magnetite's grade peaks around pass 34 at 0.81 and then *falls*, to
+0.17 by pass 256, because hematite is denser (5.26 against 5.15) and wins the limit.
+So there is a right number of cleaning stages, it is finite, and it was never chosen
+by anyone. Real mills have three or four cleaner stages for exactly this reason.
+
+**And magnetite and hematite are within about 2% on density.** No pan, no sluice, no
+jig, no operator, and no amount of skill can tell them apart. That is not a
+limitation of our model. It is why magnetic separation was invented.
 
 ### The fidelity ceiling — where to stop
 
@@ -276,6 +355,12 @@ Bare-hand verbs, all of them real:
   works *only* on coarse liberated material. Useless on sand.
 - **Crush** — rock against rock. Raises `liberation`, raises `fines`. The
   tradeoff bites immediately.
+- **Screen** — separation by size and nothing else: shake the coarse off a woven
+  mat, or off your fingers. *(Added 2026-07-09. `core/` showed that without it
+  `crush` is a strictly harmful verb no rational player would ever use, and with a
+  perfect one `crush` is strictly beneficial. Everything interesting about
+  grinding lives in the gap, because a real screen misplaces material back into
+  the mill. The verb was missing, and its absence was load-bearing.)*
 - **Wash** — cupped hands, or a depression in bedrock. Density separation with an
   atrocious grade/recovery curve. It works. Barely.
 - **Settle / decant** — costs only standing water and patience. This is the one
@@ -321,9 +406,25 @@ that exists before metallurgy, and it is real: a genuine bootstrap in which **yo
 use iron to get iron.**
 
 Drag it through a panned concentrate and the black sand leaps to the stone. Grade
-goes from ~70% to ~95% in one pass with almost no loss — it does not sit on the
-grade/recovery curve, it *jumps* it. The one thing in the world that cheats the
-law, and it cheats it because nature charged it for free.
+goes from ~70% to ~95% in one pass with almost no loss.
+
+**It does not cheat the law.** *(Corrected 2026-07-09. The original text called it
+"the one thing in the world that cheats the law," and `core/` supplied a better
+reason for it to exist.)* The lodestone reads
+`magnetic_susceptibility`, and susceptibility is uncorrelated with density. So it
+is a separator on an **orthogonal axis**, with a grade/recovery curve of its own
+that it obeys exactly as strictly as the pan obeys hers.
+
+Why that matters is not aesthetic. The harness showed that a density separator,
+run to its limit, converges on the densest phase present — and magnetite (5.15) is
+not it, because hematite (5.26) is. They are within about 2% on density. **No pan
+that has ever existed or could exist can separate magnetite from hematite.** The
+density axis is *degenerate* on precisely the pair the character cares about, and
+no tool, skill, or patience repairs a degeneracy.
+
+The lodestone is not a shortcut past the law. It is the answer to a wall the law
+puts in front of you, and it works because it is asking a different question.
+Every real magnetic separator on Earth exists for the same reason.
 
 Design rules that keep it honest:
 
@@ -723,17 +824,41 @@ this cluster works.
 
 Deliverable, in order, in a console harness with no UE editor and no renderer:
 
-1. **Pan a bucket of river sand.** Get a pile of black sand and a pile of tailings.
-   **The composition vectors sum to what went in.** Conservation of mass across a
-   single separation is the unit test — if it holds, the data model is sound, and
-   everything downstream (smelting, forging, the economy) is the same operation
-   with a different matrix. *This is the whole project in miniature.*
+1. **Pan a bucket of river sand.** *(Done, 2026-07-09 — `core/`, pure C++17, no
+   dependencies, `make test`.)* Get a pile of black sand and a pile of tailings.
+
+   The original text named conservation of mass as the unit test. **That test is
+   necessary and far too weak: a separator that does nothing conserves mass
+   perfectly.** What the harness asserts instead are *relationships*, each of
+   which survives any correction to the phase table — which is the point, since
+   every number in that table is currently `UNVERIFIED`:
+
+   - mass is conserved, per particle population, per phase, across separation,
+     crushing, and screening;
+   - raising the cut trades recovery away for grade, monotonically, at every step;
+   - **a sharper tool dominates a duller one at every matched recovery**, not
+     merely at its best point — this is the project's central claim, and it is now
+     arithmetic;
+   - a fully locked phase can never exceed the composite's own grade, for any tool
+     at any cut;
+   - liberation orders the best grade any amount of work can reach.
+
+   If a number in `phase_table.h` is corrected and a test outcome changes, the
+   test was measuring the fixture instead of the model, and the test is wrong.
 2. **Walk Era 0 → Era 1.** Dig, puddle, decant, get clay. Fire a pan. Show that
    the pan's grade/recovery curve is a function of the clay's fineness — i.e.
    prove the ratchet.
 3. **Then** smelt: slag falls out of a bloomery, and the ledger balances.
 
 If it isn't interesting to reason about here, more art won't save it.
+
+> **What step 1 cost, and what it bought.** It found three errors in this document
+> — the substance struct (twice), the missing `screen` verb, and the claim that
+> over-processing needed no arbitrary numbers — and it produced a better argument
+> for the lodestone than the one that had been written. All of it in a few hundred
+> lines with no engine, no renderer, and no art. That is the entire case for
+> building the simulation core before anything else, and it is not a hypothetical
+> case any more.
 
 **Phase B — Playable single-player on Mac.**
 Wrap Phase A in an actual character, a terrain patch, deposits, hands in the
