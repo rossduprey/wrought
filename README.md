@@ -20,7 +20,14 @@ An AI and a human build the ancestor of the AI, out of the ground, and it learns
 
 ## There is almost no code
 
-There is one design document, two license files, and `core/` — a few hundred lines of dependency-free C++17 that pans a bucket of river sand. No engine, no renderer, no art. `cd core && make test`.
+There is one design document, two license files, and `core/` — a few hundred lines of dependency-free C++17 that pans a bucket of river sand. No engine, no renderer, no art.
+
+```
+cd core && make test    # 34 assertions about the physics
+cd core && make pan     # kneel in the river and wash it yourself
+```
+
+`make pan` is the same physics with nothing added but *legibility*. You get a knob and a pair of eyes, and no numbers at all until you tip the pan into the poke. It exists because the one question the test suite cannot answer by passing is whether any of this is worth doing for twenty minutes on a Tuesday.
 
 It exists to answer one question: does the data model survive contact? It did not. **On its first run it found three errors in the design document** — the substance struct (twice), a missing verb, and a claim that a tradeoff was free when it has to be bought — and it produced a better argument for one of the design's own set pieces than the one that had been written.
 

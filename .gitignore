@@ -1,5 +1,6 @@
 .DS_Store
 core/test_separation
+core/pan_game
 Binaries/
 Intermediate/
 Saved/
