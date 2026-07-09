@@ -1080,7 +1080,7 @@ The decision changes almost nothing about the build, because **the architecture 
 chose for testability is already the architecture that makes it publishable.**
 
 **The project is named `wrought`** (resolved 2026-07-09, Ross). Published at
-`github.com/ross631/wrought`.
+`github.com/rossduprey/wrought`.
 
 *Wrought iron is bloom iron, worked by hammer — the end of our chain, and the word
 for anything shaped by labour (principle #4). It carries **slag inclusions** from

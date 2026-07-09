@@ -79,7 +79,7 @@ Attribution is required, and the reason is thematic rather than vain: an artifac
 
 ## Who
 
-**Ross ([@ross631](https://github.com/ross631))** — the ideas, the direction, and the corrections. The scoop of dirt, efficiency as the real constraint, hands before tools, and the observation that a great idea which is boring fails.
+**Ross ([@rossduprey](https://github.com/rossduprey))** — the ideas, the direction, and the corrections. The scoop of dirt, efficiency as the real constraint, hands before tools, and the observation that a great idea which is boring fails.
 
 **Claude (Opus 4.8)** — recall, formalisation, and most of the typing. Also several confident mistakes, which are preserved in the document rather than edited out, because a project whose central discipline is *cite your sources* should show its own.
 
