@@ -5,12 +5,26 @@
 // test below asserts a *relationship*, so none of them can be satisfied by
 // tuning the fixture, and correcting a density must not change any outcome.
 //
+// This suite has been rewritten once. The first version separated on particle
+// density with a hand-set per-size-bin efficiency multiplier. Two of its tests
+// were passing for the wrong reason, and are now gone:
+//
+//   "even the gentlest pan enriches"  — false. A cut below every particle in the
+//       feed is a no-op and returns the feed. The old test only passed because
+//       size_efficiency rejected fines unconditionally, which is to say the
+//       fudge factor was doing the separating.
+//
+//   "raising the cut trades recovery for grade, at every step" — true only
+//       *within one size class*. On a feed that spans two, the curve is lumpy.
+//       The old test never noticed because it never sized the feed.
+//
 // Build: make test
 
 #include <cstdio>
 #include <cmath>
 #include <vector>
 #include <algorithm>
+#include <initializer_list>
 
 #include "separate.h"
 
@@ -22,6 +36,8 @@ static void check(bool ok, const char* what) {
     std::printf("%s  %s\n", ok ? "  pass" : "* FAIL", what);
     if (!ok) ++failures;
 }
+
+static const char* sz(int s) { return s == FINES ? "fines" : s == SAND ? "sand" : "gravel"; }
 
 // Author a scoop by phase mass and liberation; the struct stores particles.
 // Composites drag gangue, so the gangue they carry is deducted from free quartz.
@@ -84,15 +100,21 @@ static Substance weathered_outcrop() {
     return b.build();
 }
 
+// Scalp the pebbles off the top, wash the mud off the bottom. What remains is one
+// size class, which is the only feed a gravity separator obeys a law on.
+static Substance sized(const Substance& s) {
+    return screen(screen(s, 1.0, GRAVEL).undersize, 1.0, SAND).oversize;
+}
+
 struct Point { double cut, rec, grade; };
 
 static std::vector<Point> frontier(const Substance& feed, const SeparatorParams& sp, int target) {
     std::vector<Point> pts;
-    for (double cut = 2.40; cut <= 5.40; cut += 0.05) {
-        SeparatorParams q = sp; q.cut_density = cut;
+    for (double lv = std::log(1e-4); lv <= std::log(3.0); lv += 0.02) {
+        SeparatorParams q = sp; q.cut_velocity = std::exp(lv);
         const SeparationResult r = separate(feed, q);
         if (r.concentrate.total_mass() <= 1e-9) continue;
-        pts.push_back({cut, recovery(feed, r.concentrate, target), r.concentrate.grade(target)});
+        pts.push_back({q.cut_velocity, recovery(feed, r.concentrate, target), r.concentrate.grade(target)});
     }
     return pts;
 }
@@ -136,8 +158,92 @@ static Substance with_magnetite_liberation(double L) {
     return b.build();
 }
 
+// Era 0's whole dressing circuit: grind in closed circuit, scalp, deslime, pan.
+static Substance dress(const Substance& ore, double intensity, double screen_eff, int cycles) {
+    return sized(closed_circuit(ore, intensity, screen_eff, cycles));
+}
+static double dressed_recovery(const Substance& ore, double intensity, double eff, int cycles, int target) {
+    return recovery(ore, separate(dress(ore, intensity, eff, cycles), PAN).concentrate, target);
+}
+
 int main() {
-    const Substance feed = river_sand();
+    const Substance raw  = river_sand();
+    const Substance feed = sized(raw);
+
+    // ---- 0. The partition variable is settling velocity, and it is solved ----
+    // A pan does not cut on density. It cuts on how fast a grain falls through
+    // water, which is density and size together. Everything in this block is a
+    // consequence of a force balance, and none of it can be tuned.
+    {
+        bool stokes_fines = true;
+        for (int p = 0; p < N_PHASE; ++p) {
+            const double d = bin_diameter(FINES);
+            const double g = settling_velocity(PHASES[p].density, d), s = stokes_velocity(PHASES[p].density, d);
+            if (std::fabs(s / g - 1.0) > 0.01) stokes_fines = false;
+        }
+        check(stokes_fines, "on fines, the drag solve agrees with Stokes' law to within 1%");
+
+        const double d_sand = bin_diameter(SAND), d_grav = bin_diameter(GRAVEL);
+        const double r_sand = stokes_velocity(PHASES[QUARTZ].density, d_sand) / settling_velocity(PHASES[QUARTZ].density, d_sand);
+        const double r_grav = stokes_velocity(PHASES[QUARTZ].density, d_grav) / settling_velocity(PHASES[QUARTZ].density, d_grav);
+        check(r_sand > 1.5 && r_grav > 10.0,
+              "on sand and gravel Stokes is not merely imprecise, it is the wrong law");
+        std::printf("        (Stokes overstates quartz by %.2fx in sand, %.0fx in gravel)\n", r_sand, r_grav);
+
+        check(reynolds(settling_velocity(PHASES[QUARTZ].density, bin_diameter(FINES)), bin_diameter(FINES)) < 1.0 &&
+              reynolds(settling_velocity(PHASES[QUARTZ].density, d_grav), d_grav) > 1000.0,
+              "the bins straddle the creeping-flow and Newton regimes: one correlation cannot be skipped");
+
+        bool by_density = true;
+        for (int s = 0; s < N_SIZE; ++s)
+            for (int p = 0; p < N_PHASE; ++p)
+                for (int q = 0; q < N_PHASE; ++q)
+                    if (PHASES[p].density > PHASES[q].density && free_velocity(p, s) <= free_velocity(q, s))
+                        by_density = false;
+        check(by_density, "within one size class, velocity ranks by density: this is what a pan reads");
+
+        bool size_dominates = true;
+        for (int s = 0; s + 1 < N_SIZE; ++s) {
+            double hi = 0.0, lo = 1e9;
+            for (int p = 0; p < N_PHASE; ++p) {
+                hi = std::fmax(hi, free_velocity(p, s));
+                lo = std::fmin(lo, free_velocity(p, s + 1));
+            }
+            if (hi >= lo) size_dominates = false;
+        }
+        check(size_dominates,
+              "across size classes the bands do not even touch: size beats density, always");
+
+        bool between = true;
+        for (int p = 0; p < N_PHASE; ++p) {
+            if (p == GANGUE) continue;
+            for (int s = 0; s < N_SIZE; ++s) {
+                const double lo = std::fmin(free_velocity(p, s), free_velocity(GANGUE, s));
+                const double hi = std::fmax(free_velocity(p, s), free_velocity(GANGUE, s));
+                if (!(composite_velocity(p, s) > lo && composite_velocity(p, s) < hi)) between = false;
+            }
+        }
+        check(between, "a composite grain settles strictly between its phase and its gangue");
+
+        const double vm = free_velocity(MAGNETITE, SAND), vh = free_velocity(HEMATITE, SAND);
+        check(std::fabs(vm - vh) / vh < 0.02,
+              "magnetite and hematite settle within 2% of each other: no gravity device separates them");
+
+        // Levigation is the one process in the design that quotes settling times,
+        // and it is also the one place Stokes is exact. So the times are not a
+        // fact about clay. They are a fact about clay and the depth of your hole.
+        const double DEPTH = 0.10; // m of standing water. AUTHORED: it's a puddle.
+        const double d_sand_fine = 62.5e-6, d_silt = 20.0e-6, d_clay = 2.0e-6;
+        const double t_sand = DEPTH / stokes_velocity(PHASES[QUARTZ].density, d_sand_fine);
+        const double t_silt = DEPTH / stokes_velocity(PHASES[QUARTZ].density, d_silt);
+        const double t_clay = DEPTH / stokes_velocity(PHASES[KAOLINITE].density, d_clay);
+        check(reynolds(stokes_velocity(PHASES[QUARTZ].density, d_sand_fine), d_sand_fine) < 1.0,
+              "levigation lives entirely in creeping flow, so its settling times are exactly derivable");
+        check(t_sand < t_silt && t_silt < t_clay,
+              "levigation separates by settling time, and the order is sand, silt, clay");
+        std::printf("        (0.10 m of water: sand %.0f s | silt %.0f s | clay %.1f h)\n",
+                    t_sand, t_silt, t_clay / 3600.0);
+    }
 
     // ---- 1. Conservation ---------------------------------------------------
     {
@@ -155,79 +261,147 @@ int main() {
             if (std::fabs(r.concentrate.phase_mass(p) + r.tailings.phase_mass(p) - feed.phase_mass(p)) > 1e-12) phases = false;
         check(phases, "separation conserves every phase, including gangue riding in composites");
 
-        const Substance c = crush(feed, 0.6);
+        const Substance c = crush(raw, 0.6);
         bool crush_ok = true;
         for (int p = 0; p < N_PHASE; ++p)
-            if (std::fabs(c.phase_mass(p) - feed.phase_mass(p)) > 1e-9) crush_ok = false;
+            if (std::fabs(c.phase_mass(p) - raw.phase_mass(p)) > 1e-9) crush_ok = false;
         check(crush_ok, "crushing conserves every phase (breakage moves mass, it does not make it)");
 
-        const ScreenResult sr = screen(feed, 0.8);
-        check(std::fabs(sr.oversize.total_mass() + sr.undersize.total_mass() - feed.total_mass()) < 1e-12,
-              "screening conserves mass");
-    }
-
-    // ---- 2. Grade trades against recovery ----------------------------------
-    {
-        const auto f = frontier(feed, PAN, MAGNETITE);
-        bool mono = true;
-        for (size_t i = 1; i < f.size(); ++i) {
-            if (f[i].rec > f[i-1].rec + 1e-9) mono = false;
-            if (f[i].grade < f[i-1].grade - 1e-9) mono = false;
+        bool screens_ok = true;
+        for (int cut = SAND; cut <= GRAVEL; ++cut) {
+            const ScreenResult sr = screen(raw, 0.8, cut);
+            if (std::fabs(sr.oversize.total_mass() + sr.undersize.total_mass() - raw.total_mass()) > 1e-12) screens_ok = false;
         }
-        check(mono, "raising the cut strictly trades recovery away for grade, at every step");
-        check(f.front().rec > f.back().rec && f.front().grade < f.back().grade,
-              "the two ends of the sweep are the two ends of the tradeoff");
-        check(f.front().grade > feed.grade(MAGNETITE),
-              "even the gentlest pan enriches: a separation is not a no-op");
+        check(screens_ok, "screening conserves mass, at either cut");
     }
 
-    // ---- 3. The tool moves the curve ---------------------------------------
-    // Isolate sharpness: same size efficiency, only the cut is blurrier. If the
-    // central claim is real, the sharper tool wins at EVERY matched recovery,
-    // not merely at its best point.
+    // ---- 2. The law, and it only holds on one size class --------------------
+    {
+        for (int target : {MAGNETITE, HEMATITE}) {
+            const auto f = frontier(feed, PAN, target);
+            bool mono = true;
+            for (size_t i = 1; i < f.size(); ++i) {
+                if (f[i].rec > f[i-1].rec + 1e-12) mono = false;
+                if (f[i].grade < f[i-1].grade - 1e-12) mono = false;
+            }
+            check(mono, target == MAGNETITE
+                  ? "sized feed: raising the cut trades magnetite recovery for grade, at every step"
+                  : "sized feed: and for hematite too, so it is not a property of one phase");
+        }
+
+        const auto f = frontier(feed, PAN, MAGNETITE);
+        bool buys = true;
+        for (const auto& p : f)
+            if (p.rec < 0.99 && p.grade <= feed.grade(MAGNETITE)) buys = false;
+        check(buys, "any cut that costs recovery buys grade; a cut that costs nothing buys nothing");
+
+        const auto fq = frontier(feed, PAN, QUARTZ);
+        bool gangue_falls = true;
+        for (size_t i = 1; i < fq.size(); ++i)
+            if (fq[i].grade > fq[i-1].grade + 1e-12) gangue_falls = false;
+        check(gangue_falls, "the gangue's grade falls as the target's rises: one law, seen from the other side");
+    }
+
+    // ---- 3. Why you screen first -------------------------------------------
+    // Feed a separator two size classes and the law breaks. The grade curve
+    // climbs inside the fines, collapses when the cut leaves them behind, and
+    // climbs again inside the sand. This is not a modelling artefact; it is the
+    // reason every mill on earth classifies before it concentrates, and the
+    // reason panning begins by washing off the mud and picking out the pebbles.
+    {
+        const Substance two_class = screen(raw, 1.0, GRAVEL).undersize; // fines + sand
+        const auto f = frontier(two_class, PAN, MAGNETITE);
+        int reversals = 0;
+        for (size_t i = 1; i < f.size(); ++i) if (f[i].grade < f[i-1].grade - 1e-9) ++reversals;
+        check(reversals > 0, "on a feed spanning two size classes the grade curve is not monotone at all");
+        std::printf("        (%d reversals in %zu steps; the law is a within-class law)\n", reversals, f.size() - 1);
+
+        // And with no screening whatsoever, the pan stops being a separator.
+        Substance cur = raw;
+        for (int n = 0; n < 256; ++n) cur = separate(cur, PAN).concentrate;
+        double sand_mass = 0.0, gravel_mass = 0.0;
+        for (int p = 0; p < N_PHASE; ++p) {
+            sand_mass   += cur.freegrain[p][SAND]   + cur.composite[p][SAND];
+            gravel_mass += cur.freegrain[p][GRAVEL] + cur.composite[p][GRAVEL];
+        }
+        check(sand_mass < 1e-6 * gravel_mass && cur.grade(QUARTZ) > cur.grade(MAGNETITE),
+              "an unscreened pan converges on the coarsest bin: it is a pebble-picking machine");
+        std::printf("        (unscreened, 256 passes: %.4f kg gravel, %.2e kg sand, quartz grade %.3f)\n",
+                    gravel_mass, sand_mass, cur.grade(QUARTZ));
+    }
+
+    // ---- 4. The tool moves the curve, and by exactly how much ---------------
     {
         SeparatorParams dull = PAN, sharp = PAN;
-        dull.sharpness = 0.80; sharp.sharpness = 0.35;
+        dull.sharpness = HANDS.sharpness; sharp.sharpness = SLUICE.sharpness;
         const auto fd = frontier(feed, dull, MAGNETITE);
         const auto fs = frontier(feed, sharp, MAGNETITE);
 
         bool dominates = true; int compared = 0;
-        for (double rec = 0.30; rec <= 0.90; rec += 0.05) {
+        for (double rec = 0.05; rec <= 0.95; rec += 0.025) {
             double gd, gs;
             if (grade_at_recovery(fd, rec, gd) && grade_at_recovery(fs, rec, gs)) {
                 ++compared;
                 if (gs <= gd) dominates = false;
             }
         }
-        check(compared >= 10, "the two tools overlap on enough of the recovery range to compare");
+        check(compared >= 20, "the two tools overlap on enough of the recovery range to compare");
         check(dominates, "a sharper cut dominates a duller one at EVERY matched recovery");
+
+        // Drive the cut far above the feed and the logistic becomes a power law:
+        // two free phases report to the concentrate in the ratio
+        //     (v1 / v2) ^ (1 / sigma).
+        // Nothing in that expression is authored except sigma itself. It is the
+        // whole of "a better tool moves the curve", and it is arithmetic.
+        auto enrichment = [](int a, int b, double sigma) {
+            SeparatorParams sp = PAN; sp.sharpness = sigma; sp.cut_velocity = 1e6;
+            Substance s; s.freegrain[a][SAND] = 1.0; s.freegrain[b][SAND] = 1.0;
+            const Substance c = separate(s, sp).concentrate;
+            return c.freegrain[a][SAND] / c.freegrain[b][SAND];
+        };
+        bool law = true;
+        for (const SeparatorParams* sp : {&HANDS, &PAN, &SLUICE}) {
+            const double got  = enrichment(MAGNETITE, QUARTZ, sp->sharpness);
+            const double want = std::pow(free_velocity(MAGNETITE, SAND) / free_velocity(QUARTZ, SAND), 1.0 / sp->sharpness);
+            if (std::fabs(got / want - 1.0) > 1e-5) law = false;
+        }
+        check(law, "the limiting enrichment of a single stage is (v1/v2)^(1/sigma), derived not chosen");
+
+        const double eh = enrichment(MAGNETITE, QUARTZ, HANDS.sharpness);
+        const double ep = enrichment(MAGNETITE, QUARTZ, PAN.sharpness);
+        const double es = enrichment(MAGNETITE, QUARTZ, SLUICE.sharpness);
+        check(eh < ep && ep < es, "so the tool ladder is an enrichment ladder, and nothing else");
+        std::printf("        (magnetite over quartz, one stage: hands %.2fx  pan %.2fx  sluice %.2fx)\n", eh, ep, es);
+        std::printf("        (hematite over magnetite, one pan stage: %.4fx — this is the lodestone's reason)\n",
+                    enrichment(HEMATITE, MAGNETITE, PAN.sharpness));
     }
 
-    // ---- 4. The liberation ceiling is real, and it is f --------------------
+    // ---- 5. The liberation ceiling is real, and it is f --------------------
     // Every particle of a fully locked phase is half gangue by mass. No cut, no
     // tool, no number of passes can produce a concentrate richer than that.
     {
-        const Substance all_locked = with_magnetite_liberation(0.0);
+        const Substance all_locked = sized(with_magnetite_liberation(0.0));
         bool ceiling = true;
         for (const SeparatorParams* sp : {&HANDS, &PAN, &SLUICE})
-            for (double cut = 2.4; cut <= 5.4; cut += 0.1) {
-                SeparatorParams q = *sp; q.cut_density = cut;
+            for (double lv = std::log(1e-4); lv <= std::log(3.0); lv += 0.05) {
+                SeparatorParams q = *sp; q.cut_velocity = std::exp(lv);
                 if (separate(all_locked, q).concentrate.grade(MAGNETITE) > COMPOSITE_TARGET_FRACTION + 1e-9) ceiling = false;
             }
         check(ceiling, "fully locked magnetite can never exceed the composite's own grade");
 
-        const double g03 = peak_grade_over_passes(with_magnetite_liberation(0.3), PAN, 64, MAGNETITE);
-        const double g05 = peak_grade_over_passes(with_magnetite_liberation(0.5), PAN, 64, MAGNETITE);
-        const double g10 = peak_grade_over_passes(with_magnetite_liberation(1.0), PAN, 64, MAGNETITE);
+        const double g03 = peak_grade_over_passes(sized(with_magnetite_liberation(0.3)), PAN, 64, MAGNETITE);
+        const double g05 = peak_grade_over_passes(sized(with_magnetite_liberation(0.5)), PAN, 64, MAGNETITE);
+        const double g10 = peak_grade_over_passes(sized(with_magnetite_liberation(1.0)), PAN, 64, MAGNETITE);
         check(g03 < g05 && g05 < g10, "liberation orders the best grade any amount of work can reach");
         std::printf("        (best attainable grade: L=0.3 %.3f | L=0.5 %.3f | L=1.0 %.3f)\n", g03, g05, g10);
     }
 
-    // ---- 5. A density separator ranks by density, and nothing else ---------
-    // Re-panning forever does not converge on your target. It converges on the
-    // densest phase present. Hematite is denser than magnetite, so in the limit
-    // the pan throws your magnetite away. This is why the lodestone exists, and
-    // it is not a cheat: it reads an axis density cannot see.
+    // ---- 6. A gravity separator ranks by velocity, and nothing else ---------
+    // Re-panning forever does not converge on your target. Within one size class
+    // it converges on the densest phase present. Hematite is denser than
+    // magnetite, so in the limit the pan throws your magnetite away. This is why
+    // the lodestone exists, and it is not a cheat: it reads an axis gravity
+    // cannot see.
     {
         Substance cur = feed;
         double best = 0.0; int best_n = 0;
@@ -237,37 +411,31 @@ int main() {
         }
         check(best_n > 1 && best_n < 256, "magnetite grade peaks at a finite number of passes, then falls");
         check(cur.grade(HEMATITE) > cur.grade(MAGNETITE),
-              "in the limit the concentrate is the densest phase, not the wanted one");
+              "in the limit the concentrate is the fastest-settling phase, not the wanted one");
         check(recovery(feed, cur, MAGNETITE) < 0.05 * recovery(feed, separate(feed, PAN).concentrate, MAGNETITE),
               "cleaning stages spend recovery: the tradeoff reappears across passes");
         std::printf("        (best magnetite grade %.3f at pass %d; at pass 256 magnetite %.3f, hematite %.3f)\n",
                     best, best_n, cur.grade(MAGNETITE), cur.grade(HEMATITE));
-
-        const double dens_mag = PHASES[MAGNETITE].density, dens_hem = PHASES[HEMATITE].density;
-        check(std::fabs(dens_mag - dens_hem) / dens_hem < 0.05,
-              "magnetite and hematite are within 5% on density: no pan can tell them apart");
     }
 
-    // ---- 6. Over-processing, and what actually causes it -------------------
+    // ---- 7. Over-processing, and what actually causes it -------------------
     // A blow both liberates and over-grinds; the two are one act. DESIGN.md
     // claimed the resulting optimum was "a day-one tradeoff with no arbitrary
     // numbers in it." Measured, that is half right, and the half that is wrong
-    // is worth more than the half that is right.
+    // is worth more than the half that is right. The finding survived the move
+    // from a density cut to a velocity cut, and got sharper: it now takes a
+    // *worse* screen to manufacture the optimum than it did before.
     {
         const Substance locked = weathered_outcrop();
 
         auto sweep = [&](const Substance& ore, double eff, int cycles,
                          double& best_i, double& best_rec, bool& interior) {
             best_i = -1.0; best_rec = -1.0;
-            std::vector<double> rec;
             for (double i = 0.0; i <= 0.901; i += 0.05) {
-                const Substance p = closed_circuit(ore, i, eff, cycles);
-                const double r = recovery(p, separate(p, PAN).concentrate, MAGNETITE);
-                rec.push_back(r);
+                const double r = dressed_recovery(ore, i, eff, cycles, MAGNETITE);
                 if (r > best_rec) { best_rec = r; best_i = i; }
             }
             interior = (best_i > 1e-9) && (best_i < 0.899);
-            return rec;
         };
 
         double bi, br; bool interior;
@@ -278,23 +446,22 @@ int main() {
         check(!interior && bi > 0.899, "behind a perfect screen, more grinding is always better");
         sweep(locked, 0.75, 3, bi, br, interior);
         check(!interior && bi > 0.899, "behind a good screen (0.75), more grinding is still always better");
+        sweep(locked, 0.50, 3, bi, br, interior);
+        check(!interior && bi > 0.899, "and behind a mediocre one (0.50) too");
 
         // Let the screen misplace enough finished material back into the mill and
         // the optimum appears. Its existence, and its location, are set by the
         // screen's efficiency — which is an AUTHORED number. Over-grinding is
         // therefore not free. It is bought.
-        sweep(locked, 0.50, 3, bi, br, interior);
-        check(interior, "behind a poor screen (0.50), recovery peaks at an interior crush intensity");
-        std::printf("        (screen 0.50: recovery peaks %.3f at intensity %.2f)\n", br, bi);
-        double bi25, br25; bool int25;
-        sweep(locked, 0.25, 3, bi25, br25, int25);
-        check(int25 && bi25 < bi, "a worse screen moves the optimum toward less grinding");
-        std::printf("        (screen 0.25: recovery peaks %.3f at intensity %.2f)\n", br25, bi25);
+        sweep(locked, 0.25, 3, bi, br, interior);
+        check(interior, "behind a bad screen (0.25), recovery peaks at an interior crush intensity");
+        std::printf("        (screen 0.25: recovery peaks %.3f at intensity %.2f)\n", br, bi);
 
         // The parameter-free half, and it is the one worth teaching: crushing
         // material that is already liberated has nothing to liberate. It only
-        // makes fines. This holds at every screen efficiency, and no number in
-        // this project can be tuned to make it false.
+        // makes fines, and fines settle too slowly to catch. This holds at every
+        // screen efficiency, and no number in this project can be tuned to make
+        // it false.
         ScoopBuilder pb;
         const double q[N_SIZE]  = {1.05, 5.25, 0.70}, ql[N_SIZE] = {1.0, 1.0, 1.0};
         const double mg[N_SIZE] = {0.12, 0.60, 0.08}, mgl[N_SIZE] = {0.95, 0.95, 0.95};
@@ -305,8 +472,7 @@ int main() {
         for (double eff : {1.00, 0.75, 0.50}) {
             double prev = 1e9;
             for (double i = 0.0; i <= 0.901; i += 0.1) {
-                const Substance p = closed_circuit(placer, i, eff, 3);
-                const double r = recovery(p, separate(p, PAN).concentrate, MAGNETITE);
+                const double r = dressed_recovery(placer, i, eff, 3, MAGNETITE);
                 if (r > prev + 1e-9) always_harmful = false;
                 prev = r;
             }
@@ -315,28 +481,34 @@ int main() {
 
         // And over-grinding is not a separate failure mode at all: grade climbs
         // monotonically as recovery is spent. It is the same law, on the size
-        // axis instead of the density axis. It was implemented once.
+        // axis instead of the velocity axis. It was implemented once.
         bool grade_climbs = true; double prev_g = -1.0;
         for (double i = 0.0; i <= 0.901; i += 0.05) {
-            const Substance p = closed_circuit(locked, i, 0.50, 8);
-            const double g = separate(p, PAN).concentrate.grade(MAGNETITE);
+            const double g = separate(dress(locked, i, 0.50, 8), PAN).concentrate.grade(MAGNETITE);
             if (g < prev_g - 1e-9) grade_climbs = false;
             prev_g = g;
         }
         check(grade_climbs, "past the recovery optimum, grinding still buys grade: the law again");
 
-        const double r0 = recovery(locked, separate(locked, PAN).concentrate, MAGNETITE);
+        const double r0 = dressed_recovery(locked, 0.0, 0.50, 3, MAGNETITE);
+        sweep(locked, 0.50, 3, bi, br, interior);
         check(br > r0, "crushing a locked ore is worth doing at all");
+        std::printf("        (locked outcrop, screen 0.50: recovery %.3f uncrushed -> %.3f at intensity %.2f)\n", r0, br, bi);
     }
 
     // ---- The picture -------------------------------------------------------
-    std::printf("\n  grade/recovery, magnetite from river sand (feed grade %.3f)\n", feed.grade(MAGNETITE));
-    std::printf("  %-8s %8s %10s %8s\n", "tool", "cut", "recovery", "grade");
+    std::printf("\n  settling velocity, m/s (free grains)\n  %-10s %10s %10s %10s\n", "phase", sz(0), sz(1), sz(2));
+    for (int p : {CARBON, QUARTZ, GOETHITE, MAGNETITE, HEMATITE})
+        std::printf("  %-10s %10.3e %10.3e %10.3e\n", PHASES[p].id,
+                    free_velocity(p, FINES), free_velocity(p, SAND), free_velocity(p, GRAVEL));
+
+    std::printf("\n  grade/recovery, magnetite from sized river sand (feed grade %.3f)\n", feed.grade(MAGNETITE));
+    std::printf("  %-8s %6s %10s %10s %8s\n", "tool", "9^sig", "cut m/s", "recovery", "grade");
     for (const SeparatorParams* sp : {&HANDS, &PAN, &SLUICE})
-        for (double cut : {3.0, 3.5, 4.0, 4.5}) {
-            SeparatorParams q = *sp; q.cut_density = cut;
+        for (double cut : {0.030, 0.050, 0.070, 0.090}) {
+            SeparatorParams q = *sp; q.cut_velocity = cut;
             const SeparationResult r = separate(feed, q);
-            std::printf("  %-8s %8.2f %10.3f %8.3f\n", sp->name, cut,
+            std::printf("  %-8s %6.2f %10.3f %10.3f %8.3f\n", sp->name, imperfection(*sp), cut,
                         recovery(feed, r.concentrate, MAGNETITE), r.concentrate.grade(MAGNETITE));
         }
 

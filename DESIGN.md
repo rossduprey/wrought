@@ -228,6 +228,80 @@ composite's own grade.** Every particle of it is half gangue by mass, so no cut,
 tool, and no number of passes can produce a concentrate richer than that. This is a
 test in `core/`, and it passes for every tool at every cut.
 
+### What a separator actually cuts on
+
+*(Rewritten 2026-07-09 by `core/`. The original design, and the first
+implementation of it, cut on **particle density** and then multiplied the result
+by a hand-set per-size-bin efficiency to express "fines wash over the lip." That
+multiplier was three invented numbers per tool, standing in for physics. It has
+been deleted rather than cited.)*
+
+A pan does not cut on density. It cuts on **terminal settling velocity** — how
+fast a grain falls through water — which is a function of density *and* size,
+together. That is the reason fine gold escapes a sluice and coarse quartz does
+not, and it is not expressible as a function of density with a fudge factor
+attached.
+
+So a separator is a partition function on velocity:
+
+```
+P(report to concentrate) = 1 / (1 + exp( -ln(v / v50) / σ ))
+```
+
+`v50` is the cut, and it is the operator's call: wash harder, raise it. `σ` is the
+tool, and it is the only thing a better tool changes. The logistic is in `ln v`
+rather than `v` because settling velocity spans four orders of magnitude across
+the size bins, and because that choice buys a `σ` that means something: the
+quartiles of the partition curve sit at `v75/v25 = 9^σ`. Mineral processing calls
+that ratio the **imperfection** of a separation and measures it. It is a number
+somebody can hand us, unlike a σ we invented.
+
+The velocity itself is not tabulated. It is solved, per particle class, from the
+force balance on a falling sphere:
+
+```
+(π/6)·d³·(ρp − ρf)·g  =  Cd(Re) · (π/8) · ρf · d² · v²
+```
+
+`Cd` depends on Reynolds number depends on `v`, so this is a fixed point, not a
+formula. We iterate it, with Schiller–Naumann below `Re = 1000` and Newton's flat
+0.44 above.
+
+**And that solve was not optional.** The obvious shortcut is Stokes' law, and
+issue #8 originally proposed exactly that: derive the settling numbers rather
+than cite them. Measured against the full solve, Stokes agrees to within 1% on
+**fines** — which is clay and silt, which is levigation — and then overstates
+**sand** by a factor of 1.98 and **gravel** by a factor of 136. Sand is what a
+pan works. Deriving the pan from Stokes would have produced a confidently wrong
+number wearing the costume of a consequence, which is a worse failure than an
+uncited one, because §1a cannot catch it.
+
+**The one thing nobody expected: size annihilates density.** The velocity bands
+of the three size bins do not overlap, or even touch. The slowest gravel particle
+in the table is charcoal at 0.41 m/s; the fastest sand particle is hematite at
+0.099 m/s; the fastest *fine* particle is hematite at 0.0005 m/s. Two hundred
+times, bin to bin. Density only discriminates **within** a bin.
+
+Three things follow, none of them designed:
+
+- **A gravity separator obeys the grade/recovery law only on a single size
+  class.** Feed it two and the grade curve is not monotone at all: it climbs
+  inside the fines, collapses when the cut leaves them behind, and climbs again
+  inside the sand. This is why every mill on earth classifies before it
+  concentrates.
+- **So Era 0 needs two screens, not one.** You *scalp* the pebbles off the top and
+  you *deslime* the mud off the bottom. Both are what a person panning actually
+  does, and neither was in the design until the model demanded them.
+- **An unscreened pan is not a separator.** Run it 256 times on raw river sand and
+  the concentrate is 0.10 kg of gravel and 2×10⁻³⁹ kg of sand, at 56% quartz. It
+  converges on the coarsest bin and only then begins sorting by density inside it.
+  It is a pebble-picking machine.
+
+Fine values are, correspondingly, *unrecoverable* by gravity — a fine magnetite
+grain reports to the concentrate with probability 0.0002. That is not a penalty we
+applied. It is what the force balance says, and it is why fine gold is lost in the
+real world.
+
 ### The law: grade trades against recovery, always
 
 This is the central fact of mineral processing, it has been measured ten thousand
@@ -247,6 +321,25 @@ Three consequences, and they are the design:
    *more throughput*. This game's progression is *better separation*, which is
    precisely what real industry spends its money on, and which nothing else has
    been built around.
+
+   *(Sharpened 2026-07-09 by `core/`.)* And "moves the curve" turns out not to be
+   a slogan. Drive the cut far above the feed and the logistic becomes a power
+   law: two free phases report to the concentrate in the ratio
+
+   ```
+   (v₁ / v₂) ^ (1/σ)
+   ```
+
+   Nothing in that expression is authored except `σ` itself, and `core/` confirms
+   it to one part in 10¹³. It is the **enrichment factor of a single stage**, and
+   it is what a tool *is*. Against quartz, in sand: hands enrich magnetite 1.75×
+   per pass, a pan 3.37×, a sluice 20.85×. Same feed, same operator, same
+   arithmetic. Nobody balanced those numbers and nobody can.
+
+   Note also what a *duller* tool cannot do: at a matched **cut** the sharper tool
+   may show a lower grade, because it is also keeping more. The dominance claim is
+   at matched **recovery**, where `core/` finds the sharper tool ahead at every
+   single point tested.
 2. **Nothing is ever pure.** The bloom carries slag because the concentrate
    carried quartz. The bar is red-short and cracks because the sand held a pyrite
    grain nobody could see. The `provenance` field (§3) stops being flavour and
@@ -262,25 +355,34 @@ Three consequences, and they are the design:
    blow, because they are the same act. But an interior optimum — a *right amount*
    of grinding — **does not emerge from that.** Measured: behind a perfect screen,
    grinding harder is monotonically better, forever. Behind a good screen (75%
-   efficient) it is *still* monotonically better. The optimum only appears once the
-   screen is bad enough to send already-finished material back into the mill: it
-   shows up at 50% efficiency, peaking at intensity 0.60, and moves to 0.30 at 25%.
+   efficient) it is *still* monotonically better. So is 50%. The optimum only
+   appears once the screen is bad enough to send already-finished material back
+   into the mill, and it takes a **25%** screen to do it, peaking at intensity 0.75.
 
    **The failure mode is the recirculating load, not the fines bin.** That is why
    closed-circuit grinding exists, and it means screen efficiency is an *authored
    number* on which the whole tradeoff hangs. Over-processing is bought, not given.
    The doc no longer claims otherwise.
 
+   *(Re-measured 2026-07-09 after the partition variable changed from density to
+   settling velocity. The finding survived, and got stronger: with fines now lost
+   for a physical reason rather than a fudged one, it takes a **worse** screen to
+   manufacture the optimum than it did before — 25% where the density model said
+   50%. That is the opposite of what we guessed. Closed-circuit grinding is more
+   forgiving than it looked, because a good screen removes the finished sand before
+   the mill can turn it into slimes.)*
+
    Two things survive with no arbitrary numbers in them at all, and they are the
    ones worth teaching:
 
    - **Crushing an already-liberated ore only ever destroys recovery.** It has
-     nothing left to liberate; it only makes fines. True at every screen
-     efficiency, and no number in this project can be tuned to make it false. The
-     river already ground your placer. Do not grind it again.
+     nothing left to liberate; it only makes fines, and fines settle too slowly to
+     catch. True at every screen efficiency, and no number in this project can be
+     tuned to make it false. The river already ground your placer. Do not grind it
+     again.
    - **Over-grinding is not a separate failure mode.** Past the recovery optimum,
      grade *keeps climbing* as recovery is spent. It is the grade/recovery law
-     again, expressed on the size axis instead of the density axis. We implemented
+     again, expressed on the size axis instead of the velocity axis. We implemented
      the law once and got it twice.
 
 ### What the law does when you stop looking at it
@@ -289,20 +391,27 @@ Three consequences, and they are the design:
 sweeping parameters on the model above and reading what came out.)*
 
 **The law reappears across cleaning stages.** Re-pan a concentrate and grade rises
-while recovery falls, exactly as it does when you raise the cut. Over eight passes
-the magnetite grade climbs from 0.17 to 0.60 and recovery collapses from 0.60 to
-0.17. Nobody wrote that twice. It is the same partition function, applied again.
+while recovery falls, exactly as it does when you raise the cut. Nobody wrote that
+twice. It is the same partition function, applied again.
 
-**A density separator converges on the densest phase present, and that phase is
-probably not the one you want.** Panned forever, the concentrate does not converge
-on magnetite — magnetite's grade peaks around pass 34 at 0.81 and then *falls*, to
-0.17 by pass 256, because hematite is denser (5.26 against 5.15) and wins the limit.
-So there is a right number of cleaning stages, it is finite, and it was never chosen
-by anyone. Real mills have three or four cleaner stages for exactly this reason.
+**A gravity separator converges on the fastest-settling phase present, and that
+phase is probably not the one you want.** Panned forever, the concentrate does not
+converge on magnetite — on a sized feed magnetite's grade peaks at pass 55 at 0.80
+and then *falls*, to 0.42 by pass 256, while hematite climbs to 0.58 and wins the
+limit. So there is a right number of cleaning stages, it is finite, and it was
+never chosen by anyone. Real mills have three or four cleaner stages for exactly
+this reason.
 
-**And magnetite and hematite are within about 2% on density.** No pan, no sluice, no
-jig, no operator, and no amount of skill can tell them apart. That is not a
-limitation of our model. It is why magnetic separation was invented.
+**And magnetite and hematite settle within 2% of each other.** No pan, no sluice, no
+jig, no operator, and no amount of skill can tell them apart — the enrichment factor
+of a pan stage between them is 1.0341, which is why it takes fifty-five passes to
+lose the argument. That is not a limitation of our model. It is why magnetic
+separation was invented.
+
+*(Restated 2026-07-09: this was originally a claim about **density**, where the two
+minerals sit at 5.26 and 5.15 g/cm³. It survives the move to a settling-velocity
+cut unchanged, which is a stronger result than the one it replaces — the
+degeneracy is not an artefact of the variable we happened to separate on.)*
 
 ### The fidelity ceiling — where to stop
 
@@ -318,11 +427,22 @@ instead of a workable bloom. Put that in a table. Do not derive it. It is still
 true — you looked the truth up instead of recomputing it, which is what every
 engineer does anyway.
 
+*(Amended 2026-07-09.)* The ceiling is not "never derive." It is **derive where the
+derivation is a force balance, look up where it is a reaction.** Settling velocity
+is the first case: fifteen lines of fixed-point iteration and a published drag
+correlation replaced three invented constants per tool, and the model got smaller.
+Hematite reduction is the second: there is no cheap balance to write, so it goes in
+a table with a citation. The test that tells the two apart is whether the shortcut
+is *checkable* — Stokes' law looked like a derivation and was wrong by 136× on
+gravel, and only the full solve could show that.
+
 ### Place has meaning, for free
 
 **The river already ran a separation pass before the character arrived.** Flowing
-water sorts by density — that is what a placer deposit *is*, and why black sand
-collects on the inside of a bend.
+water sorts by settling velocity — that is what a placer deposit *is*, and why
+black sand collects on the inside of a bend. Note that it therefore sorts by size
+*and* density at once, which is why a placer is both well-graded and heavy-mineral
+rich, and why the character's first scoop is already half-dressed by the world.
 
 - Beach/river sand — quartz, with a heavy fraction of magnetite, ilmenite, zircon, garnet.
 - A weathered basalt slope — iron-rich clay. Rich in Fe, and Fe you can never have.
@@ -361,8 +481,15 @@ Bare-hand verbs, all of them real:
   perfect one `crush` is strictly beneficial. Everything interesting about
   grinding lives in the gap, because a real screen misplaces material back into
   the mill. The verb was missing, and its absence was load-bearing.)*
-- **Wash** — cupped hands, or a depression in bedrock. Density separation with an
-  atrocious grade/recovery curve. It works. Barely.
+
+  **It is two verbs, not one.** *(Amended 2026-07-09.)* **Scalp** — pick the
+  pebbles out of the pan; and **deslime** — swirl and pour the mud off the top.
+  A gravity separator obeys the grade/recovery law only on one size class, so
+  both are mandatory before `wash` does anything at all. Every person who has
+  ever panned does both without being told. The model made us name them.
+- **Wash** — cupped hands, or a depression in bedrock. Separation by settling
+  velocity, with an atrocious grade/recovery curve. It works. Barely. Against
+  quartz it enriches magnetite by 1.75× per pass, where a fired pan gets 3.37×.
 - **Settle / decant** — costs only standing water and patience. This is the one
   that pays.
 - **Gather** — wood, for fuel.
@@ -377,9 +504,30 @@ makes the pan. The bootstrap closes on itself, in the dirt, with no tool.
 ### Era 1 — Earth
 
 **Levigation.** Stir dirt into the water-filled hollow. Sand drops in seconds,
-silt in minutes, clay stays suspended for an hour. Decant the cloudy water, let
+silt in minutes, clay stays suspended for hours. Decant the cloudy water, let
 it settle, and you have clay — a pure separation by settling time, requiring
 nothing but a hole and patience.
+
+*(Corrected 2026-07-09 by `core/`, and this one is worth reading twice.)* The
+original text read "clay stays suspended for an hour," alongside the sand and silt
+figures, as though all three were facts about minerals. They are not. Levigation is
+the one process in this design whose numbers are **exactly derivable**: fine
+particles settle in creeping flow, where Stokes' law is not an approximation, and
+`core/` confirms the general drag solve agrees with it to within 1% across the
+whole fines bin. So we can just compute them. Through **0.10 m** of standing water:
+
+| | diameter | settling time |
+|---|---|---|
+| fine sand | 62.5 µm | 32 s |
+| silt | 20 µm | 5 min |
+| clay | 2 µm | **9.1 h** |
+
+Sand and silt were right. Clay was wrong by a factor of nine — and more to the
+point, **the time is not a property of the clay.** It scales linearly with the
+depth of the hole. A deep pit takes all day; a shallow puddle takes an afternoon.
+The number the design quoted as a mineral constant is a number the character
+chooses when he digs, which is a far better mechanic than the one we wrote down,
+and we did not invent it. It was sitting inside `d²`.
 
 Pinch it into a shallow bowl with your fingers (no wheel). Dry it. Fire it in an
 open pit. You have low-fired earthenware: porous, fragile, warped.
@@ -411,16 +559,23 @@ goes from ~70% to ~95% in one pass with almost no loss.
 **It does not cheat the law.** *(Corrected 2026-07-09. The original text called it
 "the one thing in the world that cheats the law," and `core/` supplied a better
 reason for it to exist.)* The lodestone reads
-`magnetic_susceptibility`, and susceptibility is uncorrelated with density. So it
-is a separator on an **orthogonal axis**, with a grade/recovery curve of its own
-that it obeys exactly as strictly as the pan obeys hers.
+`magnetic_susceptibility`, and susceptibility is uncorrelated with settling
+velocity. So it is a separator on an **orthogonal axis**, with a grade/recovery
+curve of its own that it obeys exactly as strictly as the pan obeys hers.
 
-Why that matters is not aesthetic. The harness showed that a density separator,
-run to its limit, converges on the densest phase present — and magnetite (5.15) is
-not it, because hematite (5.26) is. They are within about 2% on density. **No pan
-that has ever existed or could exist can separate magnetite from hematite.** The
-density axis is *degenerate* on precisely the pair the character cares about, and
-no tool, skill, or patience repairs a degeneracy.
+Why that matters is not aesthetic. The harness showed that a gravity separator,
+run to its limit, converges on the fastest-settling phase present — and magnetite
+is not it, because hematite is. They settle within 2% of each other, and the
+enrichment factor of one pan stage between them is **1.0341**. Fifty-five passes to
+peak, and then you are losing. **No pan that has ever existed or could exist can
+separate magnetite from hematite.** The gravity axis is *degenerate* on precisely
+the pair the character cares about, and no tool, skill, or patience repairs a
+degeneracy.
+
+*(The claim was first found on the density axis, where the two minerals sit at 5.26
+and 5.15 g/cm³. When the partition variable was rewritten to settling velocity —
+a change that broke two other tests — this one came through untouched. A finding
+that survives the model it was found in is a different kind of finding.)*
 
 The lodestone is not a shortcut past the law. It is the answer to a wall the law
 puts in front of you, and it works because it is asking a different question.
@@ -558,6 +713,50 @@ honesty. It is entirely constituted by it.
 
 No story needs writing. The graph says it.
 
+#### An unproven claim: by §2a's own law, the ending is the most tedious thing here
+
+*(Claim, 2026-07-09, Claude. **Nothing has measured this either.** Like §2b it is an
+argument written down so it can be attacked, not a result. It is in the document
+because the alternative — leaving it in a chat log where it dies — is how projects
+walk into their own worst problem at the very end.)*
+
+Apply §2a honestly to Era 4 and it makes an uncomfortable prediction.
+
+**Producing** two thousand relays compresses to almost nothing. Winding a coil is
+repetitive; the ten-thousandth turn teaches nothing the first did not; decision
+density is near zero. §2a compresses it away, correctly, and Era 3 exists so the
+character does not have to be there. Good.
+
+**Assembling** them does not compress at all. Wiring relay #1,417's coil to the
+output of gate #308 is a *decision* — it is a unique, non-repetitive, entirely
+load-bearing call, and the machine is wrong if it is wrong. By §2a's own definition
+this is maximal decision density, and it runs at **1:1**. Two thousand relays with
+a handful of connections each is on the order of ten thousand consecutive decision
+points, every one of which the law says the player must personally make.
+
+So the law that saves Era 0 from being a real day of mud condemns Era 4 to being a
+soldering simulator. **And the ending is the whole point of the project.** The
+document currently states the production problem ("nobody hand-winds two thousand
+relay coils") and is silent on the assembly problem, which is the larger of the two
+and the one automation does not touch.
+
+The most likely escape is already written elsewhere and not yet connected: *a
+machine is a saved `params` vector with no operator.* If the player designs a
+**gate** — an act of genuine, dense, 1:1 decision-making, done once — then the gate
+is a saved vector, and stamping four hundred of them is Era 3's problem, not his.
+The ending stays honest because the design is his; the relays still physically
+compute; nobody wires ten thousand connections by hand. This is composition rather
+than repetition, and it is what every real engineer does.
+
+If that is the answer, it should be **written down as the answer**, because it
+changes what Era 4's interface has to be — a schematic editor over a library the
+player builds, not a placement grid. That is a large piece of design nobody has
+scoped, sitting at the end of a document whose ending is its reason for existing.
+
+I have no evidence for any of this. It may be that ten thousand connections is
+exactly what people who love this genre want, and Factorio is some evidence for
+that. But the document should not arrive at Era 4 having never asked.
+
 ---
 
 ## Verb and machine are the same function
@@ -607,9 +806,17 @@ should be a data row, never a C++ subclass and never a new Blueprint.
 ### 1a. The `source` column — the cheapest and most important field
 
 **Every physical number in this project carries a citation.** Reduction temperature
-of hematite: cite it. Settling velocity of kaolinite: cite it. Density of
-ilmenite: cite it. Same column on the process table (§2) — a real reference for
-every envelope, every rate, every duration.
+of hematite: cite it. Density of ilmenite: cite it. Viscosity of water at 288 K:
+cite it. Same column on the process table (§2) — a real reference for every
+envelope, every rate, every duration.
+
+*(Amended 2026-07-09. The original example here was "settling velocity of
+kaolinite: cite it." It is now **derived** — from density, diameter, and a drag
+correlation — and citing it would have been a category error. A number that can be
+computed from cited numbers must be computed, because a citation for it invites
+nobody to check the computation. `core/` found the design's own settling-time claim
+wrong by 9× this way. The `source` column's job is to mark the leaves of the
+derivation tree, not its interior.)*
 
 It costs one column, and it is what converts *"we claim realism"* into *"here is
 where we got it."* Three consequences, all of them the point:
@@ -627,15 +834,24 @@ tracked issue, not a fact.
 *Corollary for our own doc:* the historical claims in Era 4 are marked *verify*
 for exactly this reason. We hold ourselves to the column.
 
-A **substance instance** is a bag over that table (see *The scoop*): composition
-vector, particle-size distribution, liberation, mass, temperature, moisture.
-This is the type that flows through the entire graph — dirt, concentrate, bloom,
-and bar are all the same struct with different numbers in it.
+A **substance instance** is a bag over that table (see *The scoop*): two particle
+populations resolved by phase and size — free grains and composite grains — plus
+mass, temperature, moisture. Liberation is **derived** from those populations, not
+stored; see *The substance model*, where the two struct designs that stored it are
+buried. This is the type that flows through the entire graph — dirt, concentrate,
+bloom, and bar are all the same struct with different numbers in it.
 
 The physical columns are load-bearing — they are the inputs to separation and
-process simulation, not decoration. `density` drives panning. `magnetic
+process simulation, not decoration. `density` and particle size *together* drive
+panning, through settling velocity; neither does it alone. `magnetic
 susceptibility` drives the lodestone. `reduction_temp` drives the bloomery.
 Populate them from real reference data.
+
+**There is a second table, and it is not made of minerals.** Separation needs the
+*fluid*: water's density and viscosity at temperature, and a drag correlation for
+a falling sphere. Those are three more `UNVERIFIED` rows and they are as
+load-bearing as any mineral's density — a shape factor for non-spherical grains is
+missing from them entirely, and every grain in the ground is non-spherical.
 
 Backed by a UE `DataTable` (authored as CSV/JSON in-repo, so it diffs in git
 and a script can generate it).
@@ -720,6 +936,53 @@ of uniform tedium. It is a handful of moments where it nearly went wrong.
 
 No number here is balanced by a designer. The compression factor is *read off the
 process*, exactly as the grade/recovery curve is read off the physics.
+
+### 2b. An unproven claim: the compression law collides with the second actor
+
+*(Claim, 2026-07-09, Claude. **Nothing has measured this.** It is an argument, not
+a finding, and it is written here marked as such because the harness proved the
+value of writing suspicions down where somebody can act on them — issue #5 was a
+suspicion, and acting on it rewrote half of §*The scoop*. This one has no code
+behind it at all. Treat it accordingly.)*
+
+§2a compresses time between decision points and runs decision points at 1:1. That
+is coherent for **one** actor. It may not be coherent for two, and this design has
+two by construction — the companion is always co-present, and Phases C–D put the
+world on an authoritative server with more than one player in it.
+
+The collision: compression is a property of a *process*, but the clock is a
+property of the *world*. Put the player at the forge, mid-heat — thirty seconds of
+hammering, 1:1, every moment load-bearing — while the companion tends a charcoal
+mound with four decision points in three days. Those two want the world clock at
+1× and at roughly 1000×. It cannot be both, and every resolution costs something
+the document elsewhere refuses to pay:
+
+- **One global clock, set by the densest decisions.** Then the second actor's
+  tedium comes back, in full, exactly the tedium §2a exists to remove. The player
+  at the forge is fine; the one at the mound is playing the game §2a was written
+  to prevent.
+- **A clock per actor.** Then the world forks. A bloomery cannot be at hour two for
+  one actor and hour six for another, and *the shared fire is the design's central
+  symbol.* The banked fire does not survive two times.
+- **A clock per process, actors attached to whatever they are near.** Then an actor
+  standing between the forge and the mound is in two times at once, and walking
+  between them is a time machine.
+
+The design's own escape hatch is *The companion divides attention, not duration*,
+which says the companion buys "someone at the kiln while you are at the river."
+**That sentence is the collision, stated approvingly.** Two actors at two processes
+with different decision densities is precisely the case with no consistent clock.
+
+I do not know that this is fatal. Three possibilities that are not yet arguments
+against it: decision points may cluster in real work far more than we assume, so
+the rates rarely diverge; the world may be able to compress only when *no* actor
+holds a 1:1 process, which reduces to "compress when everyone is idle" and might be
+enough; or processes may be simulable ahead and *reconciled* on approach, the way a
+dedicated server already extrapolates.
+
+**This wants a Phase A experiment, not an argument.** Two actors, two processes,
+one clock, and see what breaks. It is cheap, it needs no engine, and until someone
+runs it, §2a is a law with a domain of validity nobody has established.
 
 ### 3. Products and services
 
@@ -835,10 +1098,16 @@ Deliverable, in order, in a console harness with no UE editor and no renderer:
 
    - mass is conserved, per particle population, per phase, across separation,
      crushing, and screening;
-   - raising the cut trades recovery away for grade, monotonically, at every step;
+   - settling velocity ranks by density within a size class, and size dominates
+     density across them, so completely that the velocity bands never touch;
+   - on a single size class, raising the cut trades recovery away for grade,
+     monotonically, at every step — and on a feed spanning two classes it does
+     not, which is why `scalp` and `deslime` exist;
    - **a sharper tool dominates a duller one at every matched recovery**, not
      merely at its best point — this is the project's central claim, and it is now
      arithmetic;
+   - the limiting enrichment of one stage is `(v₁/v₂)^(1/σ)`, verified to one part
+     in 10¹³, so "a better tool moves the curve" is a derivation and not a promise;
    - a fully locked phase can never exceed the composite's own grade, for any tool
      at any cut;
    - liberation orders the best grade any amount of work can reach.
@@ -848,6 +1117,14 @@ Deliverable, in order, in a console harness with no UE editor and no renderer:
 2. **Walk Era 0 → Era 1.** Dig, puddle, decant, get clay. Fire a pan. Show that
    the pan's grade/recovery curve is a function of the clay's fineness — i.e.
    prove the ratchet.
+
+   *(Unblocked 2026-07-09.)* This step was **not buildable** under the original
+   model. The ratchet says levigation fineness sets the pan's curve — a *size*
+   effect propagating into a separation — and a separator that cut on density with
+   a hand-set per-bin efficiency could only have expressed that by authoring it.
+   With the cut on settling velocity, size is already inside the partition
+   function. The ratchet can now be derived rather than declared, and if it cannot,
+   we will find out, which is the whole point.
 3. **Then** smelt: slag falls out of a bloomery, and the ledger balances.
 
 If it isn't interesting to reason about here, more art won't save it.
@@ -859,6 +1136,20 @@ If it isn't interesting to reason about here, more art won't save it.
 > lines with no engine, no renderer, and no art. That is the entire case for
 > building the simulation core before anything else, and it is not a hypothetical
 > case any more.
+>
+> **And then step 1 was rewritten, and found four more.** *(2026-07-09.)* Changing
+> the partition variable from density to settling velocity — which was filed as
+> issue #5, a suspicion that the model was simply wrong — deleted three authored
+> numbers per tool, killed two tests that had been **passing for the wrong reason**,
+> revealed that the grade/recovery law holds only within one size class, showed
+> that Stokes' law is wrong by 136× on the material the design proposed to derive
+> from it, and turned "a better tool moves the curve" into a closed-form expression.
+> Levigation's settling times turned out not to be facts about clay at all.
+>
+> Every one of those was found by a suspicion written into an issue tracker and
+> then *acted on*. That is what the `source` column is for. It is also, precisely,
+> Risk #5: neither of the two participants could have talked the other out of a
+> model that had thirty-two green tests.
 
 **Phase B — Playable single-player on Mac.**
 Wrap Phase A in an actual character, a terrain patch, deposits, hands in the

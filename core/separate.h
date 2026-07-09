@@ -1,82 +1,110 @@
 #pragma once
 
 #include <cmath>
-#include "substance.h"
+#include "settling.h"
 
-// Density separation as a partition function.
+// Gravity separation as a partition function.
 //
 // DESIGN.md describes progression as a grade/recovery curve that a better tool
 // "moves outward". A curve you author is a curve you balance, which the source
 // rule forbids. So nothing here authors a curve: a separator is the probability
 // that a particle reports to the concentrate, as a function of that particle's
-// density. The grade/recovery curve is an *output* of two numbers.
+// terminal settling velocity. The grade/recovery curve is an *output* of two
+// numbers.
 //
-//   cut_density  — the operator's call. Pan hard, raise the cut.
+//   cut_velocity — the operator's call. Wash harder, raise the cut.
 //   sharpness    — the tool. A duller tool blurs the cut, and no amount of skill
 //                  repairs it. This is what "the tool moves the curve" means.
 //
-// This is the partition (Tromp) curve of mineral processing, in the one form
-// where the tradeoff is arithmetic rather than a designer's opinion.
+// The partition is logistic in ln(v), not in v, because settling velocity spans
+// four orders of magnitude across the size bins and classifier partition curves
+// are log-normal in practice. That choice buys a reportable, falsifiable
+// definition of sharpness: with x = ln(v/v50)/sigma, the quartiles sit at
+// v75/v25 = 9^sigma. Mineral processing calls that ratio the imperfection of the
+// separation, and it is a thing that gets measured, unlike a sigma we invented.
+//
+//   hands  9^1.20 = 13.5      pan  9^0.55 = 3.1      sluice  9^0.22 = 1.6
+//
+// Those exponents are AUTHORED (issue #5). The ordering is what the tests
+// assert; the magnitudes are a standing invitation to be corrected by anyone
+// holding a real Tromp curve for a sluice box.
+//
+// Note what is NOT here any more: a per-size-bin efficiency. The first version
+// of this file cut on density and multiplied the result by size_efficiency[] to
+// make fines wash away. Cutting on velocity makes fines wash away because a fine
+// grain falls slowly, which is the actual reason. Three authored numbers per
+// tool were deleted rather than cited.
 
 namespace wrought {
 
 struct SeparatorParams {
-    double cut_density;              // g/cm^3, rho50
-    double sharpness;                // g/cm^3, smaller is a sharper cut
-    double size_efficiency[N_SIZE];  // fines leave over the lip whatever they weigh
+    double cut_velocity;  // m/s, v50
+    double sharpness;     // sigma in ln-velocity; 0 is a perfect cut
     const char* name;
 };
 
 // Cupped hands, then a low-fired pinch pot, then a built sluice. One function.
-inline constexpr SeparatorParams HANDS  = {3.5, 1.60, {0.05, 0.55, 0.70}, "hands"};
-inline constexpr SeparatorParams PAN    = {3.5, 0.80, {0.15, 1.00, 0.80}, "pan"};
-inline constexpr SeparatorParams SLUICE = {3.5, 0.35, {0.35, 1.00, 0.95}, "sluice"};
+inline constexpr SeparatorParams HANDS  = {0.060, 1.20, "hands"};
+inline constexpr SeparatorParams PAN    = {0.060, 0.55, "pan"};
+inline constexpr SeparatorParams SLUICE = {0.060, 0.22, "sluice"};
 
 struct SeparationResult {
     Substance concentrate;
     Substance tailings;
 };
 
-inline double partition(double particle_density, const SeparatorParams& sp, int size) {
-    const double x = (particle_density - sp.cut_density) / sp.sharpness;
-    return sp.size_efficiency[size] / (1.0 + std::exp(-x));
+// Fast particles stay in the pan. Slow ones go over the lip.
+inline double partition(double v, const SeparatorParams& sp) {
+    if (v <= 0.0) return 0.0;
+    const double x = std::log(v / sp.cut_velocity) / sp.sharpness;
+    return 1.0 / (1.0 + std::exp(-x));
+}
+
+// The quartile ratio v75/v25 of this tool. A separator's imperfection, in the
+// units a mineral processing paper would report it in.
+inline double imperfection(const SeparatorParams& sp) {
+    return std::pow(9.0, sp.sharpness);
 }
 
 inline SeparationResult separate(const Substance& in, const SeparatorParams& sp) {
     SeparationResult out;
     out.concentrate.temperature = out.tailings.temperature = in.temperature;
 
-    for (int p = 0; p < N_PHASE; ++p) {
-        const double rho_free = PHASES[p].density;
-        const double rho_comp = composite_density(p);
-
+    for (int p = 0; p < N_PHASE; ++p)
         for (int s = 0; s < N_SIZE; ++s) {
-            const double cf = in.freegrain[p][s] * partition(rho_free, sp, s);
+            const double cf = in.freegrain[p][s] * partition(free_velocity(p, s), sp);
             out.concentrate.freegrain[p][s] = cf;
             out.tailings.freegrain[p][s]    = in.freegrain[p][s] - cf;
 
-            // A composite reports as one particle, at one density, and its gangue
-            // is not consulted. This is where the grade ceiling comes from.
-            const double cc = in.composite[p][s] * partition(rho_comp, sp, s);
+            // A composite reports as one particle, at one velocity, and its
+            // gangue is not consulted. This is where the grade ceiling comes
+            // from.
+            const double cc = in.composite[p][s] * partition(composite_velocity(p, s), sp);
             out.concentrate.composite[p][s] = cc;
             out.tailings.composite[p][s]    = in.composite[p][s] - cc;
         }
-    }
     return out;
 }
 
 // A screen is a separation by size and nothing else. It is the verb that makes
 // crushing worth doing, and Era 0 in DESIGN.md did not have it.
+//
+// `cut_bin` is the finest bin that reports oversize. Two screens matter, and both
+// are Era 0: scalping (cut_bin = GRAVEL, take the pebbles out) and desliming
+// (cut_bin = SAND, wash the mud off). A gravity separator needs both, because it
+// obeys the grade/recovery law only within one size class. `separate()` will
+// happily concentrate a pebble.
+//
 // `efficiency` is the fraction of each particle that reports where it belongs;
 // the remainder is misplaced. AUTHORED, UNVERIFIED. A perfect screen is 1.0 and
 // does not exist.
 struct ScreenResult { Substance oversize, undersize; };
 
-inline ScreenResult screen(const Substance& in, double efficiency) {
+inline ScreenResult screen(const Substance& in, double efficiency, int cut_bin = GRAVEL) {
     ScreenResult out;
     for (int p = 0; p < N_PHASE; ++p)
         for (int s = 0; s < N_SIZE; ++s) {
-            const double to_over = (s == GRAVEL) ? efficiency : (1.0 - efficiency);
+            const double to_over = (s >= cut_bin) ? efficiency : (1.0 - efficiency);
             out.oversize.freegrain[p][s]  = in.freegrain[p][s] * to_over;
             out.undersize.freegrain[p][s] = in.freegrain[p][s] * (1.0 - to_over);
             out.oversize.composite[p][s]  = in.composite[p][s] * to_over;

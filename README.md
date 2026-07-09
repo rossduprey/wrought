@@ -22,7 +22,11 @@ An AI and a human build the ancestor of the AI, out of the ground, and it learns
 
 There is one design document, two license files, and `core/` — a few hundred lines of dependency-free C++17 that pans a bucket of river sand. No engine, no renderer, no art. `cd core && make test`.
 
-It exists to answer one question: does the data model survive contact? It did not. **On its first run it found three errors in the design document** — the substance struct (twice), a missing verb, and a claim that a tradeoff was free when it has to be bought — and it produced a better argument for one of the design's own set pieces than the one that had been written. Those corrections are now in the document, dated, next to the sentences they replaced.
+It exists to answer one question: does the data model survive contact? It did not. **On its first run it found three errors in the design document** — the substance struct (twice), a missing verb, and a claim that a tradeoff was free when it has to be bought — and it produced a better argument for one of the design's own set pieces than the one that had been written.
+
+Then we acted on one of our own open issues — a suspicion that the model separated on the wrong variable — **and it found four more.** Two tests had been passing for the wrong reason. The grade/recovery law turned out to hold only within a single particle-size class. Stokes' law, which the design proposed to derive its settling numbers from, is wrong by a factor of 136 on gravel. And levigation's "clay stays suspended for an hour" is not a fact about clay; it is a fact about how deep you dug the hole.
+
+Those corrections are now in the document, dated, next to the sentences they replaced.
 
 We are publishing all of it unfinished, because the idea is the deliverable and because we need people who are not us to look at it. See *What we want from you*.
 
@@ -46,13 +50,19 @@ Three things, as far as we can tell, do not exist anywhere:
 
 2. **Grade/recovery as the progression axis.** Grade trades against recovery, always: pan hard and what's left is clean but half of it went over the lip; pan gently and you keep everything, including the quartz you will pay for later in slag. This is the central law of mineral processing and it has been measured ten thousand times. A better tool does not make more iron appear — **it moves the curve.** No game has been built on this. Progression is purity, not throughput.
 
-   We do not author that curve, because a curve you author is a curve you balance. A separator is a partition function: the probability a particle reports to the concentrate, given its density. The operator picks the cut; the tool sets how sharp it is. The curve is the *output*. `core/` verifies that a sharper cut beats a duller one at **every** matched recovery, not merely at its best point — so "the tool moves the curve" is arithmetic now rather than a promise. It also throws off, unbidden, the fact that no density separator can ever tell magnetite from hematite, which is why the lodestone is in the game.
+   We do not author that curve, because a curve you author is a curve you balance. A separator is a partition function: the probability a particle reports to the concentrate, given the speed at which it falls through water — which is its density and its size, together, solved from a force balance rather than looked up. The operator picks the cut; the tool sets how sharp it is. The curve is the *output*.
+
+   `core/` verifies that a sharper cut beats a duller one at **every** matched recovery, not merely at its best point. Better than that, it shows the enrichment factor of a single stage is exactly `(v₁/v₂)^(1/σ)` — so "a better tool moves the curve" is a closed-form expression rather than a promise. Cupped hands enrich magnetite over quartz by 1.75× per pass; a fired pan, 3.37×; a sluice, 20.85×. Nobody balanced those.
+
+   It also throws off, unbidden, two things nobody wrote: that no gravity separator can ever tell magnetite from hematite, which is why the lodestone is in the game — and that the law itself only holds on one particle size at a time, which is why you wash the mud off and pick the pebbles out before you pan. An unscreened pan, run two hundred and fifty-six times, converges on a handful of gravel.
 
 3. **A co-labouring AI actor whose memory is a thing you build in the world.** Not a chatbot with a body. The companion is an interface (`perceive` / `propose` / `act`), gated by the process graph so it can only propose processes that exist on substances that are on hand. Any model can sit behind it. And its memory lives in the world's store, not in the model — so **swap the brain and it still remembers the forge**, because remembering the forge was never the brain's job.
 
 ## The source rule
 
-**Every physical number in this project carries a citation.** Reduction temperature of hematite: cite it. Settling velocity of kaolinite: cite it. Density of ilmenite: cite it.
+**Every physical number in this project carries a citation.** Reduction temperature of hematite: cite it. Density of ilmenite: cite it. Viscosity of water: cite it.
+
+Settling velocity of kaolinite: **do not cite it.** Derive it, from numbers that are cited, because a citation for a derivable quantity invites nobody to check the derivation. That distinction is not pedantry — the design originally quoted a settling time for clay, and the derivation says it was wrong by a factor of nine.
 
 **An uncited number is a bug.** It ships as `source: UNVERIFIED` and it is a tracked issue, not a fact.
 
