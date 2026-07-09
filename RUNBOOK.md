@@ -80,6 +80,19 @@ Four results are settled. Each has a way it could be un-settled, and that is wri
 - **Era 1 has a lodestone-shaped hole.** Levigation cannot separate clay from clay-sized quartz; the velocity ratio is 1.031×, the same 1.03× that hides magnetite in hematite. See **#15**. *Closed by* **#13** if kaolinite is given the drag of a platelet rather than of a sphere, which is the single most dangerous uncited number in the project — it can reverse a finding rather than refine one.
 - **Throughput is a bigger shovel.** More mass per hour is not progression. A bigger pot is, because it moves the curve outward at matched grade. This distinction was got wrong once already, in the direction of thinking the pot's loop was illegal.
 
-The next piece of work is either **Phase A step 3 (smelt)** — slag falls out of a bloomery and the ledger balances — or **#13 first**, on the grounds that #13 can invalidate the finding `README.md`'s front page is currently built around.
+The next piece of work is either **Phase A step 3 (smelt)** — slag falls out of a bloomery and the ledger balances — or **#13 first**, on the grounds that #13 can invalidate the finding `README.md`'s front page is currently built around. Smelt is downstream of nothing and cannot invalidate anything already written; #13 can, and it grows more expensive the longer the front page stands on it.
 
-`DESIGN.md` § "Open decisions — Ross picks" is authoritative for anything not settled here. Ross picks. When two fixes both look right and trade off against each other, say so and let him choose; do not quietly take one.
+---
+
+## Open, and written down nowhere else
+
+`DESIGN.md` § "Open decisions — Ross picks" holds the *project* decisions — build host, scope, licence, canonical host — and most are resolved. It does not hold these. These were carried in conversation across several sessions, which is not a place things survive. They are Ross's to answer and none of them has been.
+
+- **Does the three-clause test go into `DESIGN.md` as a section explicitly owned by Ross**, the way §2a is? Asked twice, never granted.
+- **Does "teach the tool, never the wisdom" become a stated rule** rather than a habit that happens to be followed?
+- **The §2b experiment.** Two actors, two processes, one clock; find out what breaks. Costs nothing and needs no engine.
+- **The re-panning verb.** Throwing tailings in the river is wrong — real panners re-pan them. The verb is free and has never been picked up.
+- **Is `pick` a tax or a decision?** If it is a tax, it should not be a verb.
+- **How does a real panner's *tilt* become a mouse gesture?** This decides whether the pan is playable at all, and it is the only question here that could stop the project.
+
+When two fixes both look right and trade off against each other, say so and let Ross choose. Do not quietly take one.

@@ -34,6 +34,8 @@ cd core && make pan         # kneel in the river and wash it yourself
 cd core && make ratchet-run # watch the design document lose an argument
 ```
 
+Nothing to install: `g++` and `make`. If you are about to work on it rather than read it, `RUNBOOK.md` is the orientation — the toolchain, the map of `core/`, and which of the findings below are still provisional.
+
 `make pan` is the same physics with nothing added but *legibility*. It exists because the one question the test suite cannot answer by passing is whether any of this is worth doing for twenty minutes on a Tuesday.
 
 The pan shows you its own composition vector, live, one row per mineral, changing under your hands as you wash. That was not the original design — the original design showed you a picture of a pan and no numbers, on the theory that there is no assay laboratory in a river. But a *score* and a *state* are not the same thing, and only the first one is a lie. A player given one number with an arrow pointing up will optimise it instead of playing; a player given the composition of what is in front of him is being given the thing this project claims is its central novelty, and hiding it made the novelty invisible. The panner has no assay. **The panner is not alone** — claim #3 below is a co-labouring AI, and asking it what is in the dirt is not cheating, it is the relationship. Grade and recovery are always shown together, because either one alone is a score again.
