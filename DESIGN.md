@@ -524,7 +524,13 @@ Three consequences, and they are the design:
    carried quartz. The bar is red-short and cracks because the sand held a pyrite
    grain nobody could see. The `provenance` field (§3) stops being flavour and
    becomes load-bearing: **an item remembers the composition of the scoop it came
-   from**, all the way down.
+   from**, all the way down. *(Both halves of this are now built. The slag floor
+   is in `forge.h` consolidation; red-short is in `forge.h` shaping as of
+   2026-07-10 — sulfur is tracked on the element ledger (`EL_S`, `smelt.h`),
+   pyrite seeds it into the metal in the bloomery, it survives the fire, and above
+   the Fe–FeS eutectic (~988 °C) hot work tears the grain boundaries. The pyrite
+   grain nobody could see is exactly the point: no Era-1 separator can reject
+   sulfur, so it is found only at the last blow, by the crack.)*
 3. **Over-processing is a real failure — but not for the reason stated here
    originally, and it is not free.** *(Corrected 2026-07-09 by `core/`. The
    original text read: "Grind too far and you make slimes you cannot separate. A
@@ -993,9 +999,13 @@ cleaner scales iron away, the grade/recovery law a fourth time. See Phase A step
 forge's second half. Form is free at any heat because it is volume conservation;
 hardness is only cold, because above the recrystallization floor, ~0.4 of iron's
 melting point, the metal re-grows grain as fast as the hammer tangles it. Form and
-hardness are won at opposite ends of the heat.)* **Iron comes out a solid; copper
-(Era 2b) comes out a liquid and is cast, not forged — so this arrow is where the
-two metals' chains diverge, and shaping is the axis they later share.**
+hardness are won at opposite ends of the heat. Shaping also carries **red-short**:
+a bar seeded with sulfur by pyrite back in the bloomery cracks when worked hot,
+above the Fe–FeS eutectic ~988 °C — the contaminant no separator could see, found
+only at the anvil. `EL_S` joined the element ledger to make it possible.)* **Iron
+comes out a solid; copper (Era 2b) comes out a liquid and is cast, not forged — so
+this arrow is where the two metals' chains diverge, and shaping is the axis they
+later share.**
 
 ### Era 2b — Copper, and the payoff of a useless verb
 
@@ -1735,6 +1745,37 @@ Deliverable, in order, in a console harness with no UE editor and no renderer:
    a hard edge can only be beaten in cold, so form and hardness are won at opposite
    ends of the fire. This is also the axis **copper shares** with iron — the two
    chains diverge at the furnace (forge vs. cast) and rejoin here, at shaping.
+
+6. **And the poison finds you at the last blow: red-short.**
+
+   *(Done 2026-07-10. `core/forge.h` shaping + `smelt.h` ledger.)* This is the
+   payoff of "nothing is ever pure" (§ above) and the close of the iron chain. The
+   sand held **pyrite**, and pyrite is sulfur. No Era-1 tool rejects it: sulfur is
+   not magnetic, does not settle apart, and the bloomery's fluxless acidic slag is
+   a poor sink for it — so a fraction dissolves into the reduced iron and rides the
+   metal, invisible, through consolidation to the anvil. The finding inverts step 5:
+
+   - **Sulfur makes the hot end the forbidden end.** Iron and iron-sulfide form a
+     eutectic that melts at ~988 °C — *below* a forging heat (verified, a tabulated
+     phase equilibrium, not a force balance). So worked **hot**, a sulfur-bearing
+     bar carries a liquid film on its grain boundaries and tears along them under
+     the hammer: it red-shorts, it will not weld, it cracks — at exactly the heat
+     where clean iron flows free (step 5). Worked **cold**, the film is solid and
+     the bar holds — but cold is where metal will not move and where it hardens
+     toward brittleness. Dirty iron is trapped at both ends of the heat. `core/`
+     confirms it: a clean bar forges to full soundness hot; the same-iron pyritic
+     bar (≈1.7% S in the metal) is torn to a few percent sound in six hot blows,
+     yet stays perfectly sound — and merely hardens — worked cold.
+
+   This is why pyritic ore was worthless despite being iron-rich, and why the
+   lodestone and the crush were never only about yield: they were the chain's only
+   defence against a contaminant that no separation stage can see and only the
+   hammer can find. What is verified is the eutectic; what is authored is the sulfur
+   **threshold** for the embrittling film, the metal/slag **partition**, and the
+   **cracking rate** (issue #24) — the finding rides the eutectic sitting below
+   forging heat and cracking being monotone in hot sulfur-strain, not their values.
+   Sulfur is the first element tracked on the ledger (`EL_S`) not for the mass
+   balance but because it *rides*: the one impurity with a fate outside the slag.
 
 If it isn't interesting to reason about here, more art won't save it.
 

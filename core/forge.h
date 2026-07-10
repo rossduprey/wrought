@@ -8,7 +8,9 @@
 // becomes a shaped tool. The forge has two halves and this file holds both:
 // CONSOLIDATION (bloom -> bar), which densifies, and SHAPING (bar -> tool),
 // which gives a form and hardens it. They are the same anvil and the same verb;
-// what changes is what the hammer is for.
+// what changes is what the hammer is for. Shaping also holds the chain's last
+// finding, RED-SHORT: the hammer is the only tool that can find the sulfur three
+// stages of separation could not remove -- and it finds it by cracking.
 //
 // This is the first process in the project that is DEFORMATION, not separation.
 // Everything before it -- pan, sluice, lodestone, even the bloomery's chemistry --
@@ -94,6 +96,7 @@ inline double slag_per_iron(double phi) {
 // the hammer touched it -- everything the pores could not hold.
 struct Bloom {
     double iron = 0.0;          // kg metallic Fe (the sponge's solid)
+    double sulfur = 0.0;        // kg S dissolved in the metal (the red-short seed)
     double slag[N_ELEM] {};     // kg entrained slag, by element
     double drained[N_ELEM] {};  // kg slag shed in the furnace, by element
     double temperature = 288.0; // K
@@ -102,6 +105,7 @@ struct Bloom {
 // The consolidated bar.
 struct Bar {
     double iron = 0.0;          // kg metal remaining after scale loss
+    double sulfur = 0.0;        // kg S still dissolved in the metal (survives the fire)
     double slag[N_ELEM] {};     // kg residual slag, the stringers
     double scale[N_ELEM] {};    // kg iron lost to hammer scale (left the piece)
     double drained[N_ELEM] {};  // kg slag squeezed out (furnace + every heat)
@@ -123,6 +127,7 @@ inline double slag_mass(const double s[N_ELEM]) {
 inline Bloom pull_bloom(const BloomResult& fired, double packing = GREEN_PACKING) {
     Bloom b;
     b.iron = fired.bloom_iron;
+    b.sulfur = fired.bloom_sulfur; // dissolved in the metal, not in the drainable slag
     b.temperature = fired.bloom.temperature;
 
     const double total = slag_mass(fired.slag);
@@ -147,6 +152,7 @@ inline Bar consolidate(const Bloom& green, int heats,
                        double scale_rate = SCALE_PER_HEAT) {
     Bar bar;
     bar.iron = green.iron;
+    bar.sulfur = green.sulfur; // dissolved sulfur survives the fire -- scale is iron, not S
     bar.temperature = green.temperature;
     bar.heats = heats;
     for (int e = 0; e < N_ELEM; ++e) {
@@ -244,14 +250,63 @@ inline constexpr double H_SATURATED = 220.0;
 // its size only sets how fast. Issue #23.
 inline constexpr double STRAIN_SCALE = 0.6;
 
+// ------------------------------------------------------------------------
+// RED-SHORT: the poison that only the hammer can find.
+//
+// Shaping said the heat is a smith's friend: form is free hot, so you work hot
+// to move metal and save the cold, hardening blows for the end. RED-SHORT is the
+// exact inversion of that friendship, and it is triggered by the one thing three
+// stages of separation could not remove -- the sulfur that dissolved into the
+// iron back in the bloomery (smelt.h) and rode the metal, invisible, through
+// consolidation to this anvil. The finding:
+//
+//   SULFUR MAKES HOT THE FORBIDDEN END. Iron and iron-sulfide form a eutectic
+//   that melts at ~988 C -- far below a forging heat. So when a sulfur-bearing
+//   bar is worked HOT, a liquid film wets its grain boundaries, and the metal
+//   tears itself apart along them under the hammer: it crumbles, it will not
+//   weld, it cracks. Cold, the film is solid and the bar holds -- but cold is
+//   where metal will not flow and where it work-hardens toward brittleness. So
+//   dirty iron is trapped: it red-shorts at the hot end where clean iron flows
+//   free, and it barely moves at the cold end where it is merely sound. The
+//   contaminant no pan, no sluice, no lodestone could see is the one that decides
+//   whether the metal can be forged at all -- and it is revealed only here, at
+//   the last blow, under deformation. This is why pyritic ore was worthless
+//   despite being iron-rich, and it closes the iron chain: the whole point of the
+//   lodestone and the crush was never just yield, it was to keep this poison out.
+//
+// Per DESIGN.md's fidelity ceiling -- look up the reaction, derive the balance --
+// the eutectic temperature is VERIFIED (a tabulated phase equilibrium, not a
+// force balance). What is AUTHORED is the sulfur THRESHOLD at which a continuous
+// embrittling film forms and the RATE at which hot strain then opens cracks
+// (issue #24). The finding depends on the eutectic existing below forging heat
+// and on cracking being monotone in hot sulfur-strain, not on those values.
+
+// Fe-FeS eutectic melting point: 988 C = 1261 K. Above it, a sulfur-bearing
+// bar's grain boundaries carry a liquid film. VERIFIED (Fe-S phase diagram);
+// well below any forging or welding heat, which is the whole trap.
+inline constexpr double EUTECTIC_T = 1261.0;
+
+// Sulfur mass fraction of the metal above which the grain-boundary sulfide forms
+// a continuous embrittling film. Hot shortness sets in above ~0.05 wt% S when
+// there is no manganese to fix it, as bloomery iron has none. AUTHORED, cited
+// threshold: it sets WHERE red-short begins, not that it does. Issue #24.
+inline constexpr double RED_SHORT_S = 5.0e-4;
+
+// Cracking e-folding: how much (excess-sulfur x hot strain) opens grain-boundary
+// cracks. Soundness decays as exp(-cracking), so this only sets how fast a
+// red-short bar comes apart. AUTHORED, finding-independent in size. Issue #24.
+inline constexpr double CRACK_SCALE = 0.02;
+
 // A shaped piece. Pure deformation: it carries the bar's metal and stringers
 // unchanged, plus the two things shaping creates -- a form (elongation, length
 // as a multiple of the stock bar) and a history of cold strain that survived.
 struct Tool {
     double iron = 0.0;          // kg metal, unchanged by pure deformation
+    double sulfur = 0.0;        // kg S dissolved in the metal (rode in from the bloom)
     double slag[N_ELEM] {};     // the bar's stringers, drawn out along the grain
     double elongation = 1.0;    // length as a multiple of the stock bar
     double cold_strain = 0.0;   // accumulated plastic strain worked in below recryst
+    double cracking = 0.0;      // grain-boundary damage from hot-working a sulfurous bar
     double temperature = 288.0; // K, the piece's current heat
 };
 
@@ -259,6 +314,7 @@ struct Tool {
 inline Tool stock(const Bar& bar) {
     Tool t;
     t.iron = bar.iron;
+    t.sulfur = bar.sulfur;
     t.temperature = bar.temperature;
     for (int e = 0; e < N_ELEM; ++e) t.slag[e] = bar.slag[e];
     return t;
@@ -274,6 +330,15 @@ inline void draw(Tool& t, double reduction, double T) {
     const double eps = -std::log(1.0 - r);   // true strain of this pass
     t.elongation *= std::exp(eps);           // form: won hot or cold
     if (T < RECRYST_T) t.cold_strain += eps; // hardness: only cold survives
+
+    // Red-short: above the Fe-FeS eutectic a sulfurous bar's grain boundaries are
+    // wetted by a liquid film, and hot strain tears the metal along them. Below
+    // the eutectic the film is solid and the bar holds, however dirty. So the
+    // crack is a HOT failure, and only for metal above the sulfur threshold.
+    const double s_frac = (t.iron + t.sulfur > 0.0) ? t.sulfur / (t.iron + t.sulfur) : 0.0;
+    if (T >= EUTECTIC_T && s_frac > RED_SHORT_S)
+        t.cracking += (s_frac - RED_SHORT_S) / CRACK_SCALE * eps;
+
     t.temperature = T;
 }
 
@@ -284,5 +349,11 @@ inline double hardness(const Tool& t) {
     return H_ANNEALED + (H_SATURATED - H_ANNEALED) *
            (1.0 - std::exp(-t.cold_strain / STRAIN_SCALE));
 }
+
+// Structural soundness of the piece: 1 is whole, 0 is come apart. Grain-boundary
+// cracking from hot-working a sulfurous bar decays it exponentially. A clean bar,
+// or a dirty one kept below the eutectic, stays exactly 1 -- it is only hot work
+// on sulfurous metal that spends soundness. This is the red-short verdict.
+inline double soundness(const Tool& t) { return std::exp(-t.cracking); }
 
 } // namespace wrought

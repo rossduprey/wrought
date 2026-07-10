@@ -32,36 +32,49 @@
 // silica -- free quartz and silicate-bound alike -- reports to a pure fayalite
 // slag. Real slags carry alumina, lime and free silica and melt at other
 // temperatures; those move the wall a little, and they are a tracked issue (#21).
+//
+// One element on the ledger is not here for the balance -- it is here because it
+// RIDES. Sulfur, carried by pyrite, is not rejected by any Era-1 tool: it is not
+// magnetic, it does not settle apart, and the bloomery's acidic slag, having no
+// lime flux, is a poor sulfur sink -- so a fraction of it dissolves into the
+// reduced iron and stays there, invisible, all the way to the anvil. It does no
+// harm in this file. It does its harm two files downstream, at the last blow of
+// the hammer, where it makes the metal RED-SHORT (forge.h). Tracking it here is
+// what lets that failure exist at all: it is the contaminant no separation can
+// see, revealed only under deformation. Issue #24.
 
 namespace wrought {
 
-// Elements we account. OTHER lumps Ti, S, Ca, Al, K, H, Mn... -- everything not
-// on the iron/silica/carbon/oxygen ledger. It is conserved as a bucket, which is
-// all the balance needs.
-enum Element { EL_FE, EL_SI, EL_O, EL_C, EL_OTHER, N_ELEM };
+// Elements we account. S is tracked on its own (not lumped) because it is the one
+// impurity that survives into the metal and breaks it downstream -- red-short, in
+// forge.h. OTHER still lumps Ti, Ca, Al, K, H, Mn... -- everything with nowhere to
+// go but slag. Both are conserved; only S has a fate outside the slag.
+enum Element { EL_FE, EL_SI, EL_O, EL_C, EL_S, EL_OTHER, N_ELEM };
 
 // A mineral's formula, as counts of the tracked atoms per formula unit plus the
 // molar mass. Everything else in the formula falls into OTHER = M - tracked.
 // Atomic weights are IUPAC 2021 standard values -- the most citable numbers in
 // the project, and the reason nothing in this file is UNVERIFIED.
-struct Formula { double molar_mass, n_fe, n_si, n_o, n_c; };
+struct Formula { double molar_mass, n_fe, n_si, n_o, n_c, n_s; };
 
 namespace detail {
-    constexpr double A_FE = 55.845, A_SI = 28.085, A_O = 15.999, A_C = 12.011;
+    constexpr double A_FE = 55.845, A_SI = 28.085, A_O = 15.999, A_C = 12.011, A_S = 32.06;
     // Per-phase formulae, indexed by PhaseId. A zero row means "no tracked atoms",
-    // which is correct for a bloom of metallic iron carrying only Fe.
+    // which is correct for a bloom of metallic iron carrying only Fe. Pyrite is the
+    // only sulfur-bearer: FeS2 is now fully resolved (Fe + 2 S ~= its whole mass),
+    // so its OTHER falls to ~0 and its sulfur is on the ledger where it can do harm.
     inline constexpr Formula FORMULA[N_PHASE] = {
-        /*QUARTZ    SiO2         */ {60.083,  0, 1, 2, 0},
-        /*FELDSPAR  KAlSi3O8     */ {278.33,  0, 3, 8, 0},
-        /*KAOLINITE Al2Si2O5(OH)4*/ {258.16,  0, 2, 9, 0},
-        /*MAGNETITE Fe3O4        */ {231.53,  3, 0, 4, 0},
-        /*HEMATITE  Fe2O3        */ {159.69,  2, 0, 3, 0},
-        /*GOETHITE  FeO(OH)      */ {88.851,  1, 0, 2, 0},
-        /*ILMENITE  FeTiO3       */ {151.71,  1, 0, 3, 0},
-        /*PYRITE    FeS2         */ {119.97,  1, 0, 0, 0},
-        /*CALCITE   CaCO3        */ {100.09,  0, 0, 3, 1},
-        /*CARBON    C            */ {12.011,  0, 0, 0, 1},
-        /*IRON      Fe (metal)   */ {55.845,  1, 0, 0, 0},
+        /*QUARTZ    SiO2         */ {60.083,  0, 1, 2, 0, 0},
+        /*FELDSPAR  KAlSi3O8     */ {278.33,  0, 3, 8, 0, 0},
+        /*KAOLINITE Al2Si2O5(OH)4*/ {258.16,  0, 2, 9, 0, 0},
+        /*MAGNETITE Fe3O4        */ {231.53,  3, 0, 4, 0, 0},
+        /*HEMATITE  Fe2O3        */ {159.69,  2, 0, 3, 0, 0},
+        /*GOETHITE  FeO(OH)      */ {88.851,  1, 0, 2, 0, 0},
+        /*ILMENITE  FeTiO3       */ {151.71,  1, 0, 3, 0, 0},
+        /*PYRITE    FeS2         */ {119.97,  1, 0, 0, 0, 2},
+        /*CALCITE   CaCO3        */ {100.09,  0, 0, 3, 1, 0},
+        /*CARBON    C            */ {12.011,  0, 0, 0, 1, 0},
+        /*IRON      Fe (metal)   */ {55.845,  1, 0, 0, 0, 0},
     };
 }
 
@@ -69,12 +82,13 @@ namespace detail {
 inline double element_fraction(int p, int e) {
     const Formula& f = detail::FORMULA[p];
     const double tracked = f.n_fe * detail::A_FE + f.n_si * detail::A_SI
-                         + f.n_o * detail::A_O + f.n_c * detail::A_C;
+                         + f.n_o * detail::A_O + f.n_c * detail::A_C + f.n_s * detail::A_S;
     switch (e) {
         case EL_FE:    return f.n_fe * detail::A_FE / f.molar_mass;
         case EL_SI:    return f.n_si * detail::A_SI / f.molar_mass;
         case EL_O:     return f.n_o  * detail::A_O  / f.molar_mass;
         case EL_C:     return f.n_c  * detail::A_C  / f.molar_mass;
+        case EL_S:     return f.n_s  * detail::A_S  / f.molar_mass;
         case EL_OTHER: return (f.molar_mass - tracked) / f.molar_mass;
     }
     return 0.0;
@@ -93,9 +107,19 @@ inline void assay_elements(const Substance& s, double out[N_ELEM]) {
 
 // Iron the bloomery can reduce: the oxides. Silicate-locked iron is not here (it
 // stays in slag) -- but the phase table has none. Ilmenite's iron is refractory
-// and reports to slag; pyrite is a sulfide and poisons the bloom, not reduces to
-// it. So the reducible set is exactly the three iron oxides. Issue #21.
+// and reports to slag; pyrite is a sulfide -- its iron does not reduce here, and
+// its SULFUR is the poison (partitioned below, not to slag alone). So the
+// reducible set is exactly the three iron oxides. Issue #21.
 inline bool reducible(int p) { return p == MAGNETITE || p == HEMATITE || p == GOETHITE; }
+
+// Fraction of the charge's sulfur that dissolves into the reduced iron rather than
+// leaving with the slag. A bloomery's acidic fayalitic slag, with no lime flux, is
+// a poor sulfur sink, so a large share stays in the metal -- which is exactly why
+// bloomery iron from pyritic ore was red-short and worthless. AUTHORED, finding-
+// independent: the sign (some sulfur reaches the metal), not the size, is what lets
+// red-short exist. Manganese, which would fix the sulfur harmlessly, is an Era-3
+// answer this chain does not have yet. Issue #24.
+inline constexpr double SULFUR_TO_METAL = 0.5;
 
 // M(SiO2)/M(Si): mass of silica per unit mass of silicon.
 inline constexpr double SIO2_PER_SI = 60.083 / 28.085;
@@ -110,11 +134,12 @@ inline constexpr double FE_PER_SIO2 = 2.0 * 55.845 / 60.083; // = 1.859
 inline constexpr double CARBON_PER_FE = 1.5 * 12.011 / 55.845; // = 0.3226 kg C / kg Fe
 
 struct BloomResult {
-    Substance bloom;         // metallic iron (freegrain[IRON])
-    double slag[N_ELEM] {};  // element masses locked in the slag
-    double gas[N_ELEM] {};   // element masses leaving as CO/CO2
-    double bloom_iron = 0.0; // kg of metal, convenience
-    bool lit = false;        // did the furnace reach reducing conditions
+    Substance bloom;           // metallic iron (freegrain[IRON])
+    double slag[N_ELEM] {};    // element masses locked in the slag
+    double gas[N_ELEM] {};     // element masses leaving as CO/CO2
+    double bloom_iron = 0.0;   // kg of metal, convenience
+    double bloom_sulfur = 0.0; // kg sulfur dissolved in the metal (the red-short seed)
+    bool lit = false;          // did the furnace reach reducing conditions
 };
 
 // Fire the bloomery. `ore` is the charge, `charcoal` its fuel/reductant (a
@@ -165,6 +190,12 @@ inline BloomResult bloomery(const Substance& ore, const Substance& charcoal,
     r.bloom.freegrain[IRON][SAND] = bloom_fe;
     r.bloom.temperature = ore.temperature;
 
+    // Sulfur partitions. Only a furnace that made metal can take sulfur into it;
+    // the acidic slag keeps the rest. This is the seed of red-short, carried in the
+    // metal (a scalar, not a slag phase) all the way to the anvil in forge.h.
+    const double s_to_metal = (bloom_fe > 0.0) ? in[EL_S] * SULFUR_TO_METAL : 0.0;
+    r.bloom_sulfur = s_to_metal;
+
     // What leaves up the stack. The metal took `bloom_fe` of the reducible iron;
     // the oxygen bound to that fraction goes with it as gas. And all the charcoal
     // is gone -- carbon does not survive a bloomery: what did not reduce iron
@@ -181,6 +212,7 @@ inline BloomResult bloomery(const Substance& ore, const Substance& charcoal,
     r.slag[EL_SI]    = in[EL_SI];
     r.slag[EL_O]     = in[EL_O] - o_to_gas;
     r.slag[EL_C]     = 0.0;
+    r.slag[EL_S]     = in[EL_S] - s_to_metal;
     r.slag[EL_OTHER] = in[EL_OTHER];
 
     return r;

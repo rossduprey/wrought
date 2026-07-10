@@ -1306,6 +1306,83 @@ int main() {
                     hot.elongation, hardness(hot), hardness(cold));
     }
 
+    // ---- 15. Red-short: the poison only the hammer can find -------------------
+    // Sulfur from pyrite dissolves into the bloom and no Era-1 separator can pull
+    // it back out; it rides the metal, invisible, to the anvil. There, above the
+    // Fe-FeS eutectic (~988 C), it wets the grain boundaries and the bar cracks
+    // under hot work. Cold, it holds -- but cold it will not flow and it hardens.
+    // The contaminant no pan or magnet could see decides whether the metal forges.
+    {
+        auto charcoal = [](double kg) { Substance c; c.freegrain[CARBON][SAND] = kg; return c; };
+        auto ore = [](double mag, double qz, double py) {
+            Substance o;
+            o.freegrain[MAGNETITE][SAND] = mag;
+            o.freegrain[QUARTZ][SAND]    = qz;
+            if (py > 0.0) o.freegrain[PYRITE][SAND] = py;
+            return o;
+        };
+        const Substance dirty = ore(5.0, 0.5, 0.15); // pyritic charge
+        const Substance clean = ore(5.0, 0.5, 0.0);  // same iron, no sulfur
+
+        const BloomResult fd = bloomery(dirty, charcoal(2.0));
+        const BloomResult fc = bloomery(clean, charcoal(2.0));
+
+        // (a) sulfur reaches the metal from pyritic ore, and none from clean ore.
+        // The partition is real: the acidic slag does not take it all.
+        check(fd.bloom_sulfur > 0.0 && fc.bloom_sulfur == 0.0,
+              "sulfur dissolves into the bloom: a pyritic charge seeds the metal, a clean one does not");
+
+        // (b) the sulfur ledger balances: what pyrite brought in leaves as metal
+        // sulfur plus slag sulfur, nothing lost.
+        double in_ore[N_ELEM], in_fuel[N_ELEM];
+        assay_elements(dirty, in_ore); assay_elements(charcoal(2.0), in_fuel);
+        const double s_in = in_ore[EL_S] + in_fuel[EL_S];
+        check(s_in > 0.0 && std::fabs(s_in - (fd.bloom_sulfur + fd.slag[EL_S])) < 1e-12,
+              "the sulfur ledger balances: charge S = metal S + slag S");
+
+        // Consolidate both to bars; the dissolved sulfur survives the fire (scale
+        // is iron, not sulfur), so it is still there at the anvil.
+        const Bar bd = consolidate(pull_bloom(fd), 6);
+        const Bar bc = consolidate(pull_bloom(fc), 6);
+        check(std::fabs(bd.sulfur - fd.bloom_sulfur) < 1e-12 && bd.sulfur > 0.0,
+              "sulfur survives consolidation: the fire scales off iron, not the dissolved poison");
+
+        const double FORGE = EUTECTIC_T + 250.0; // a true forging heat, above the eutectic
+        const double COLD  = RECRYST_T - 400.0;  // a black bar, below eutectic and recryst both
+
+        // (c) worked hot, the dirty bar red-shorts while the clean one stays whole.
+        Tool dh = stock(bd), ch = stock(bc);
+        for (int i = 0; i < 6; ++i) { draw(dh, 0.5, FORGE); draw(ch, 0.5, FORGE); }
+        check(soundness(ch) == 1.0 && soundness(dh) < 0.5,
+              "red-short is a hot failure: clean iron forges whole, sulfurous iron cracks apart");
+
+        // (d) the SAME dirty bar worked COLD stays perfectly sound -- below the
+        // eutectic the sulfide film is solid and the grain boundaries hold.
+        Tool dc = stock(bd);
+        for (int i = 0; i < 6; ++i) draw(dc, 0.5, COLD);
+        check(soundness(dc) == 1.0,
+              "cold, the poison sleeps: below the eutectic even a sulfurous bar holds together");
+
+        // (e) the trap. The dirty bar cannot be worked hot (it cracks) and the cold
+        // end where it is sound is exactly where it hardens toward brittleness. The
+        // clean bar has no such bind. Sulfur turns the whole heat-axis against you.
+        check(soundness(dh) < 0.5 && soundness(dc) == 1.0 && hardness(dc) > hardness(dh) + 50.0,
+              "sulfurous iron is trapped: it red-shorts hot and only hardens cold, sound at neither working heat");
+
+        // (f) cracking is monotone in hot work: every hot blow on a sulfurous bar
+        // spends more soundness, without bound toward zero.
+        Tool one = stock(bd), five = stock(bd);
+        draw(one, 0.5, FORGE);
+        for (int i = 0; i < 5; ++i) draw(five, 0.5, FORGE);
+        check(soundness(one) < 1.0 && soundness(five) < soundness(one),
+              "each hot blow costs soundness: red-short worsens monotonically under the hammer");
+
+        const double s_frac = 100.0 * bd.sulfur / (bd.iron + bd.sulfur);
+        std::printf("        (bar %.2f%% S: 6 hot blows -> %.0f%% sound (cracked); "
+                    "6 cold blows -> %.0f%% sound, %.0f HB (hard))\n",
+                    s_frac, 100.0 * soundness(dh), 100.0 * soundness(dc), hardness(dc));
+    }
+
     // ---- The picture -------------------------------------------------------
     std::printf("\n  settling velocity, m/s (free grains)\n  %-10s %10s %10s %10s %10s\n",
                 "phase", sz(0), sz(1), sz(2), sz(3));
