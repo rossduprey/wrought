@@ -12,7 +12,7 @@ Debian 13. `g++ 14.2.0`, `GNU Make 4.4.1`. No dependencies, no build system beyo
 
 ```
 cd core
-make test          # 69 assertions. Must print "ok (0 failures)".
+make test          # 76 assertions. Must print "ok (0 failures)".
 make ratchet-run   # a measurement, not a test. Allowed to come out badly.
 make pan           # play it
 make clean
@@ -34,6 +34,7 @@ Read them in this order. Each one only knows about the ones above it.
 | `substance.h` | `Substance`: a `[phase][size]` mass matrix, twice — free grains and composites. `grade()`. No position, no vertical dimension, no volume. |
 | `settling.h` | Terminal velocity from a force balance, solved as a damped fixed point. Water properties from temperature; grain shape from the aspect ratio. `free_velocity(p, s, T)` is the number the whole project turns on, and the long comment on what a bin diameter *means* is the most load-bearing paragraph in `core/`. |
 | `separate.h` | The Tromp partition, `9^σ` imperfection, screening, crushing, closed circuit, the bed (`exposed()`), `skin_depth()`, `recovery()`. |
+| `magnetic.h` | The lodestone. A force balance on `magnetic_susceptibility` — `L = χ·B∇B/(μ₀ρg)`, grain volume cancels. Separates magnetite from everything on an axis orthogonal to the pan. Its two authored magnet numbers are asserted **not to matter**, because magnetite's χ/ρ is ~1375× the next phase's. |
 | `levigate.h` | The batch decant. Its partition is a ramp and it is exact — there is no authored sharpness in this file. |
 | `fire.h` | The two bridges from a body of clay to a tool: grit → sharpness, clay → vessel. The first is **derived** now — the log law over a rough bed — and keeps one bounded shape factor where it used to keep an invented functional form. The second is still invented end to end. Both are issues. Read the "two misplacements" note at the foot of its header before you touch `fire_pan`. |
 

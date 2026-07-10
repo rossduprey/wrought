@@ -27,6 +27,7 @@
 #include <initializer_list>
 
 #include "fire.h"
+#include "magnetic.h"
 
 using namespace wrought;
 
@@ -992,6 +993,96 @@ int main() {
               "the old bridge overstated the blur 8.85x, and the blur was already nothing");
         std::printf("        (authored %.3e, derived %.3e, against a wrist of %.2f)\n",
                     authored, derived, WRIST_SHARPNESS);
+    }
+
+    // ---- 11. the lodestone: a force balance on an orthogonal axis ----------
+    //
+    // The magnet reads magnetic_susceptibility and nothing else. The claims here
+    // are that it lifts magnetite and only magnetite; that it does this by a
+    // volume-independent force balance; that its authored strength does not
+    // matter across two orders of magnitude; that it splits the one pair no pan
+    // can (magnetite from hematite); and that a locked grain still caps its grade.
+    {
+        // (a) magnetite lifts, everything else does not, at the authored reach.
+        bool only_magnetite = lift_number(PHASES[MAGNETITE].magnetic_susceptibility,
+                                          PHASES[MAGNETITE].density) > 1.0;
+        for (int p = 0; p < N_PHASE; ++p)
+            if (p != MAGNETITE)
+                only_magnetite = only_magnetite
+                    && lift_number(PHASES[p].magnetic_susceptibility, PHASES[p].density) < 1.0;
+        check(only_magnetite,
+              "the lodestone lifts magnetite and no other phase in the table");
+
+        // (b) a diamagnetic grain is repelled, exactly, not feebly attracted.
+        check(magnetic_partition(lift_number(PHASES[QUARTZ].magnetic_susceptibility,
+                                             PHASES[QUARTZ].density)) == 0.0
+              && magnetic_partition(lift_number(PHASES[CALCITE].magnetic_susceptibility,
+                                                PHASES[CALCITE].density)) == 0.0,
+              "quartz and calcite are diamagnetic: the stone pushes them away, partition is 0");
+
+        // (c) the gap that makes the magnet's strength irrelevant: magnetite's
+        // lift number is more than 1000x the next-strongest phase's. This is why
+        // any reach in a wide band lifts magnetite alone.
+        double L_mag = lift_number(PHASES[MAGNETITE].magnetic_susceptibility, PHASES[MAGNETITE].density);
+        double L_next = 0.0;
+        for (int p = 0; p < N_PHASE; ++p)
+            if (p != MAGNETITE)
+                L_next = std::fmax(L_next,
+                    lift_number(PHASES[p].magnetic_susceptibility, PHASES[p].density));
+        check(L_mag / L_next > 1000.0,
+              "magnetite's lift number is >1000x every other phase: the gap that frees the magnet from tuning");
+        std::printf("        (magnetite L = %.1f, next phase L = %.4f, ratio %.0fx)\n",
+                    L_mag, L_next, L_mag / L_next);
+
+        // (d) the money test: the one pair no pan can separate. Equal masses of
+        // free magnetite and free hematite, in the same size bin, so they settle
+        // within 2% and gravity is degenerate on them. The lodestone splits them.
+        Substance pair;
+        pair.freegrain[MAGNETITE][SAND] = 1.0;
+        pair.freegrain[HEMATITE][SAND]  = 1.0;
+        const SeparationResult mag = lodestone(pair);
+        check(mag.concentrate.grade(MAGNETITE) > 0.99
+              && recovery(pair, mag.concentrate, MAGNETITE) > 0.99
+              && recovery(pair, mag.concentrate, HEMATITE) < 0.01,
+              "the lodestone splits magnetite from hematite, which no pan can: an orthogonal axis");
+        std::printf("        (magnetite/hematite: pan enrichment 1.034x per stage, lodestone grade %.4f in one)\n",
+                    mag.concentrate.grade(MAGNETITE));
+
+        // (e) the strength of the stone does not matter. A panned concentrate,
+        // cleaned by magnets spanning 14x..140x the threshold reach and sharpness
+        // 0.2..0.5, lands at the same grade and recovery to within 1%.
+        Substance conc = feed;
+        for (int i = 0; i < 40; ++i) conc = separate(conc, PAN).concentrate;
+        double g_lo = 1.0, g_hi = 0.0, r_lo = 1.0;
+        for (double reach : {0.3, 0.9, 3.0})
+            for (double sigma : {0.2, 0.35, 0.5}) {
+                const SeparationResult r = lodestone(conc, reach, sigma);
+                g_lo = std::fmin(g_lo, r.concentrate.grade(MAGNETITE));
+                g_hi = std::fmax(g_hi, r.concentrate.grade(MAGNETITE));
+                r_lo = std::fmin(r_lo, recovery(conc, r.concentrate, MAGNETITE));
+            }
+        check(g_hi - g_lo < 0.01 && r_lo > 0.98,
+              "the magnet's authored strength does not matter across 10x reach and 2.5x sharpness");
+        std::printf("        (grade held in [%.4f, %.4f], recovery >= %.4f, on a feed of %.3f magnetite)\n",
+                    g_lo, g_hi, r_lo, conc.grade(MAGNETITE));
+
+        // (f) the grade ceiling is liberation, not the magnet. A fully locked
+        // magnetite feed reports every grain to the stone -- gangue and all --
+        // and the concentrate grade is exactly the composite fraction, 0.5.
+        Substance locked;
+        locked.composite[MAGNETITE][SAND] = 1.0;
+        const SeparationResult lk = lodestone(locked);
+        check(std::fabs(lk.concentrate.grade(MAGNETITE) - COMPOSITE_TARGET_FRACTION) < 1e-9
+              && recovery(locked, lk.concentrate, MAGNETITE) > 0.99,
+              "a fully locked feed: the stone grabs it all and the grade is the composite's, not 1.0");
+
+        // (g) mass is conserved by the pass, per phase.
+        bool conserved = true;
+        const SeparationResult cs = lodestone(feed);
+        for (int p = 0; p < N_PHASE; ++p)
+            conserved = conserved && std::fabs(
+                cs.concentrate.phase_mass(p) + cs.tailings.phase_mass(p) - feed.phase_mass(p)) < 1e-9;
+        check(conserved, "the lodestone conserves every phase across the pass");
     }
 
     // ---- The picture -------------------------------------------------------
