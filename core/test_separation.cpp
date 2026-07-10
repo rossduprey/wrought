@@ -29,6 +29,7 @@
 #include "fire.h"
 #include "magnetic.h"
 #include "smelt.h"
+#include "forge.h"
 
 using namespace wrought;
 
@@ -1166,6 +1167,85 @@ int main() {
         const double lean = bloomery(pure_mag, charcoal(0.1)).bloom_iron;
         check(lean > 0.0 && lean < fed && std::fabs(lean - 0.1 / CARBON_PER_FE) < 1e-9,
               "too little charcoal reduces too little iron: the bloom is carbon-limited");
+    }
+
+    // ---- 13. the forge: a spongy bloom becomes a bar, and cannot be cleaned --
+    //
+    // The first DEFORMATION process. A bloom is a sponge with slag in its pores;
+    // hammering closes the pores and squeezes the slag out -- but only through
+    // pores that still connect. Below the connectivity floor the trapped slag has
+    // no path out, so a wrought bar always carries stringers, and the residual is
+    // set by geometry, not by how long you hammer. The fayalite wall's twin. And
+    // the grade/recovery law pays out a fourth time: every heat that drains slag
+    // also scales iron away, so a cleaner bar is a smaller one.
+    {
+        auto charcoal = [](double kg) { Substance c; c.freegrain[CARBON][SAND] = kg; return c; };
+        auto ore_at = [](double mag, double qz) {
+            Substance o; o.freegrain[MAGNETITE][SAND] = mag; o.freegrain[QUARTZ][SAND] = qz; return o;
+        };
+        // A real smelt with silica in the charge: it clears the wall, so there is a
+        // bloom, and it leaves fayalite slag for the pores to hold.
+        const BloomResult fired = bloomery(ore_at(3.0, 1.0), charcoal(2.0));
+        const Bloom green = pull_bloom(fired);
+
+        // (a) the furnace does not hand you metal. A green bloom carries slag.
+        check(green.iron > 0.0 && slag_mass(green.slag) > 0.0,
+              "a green bloom is a sponge: iron welded around slag-filled pores, not clean metal");
+
+        // (b) the floor is set by connectivity, not effort. With no scale loss the
+        // iron is fixed, so the floor is a true fixed point: blooms that start with
+        // very different slag converge to the SAME residual, and hammering past
+        // saturation changes nothing.
+        const Bloom loose = pull_bloom(fired, 0.45); // porosity 0.55, slag-rich
+        const Bloom dense = pull_bloom(fired, 0.70); // porosity 0.30, slag-lean
+        const Bar l40 = consolidate(loose, 40, SLAG_EXPULSION, 0.0);
+        const Bar d40 = consolidate(dense, 40, SLAG_EXPULSION, 0.0);
+        const Bar l80 = consolidate(loose, 80, SLAG_EXPULSION, 0.0);
+        check(slag_mass(loose.slag) > 1.5 * slag_mass(dense.slag)
+              && std::fabs(slag_fraction(l40) - slag_fraction(d40)) < 1e-6
+              && std::fabs(slag_fraction(l40) - slag_fraction(l80)) < 1e-9
+              && slag_fraction(l80) > 0.0,
+              "the slag floor is connectivity, not effort: different blooms, same residual, and it never reaches zero");
+
+        // (c) purity costs yield: more heats drive the slag down AND the metal down.
+        // The pan's law, on the forge's axis.
+        const Bar b3  = consolidate(green, 3);
+        const Bar b8  = consolidate(green, 8);
+        check(slag_fraction(b8) < slag_fraction(b3) && yield(green, b8) < yield(green, b3),
+              "a cleaner bar is a smaller bar: every heat expels slag and scales iron away");
+
+        // (d) you cannot hammer a bar clean. The floor is positive at every effort.
+        bool always_dirty = true;
+        for (int h : {5, 20, 100, 500})
+            always_dirty = always_dirty && slag_fraction(consolidate(green, h, SLAG_EXPULSION, 0.0)) > 1e-3;
+        check(always_dirty, "wrought iron is wrought: no number of heats produces slag-free metal");
+
+        // (e) the ledger balances element by element: green iron + slag = bar iron
+        // + residual slag + scale + drained.
+        const Bar bar = consolidate(green, 8);
+        bool balanced = true;
+        for (int e = 0; e < N_ELEM; ++e) {
+            const double gin  = (e == EL_FE ? green.iron : 0.0) + green.slag[e] + green.drained[e];
+            const double bout = (e == EL_FE ? bar.iron : 0.0) + bar.slag[e] + bar.scale[e] + bar.drained[e];
+            balanced = balanced && std::fabs(gin - bout) < 1e-12;
+        }
+        check(balanced, "the forge ledger balances: green bloom = bar + scale + drained slag, element by element");
+
+        // (f) scale is iron and nothing else -- it is the metal's own surface, not
+        // its slag, that oxidizes and flakes off.
+        bool scale_is_iron = true;
+        for (int e = 0; e < N_ELEM; ++e)
+            if (e != EL_FE) scale_is_iron = scale_is_iron && bar.scale[e] == 0.0;
+        check(scale_is_iron && bar.scale[EL_FE] > 0.0,
+              "hammer scale is iron: the loss to purity is paid in metal, not in slag");
+
+        const double green_frac = slag_mass(green.slag) / (green.iron + slag_mass(green.slag));
+        std::printf("        (green bloom %.1f%% slag; ", 100.0 * green_frac);
+        for (int h : {2, 5, 10}) {
+            const Bar bh = consolidate(green, h);
+            std::printf("%d heats -> %.2f%% slag at %.0f%% yield%s", h,
+                        100.0 * slag_fraction(bh), 100.0 * yield(green, bh), h == 10 ? ")\n" : ", ");
+        }
     }
 
     // ---- The picture -------------------------------------------------------

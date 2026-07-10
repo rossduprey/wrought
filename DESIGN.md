@@ -983,6 +983,15 @@ charge smelts only above Fe/SiO₂ = 1.859. Possibility never enters it: the iro
 is right there in the sand, and the furnace hands it all to the slag unless you
 first crush and magnetically clean the ore past the wall. See Phase A step 3.
 
+*(And the bar, built 2026-07-10, `core/forge.h`.)* The `→ bar` arrow is the first
+**deformation** in the project, and it has a wall of its own. A bloom comes out a
+slag-filled sponge, and hammering can only drain slag through pores that still
+connect; below the percolation threshold the rest is trapped as stringers. So a
+wrought bar is never clean — ~1.5%, set by geometry, not effort — and driving it
+cleaner scales iron away, the grade/recovery law a fourth time. See Phase A step 4.
+**Iron comes out a solid; copper (Era 2b) comes out a liquid and is cast, not
+forged — so this arrow is where the two metals' chains diverge.**
+
 ### Era 2b — Copper, and the payoff of a useless verb
 
 Historically copper precedes iron, and it does here too, for a reason that closes
@@ -1660,6 +1669,42 @@ Deliverable, in order, in a console harness with no UE editor and no renderer:
      found tool of Era 1 is revealed as the literal gate of Era 2. The lodestone
      (see "the lodestone" above) was built to close this step and is recorded
      there.
+4. **Then** forge: hammer the spongy bloom into a solid bar.
+
+   *(Done 2026-07-10. `core/forge.h`.)* This is the first process in the project
+   that is **deformation, not separation** — every step before it sorts a
+   population of grains by a property; this one squeezes a single porous solid
+   and drives out what is not iron. It invalidates nothing already written, which
+   is the point of doing it here: it is downstream of everything.
+
+   A bloom is not metal. It is a **sponge** — reduced iron welded at half density,
+   its pores full of the fayalite slag the wall put there. Hammering closes the
+   pores and squeezes the slag out, and the finding is a second floor, geometric
+   like the first:
+
+   - **Slag drains only through connected pores.** As the sponge densifies its
+     porosity falls, and below a percolation threshold the pores stop touching.
+     The slag in those isolated pores has no path to the surface and no hammer
+     removes it. So a wrought bar **always** carries slag — as stringers — and the
+     residual (~1.5%, squarely in the measured 1–4% range) is set by
+     **connectivity, not effort**: hammer twice as long, get the same number. It
+     is the fayalite wall's deformation twin, and it is *why wrought iron is
+     wrought*. `core/` confirms it: blooms that start with 3× different slag
+     converge on the identical residual, and hammering past saturation moves it by
+     one part in a billion.
+
+   - **And the grade/recovery law pays out a fourth time.** Every heat that expels
+     slag also scales iron off the surface, so driving the bar cleaner costs metal:
+     31% slag at full yield, or 2% slag at 78% yield, and nothing buys both. The
+     pan's law, on settling velocity; the mill's, on grain size; the cleaner
+     stage's, on repetition; and now the forge's, under the hammer. We implemented
+     one law and have found it four times.
+
+   What is authored here is the *rate* — how fast a heat drains slag and scales
+   iron — the forge's version of the pan's sharpness (physical process, authored
+   speed), tracked as issue #22. The two floors are derived: connectivity is
+   geometry, and the slag a porosity holds is volume arithmetic against two
+   densities. Neither finding depends on an authored number's value, only its sign.
 
 If it isn't interesting to reason about here, more art won't save it.
 
