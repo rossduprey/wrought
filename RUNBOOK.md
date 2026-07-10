@@ -12,7 +12,7 @@ Debian 13. `g++ 14.2.0`, `GNU Make 4.4.1`. No dependencies, no build system beyo
 
 ```
 cd core
-make test          # 76 assertions. Must print "ok (0 failures)".
+make test          # 85 assertions. Must print "ok (0 failures)".
 make ratchet-run   # a measurement, not a test. Allowed to come out badly.
 make pan           # play it
 make clean
@@ -35,6 +35,7 @@ Read them in this order. Each one only knows about the ones above it.
 | `settling.h` | Terminal velocity from a force balance, solved as a damped fixed point. Water properties from temperature; grain shape from the aspect ratio. `free_velocity(p, s, T)` is the number the whole project turns on, and the long comment on what a bin diameter *means* is the most load-bearing paragraph in `core/`. |
 | `separate.h` | The Tromp partition, `9^σ` imperfection, screening, crushing, closed circuit, the bed (`exposed()`), `skin_depth()`, `recovery()`. |
 | `magnetic.h` | The lodestone. A force balance on `magnetic_susceptibility` — `L = χ·B∇B/(μ₀ρg)`, grain volume cancels. Separates magnetite from everything on an axis orthogonal to the pan. Its two authored magnet numbers are asserted **not to matter**, because magnetite's χ/ρ is ~1375× the next phase's. |
+| `smelt.h` | The bloomery. The first process that is chemistry, not mechanics — so it is a **tabulated reaction**, not a force balance. An element ledger (Fe/Si/O/C/other, from formulae and standard atomic weights) that balances across ore + charcoal → bloom + slag + gas. Its one finding is derived, not authored: with no flux, silica leaves as fayalite and eats **1.859 kg Fe per kg SiO₂**, so a charge smelts only above Fe/SiO₂ = 1.859. |
 | `levigate.h` | The batch decant. Its partition is a ramp and it is exact — there is no authored sharpness in this file. |
 | `fire.h` | The two bridges from a body of clay to a tool: grit → sharpness, clay → vessel. The first is **derived** now — the log law over a rough bed — and keeps one bounded shape factor where it used to keep an invented functional form. The second is still invented end to end. Both are issues. Read the "two misplacements" note at the foot of its header before you touch `fire_pan`. |
 
@@ -72,7 +73,7 @@ Commit messages are lowercase, `area: what changed`, and they are allowed to be 
 
 ## Where we are
 
-Era 0 (hands, pan, sluice, lodestone) and the first half of Era 1 (levigation, fired pot) are implemented and measured. Nothing else exists.
+Era 0 (hands, pan, sluice, lodestone) and Era 1 (levigation, fired pot) are implemented and measured, and the door into Era 2 is open: the bloomery smelts, and iron falls out of it (`smelt.h`, 2026-07-10). Nothing past the first bloom exists — no bar, no forge, no copper.
 
 **This section said, on 2026-07-09, that #13 was "the single most dangerous uncited number in the project — it can reverse a finding rather than refine one." On 2026-07-10 it was done, and it did.** One of the four settled results below is now struck through. Read that as encouragement: the paragraph was right, the work was worth prioritising, and the way to find out was to go and do the arithmetic. **#10 was done the same day, for the same reason, and it reversed a different thing than anyone expected.** Of the three results that remain, one is now derived rather than provisional:
 
@@ -80,6 +81,7 @@ Era 0 (hands, pan, sluice, lodestone) and the first half of Era 1 (levigation, f
 - **Levigation authors nothing.** Its imperfection is exactly 3.0 for every vessel, charge and wait, and even the pour fraction is derived. Nothing to overturn — it is algebra. *(Survived #13: the algebra never moved. Every number it stood on did.)*
 - ~~**Era 1 has a lodestone-shaped hole.** Levigation cannot separate clay from clay-sized quartz; the velocity ratio is 1.031×, the same 1.03× that hides magnetite in hematite.~~ **Overturned 2026-07-10 by #13.** The 1.031× was the ratio between two *spheres* of equal diameter and unequal density; kaolinite is a platelet and the real ratio is **6.977×**. Levigation divides the clay bin, reaches grade 1.000 given patience, and has a grade/recovery curve like every other separator here. Deflocculation (**#15**) survives as an *improvement*, not a *requirement*.
 - **Throughput is a bigger shovel.** More mass per hour is not progression. A bigger pot is, because it moves the curve outward at matched grade. This distinction was got wrong once already, in the direction of thinking the pot's loop was illegal. *(Survived #13, but its old proof did not: "same grade, more recovery" was only sayable while grade was pinned. The pot now wins at every matched grade, which is the real test and the one §2a specifies.)*
+- **Iron has a wall, and it is 1.859.** *(Added 2026-07-10 by `smelt.h`.)* A fluxless bloomery loses 1.859 kg of iron to fayalite slag per kg of silica — two atomic weights, nobody's choice — so a charge smelts only above Fe/SiO₂ = 1.859. Panned sand assays 0.12 and washes no higher than ≈ 0.5, so **the pan cannot make smeltable ore.** This is the concrete form of "possibility is not the gate, efficiency is," and it is why the lodestone is not romantic decoration: crush-and-magnet is the only Era-1 path across the wall. If any of `phase_table.h`'s densities or `substance.h`'s `COMPOSITE_TARGET_FRACTION` move, the exact ratios shift but the wall does not — it is stoichiometry, not fixture.
 
 Three habits earned their keep on 2026-07-10 and are worth stating as rules rather than as anecdotes.
 
@@ -89,7 +91,9 @@ Three habits earned their keep on 2026-07-10 and are worth stating as rules rath
 
 **A lesson learned in one file does not propagate to the next one by itself.** `separate.h` worked out on 2026-07-09 that *a separator has two misplacements, not one*, and rewrote `screen()` around it. `fire.h` was making the identical mistake about pot floors — one authored line, one function away, charging the cost of a grain that never moved to the blur of the grains that did — and it survived a full day and a passing test suite. When you fix a modelling error, grep for the shape of it, not for the symbol.
 
-The next piece of work is **Phase A step 3 (smelt)** — slag falls out of a bloomery and the ledger balances. It is downstream of nothing and cannot invalidate anything already written, which is now the whole of what is left to choose from: **#13 and #10 are both closed**, and with them the last authored number under a front-page finding. What remains open is either a set piece (**#15**, deflocculation), an unbuilt model (**#19**, hiding–exposure, which #10 opened and did not close), or a citation chore (**#1, #2, #5, #12, #16, #17, #18**) — none of which can reverse anything.
+**A step's dependencies are not always the ones the plan drew.** This very section said, right here, that smelt "is downstream of nothing." It is downstream of *two* things — the lodestone and the crush — and the way that surfaced was a probe that tried to feed a bloomery from a pan and got a glassy slag. The plan's dependency graph is a hypothesis like any other; the arithmetic is what actually knows the edges. Build the probe before you believe the ordering.
+
+The next piece of work is **bloom → bar → tool**: consolidating the spongy bloom and forging it, which is Era 2 proper and the first mechanics in the project that are *deformation*, not separation — genuinely new territory, downstream of everything, able to invalidate nothing already written. Everything else open is a set piece (**#15**, deflocculation), an unbuilt model (**#19**, hiding–exposure), or a citation chore (**#1, #2, #5, #7, #12, #16, #17, #18, #20, #21**). Note **#21** and **#20** as this session's debts: the bloomery's slag chemistry and reducible set are simplified, and the lodestone's and the `IRON` phase's numbers are authored — none of which can reverse the two findings they sit under (the fayalite wall and the orthogonal magnetic axis), both of which are stoichiometry and susceptibility ratios, not fixture.
 
 ---
 

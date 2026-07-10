@@ -976,6 +976,13 @@ week one and have nowhere to put it and no way to force air through it.
 Then: bloomery. Ore → bloom → bar → tool. The first chain that gets full process
 fidelity, and the first time the character makes a thing that makes things.
 
+*(Built 2026-07-10, `core/smelt.h`.)* And "efficiency is the gate" turned out to
+be a specific number. A fluxless bloomery loses **1.859 kg of iron to fayalite
+slag per kg of silica** in the charge — two atomic weights, no author — so a
+charge smelts only above Fe/SiO₂ = 1.859. Possibility never enters it: the iron
+is right there in the sand, and the furnace hands it all to the slag unless you
+first crush and magnetically clean the ore past the wall. See Phase A step 3.
+
 ### Era 2b — Copper, and the payoff of a useless verb
 
 Historically copper precedes iron, and it does here too, for a reason that closes
@@ -1626,6 +1633,33 @@ Deliverable, in order, in a console harness with no UE editor and no renderer:
    law that once made "even the gentlest pan enriches" a test passing for the wrong
    reason). Both are preserved in the file, next to what replaced them.
 3. **Then** smelt: slag falls out of a bloomery, and the ledger balances.
+
+   *(Done 2026-07-10. `core/smelt.h`, `core/magnetic.h`, and a metallic `IRON`
+   phase for the bloom to live in. It balances — and the ledger turned out to
+   have a wall in it that nobody authored.)* Two things had to exist first, and
+   one of them was a whole tool the step's plan had not accounted for:
+
+   - **The bloomery has no flux, and that is a number, not a mood.** With no lime
+     to take the silica, the only way for silica to leave the furnace is as
+     fayalite, Fe₂SiO₄ = 2 FeO + SiO₂ — which drags **1.859 kg of iron into the
+     slag per kg of silica**, a figure that is nothing but two atomic weights.
+     So a charge yields metal only above **Fe/SiO₂ = 1.859 by mass**. This is the
+     hard, real, non-arbitrary answer the "minerals not elements" section promised
+     the whole game would have, and it is why bog iron and magnetically-cleaned
+     ironsand — not the richest ores, the *least siliceous* — are what humans
+     actually smelted. Panned river sand assays Fe/SiO₂ ≈ 0.12 and cannot be
+     washed past ≈ 0.5; it is 3–16× short and yields a glassy slag and no iron.
+
+   - **Smelt is downstream of the lodestone, and then of the crush.** The plan
+     called this step "downstream of nothing." It is not. The pan cannot clear the
+     wall; the lodestone on panned sand lands at Fe/SiO₂ ≈ 1.76, *just* short,
+     because locked magnetite drags its own quartz to the stone. What clears it is
+     **liberation** — crush to free the magnetite from its gangue, and only then
+     does the magnet reject the silica (Fe/SiO₂ jumps past 20). So the chain that
+     makes iron is dig → pan → **crush** → lodestone → bloomery, and the romantic
+     found tool of Era 1 is revealed as the literal gate of Era 2. The lodestone
+     (see "the lodestone" above) was built to close this step and is recorded
+     there.
 
 If it isn't interesting to reason about here, more art won't save it.
 

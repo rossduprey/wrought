@@ -28,6 +28,7 @@
 
 #include "fire.h"
 #include "magnetic.h"
+#include "smelt.h"
 
 using namespace wrought;
 
@@ -1003,15 +1004,19 @@ int main() {
     // matter across two orders of magnitude; that it splits the one pair no pan
     // can (magnetite from hematite); and that a locked grain still caps its grade.
     {
-        // (a) magnetite lifts, everything else does not, at the authored reach.
+        // (a) magnetite lifts, no other ORE mineral does. IRON is excluded: it is
+        // a product, not something you pan, and a magnet grabs a bloom -- asserted
+        // just below so the exclusion is not hiding a bug.
         bool only_magnetite = lift_number(PHASES[MAGNETITE].magnetic_susceptibility,
                                           PHASES[MAGNETITE].density) > 1.0;
         for (int p = 0; p < N_PHASE; ++p)
-            if (p != MAGNETITE)
+            if (p != MAGNETITE && p != IRON)
                 only_magnetite = only_magnetite
                     && lift_number(PHASES[p].magnetic_susceptibility, PHASES[p].density) < 1.0;
         check(only_magnetite,
-              "the lodestone lifts magnetite and no other phase in the table");
+              "the lodestone lifts magnetite and no other ore mineral");
+        check(lift_number(PHASES[IRON].magnetic_susceptibility, PHASES[IRON].density) > 1.0,
+              "and it lifts metallic iron too: a magnet sticks to a bloom");
 
         // (b) a diamagnetic grain is repelled, exactly, not feebly attracted.
         check(magnetic_partition(lift_number(PHASES[QUARTZ].magnetic_susceptibility,
@@ -1026,7 +1031,7 @@ int main() {
         double L_mag = lift_number(PHASES[MAGNETITE].magnetic_susceptibility, PHASES[MAGNETITE].density);
         double L_next = 0.0;
         for (int p = 0; p < N_PHASE; ++p)
-            if (p != MAGNETITE)
+            if (p != MAGNETITE && p != IRON) // IRON is a product, not an ore gangue
                 L_next = std::fmax(L_next,
                     lift_number(PHASES[p].magnetic_susceptibility, PHASES[p].density));
         check(L_mag / L_next > 1000.0,
@@ -1083,6 +1088,84 @@ int main() {
             conserved = conserved && std::fabs(
                 cs.concentrate.phase_mass(p) + cs.tailings.phase_mass(p) - feed.phase_mass(p)) < 1e-9;
         check(conserved, "the lodestone conserves every phase across the pass");
+    }
+
+    // ---- 12. the bloomery: slag falls out and the ledger balances ----------
+    //
+    // The finding is a wall, and it is derived from two atomic weights: with no
+    // flux, silica leaves only as fayalite, dragging 1.859 kg of iron per kg of
+    // silica. A charge yields metal only above Fe/SiO2 = 1.859 -- which panned
+    // sand never reaches and the lodestone always does. That makes smelt
+    // downstream of the magnet, not of nothing.
+    {
+        auto charcoal = [](double kg) { Substance c; c.freegrain[CARBON][SAND] = kg; return c; };
+
+        // (a) the wall constant is 2*M(Fe)/M(SiO2), not a chosen number.
+        check(std::fabs(FE_PER_SIO2 - 1.8589) < 1e-3,
+              "the fayalite wall is 1.859 kg Fe per kg silica: two atomic weights, no author");
+
+        // (b) pure magnetite smelts; river sand cannot, because its iron is
+        // outnumbered by its own silica.
+        Substance pure_mag; pure_mag.freegrain[MAGNETITE][SAND] = 1.0;
+        const BloomResult bm = bloomery(pure_mag, charcoal(1.0));
+        check(bm.bloom_iron > 0.7 && bm.bloom.grade(IRON) > 0.999,
+              "pure magnetite yields a bloom of metallic iron");
+        check(iron_to_silica(raw) < FE_PER_SIO2 && bloomery(raw, charcoal(5.0)).bloom_iron == 0.0,
+              "raw river sand yields no bloom: its silica eats its iron");
+        std::printf("        (river sand Fe/SiO2 = %.3f, wall %.3f -- short by %.1fx)\n",
+                    iron_to_silica(raw), FE_PER_SIO2, FE_PER_SIO2 / iron_to_silica(raw));
+
+        // (c) the threshold is sharp. Magnetite (Fe 0.724) plus quartz: the ratio
+        // crosses 1.859 at a magnetite:quartz mass of 2.569. Straddle it.
+        auto ore_at = [](double mag, double qz) {
+            Substance o; o.freegrain[MAGNETITE][SAND] = mag; o.freegrain[QUARTZ][SAND] = qz; return o;
+        };
+        check(bloomery(ore_at(2.7, 1.0), charcoal(2.0)).bloom_iron > 0.0
+              && bloomery(ore_at(2.4, 1.0), charcoal(2.0)).bloom_iron == 0.0,
+              "the wall is a threshold: 2.7:1 magnetite:quartz smelts, 2.4:1 does not");
+
+        // (d) the chain, and what gates it. Raw sand cannot smelt. The lodestone
+        // alone lands close but SHORT -- locked magnetite drags its own quartz to
+        // the stone -- so the real gate is LIBERATION: crush to free the magnetite
+        // from its gangue, and only then does the magnet reject the silica and the
+        // charge clear the wall. Smelt is downstream of the magnet AND the crush.
+        Substance panned = raw;
+        for (int i = 0; i < 60; ++i) panned = separate(panned, PAN).concentrate;
+        const double one_pass = iron_to_silica(lodestone(panned).concentrate);
+        Substance liberated = panned;
+        for (int i = 0; i < 8; ++i) liberated = crush(liberated, 0.5);
+        const Substance cleaned = lodestone(liberated).concentrate;
+        check(bloomery(raw, charcoal(5.0)).bloom_iron == 0.0
+              && iron_to_silica(cleaned) > FE_PER_SIO2
+              && bloomery(cleaned, charcoal(5.0)).bloom_iron > 0.0,
+              "dig -> pan -> crush -> lodestone -> bloom: liberation is the gate the furnace needs");
+        std::printf("        (lodestone alone: Fe/SiO2 = %.2f, short of %.2f; after crushing: %.2f -> bloom)\n",
+                    one_pass, FE_PER_SIO2, iron_to_silica(cleaned));
+
+        // (e) the ledger balances: every element in ore+charcoal leaves in exactly
+        // one of bloom, slag, gas.
+        const Substance ore = ore_at(3.0, 1.0);
+        const Substance fuel = charcoal(2.0);
+        const BloomResult br = bloomery(ore, fuel);
+        double in_ore[N_ELEM], in_fuel[N_ELEM], bloom_el[N_ELEM];
+        assay_elements(ore, in_ore); assay_elements(fuel, in_fuel);
+        assay_elements(br.bloom, bloom_el);
+        bool balanced = true;
+        for (int e = 0; e < N_ELEM; ++e)
+            balanced = balanced && std::fabs((in_ore[e] + in_fuel[e])
+                                             - (bloom_el[e] + br.slag[e] + br.gas[e])) < 1e-9;
+        check(balanced, "the ledger balances: ore + charcoal = bloom + slag + gas, element by element");
+
+        // (f) a cold furnace reduces nothing; all the iron stays in the slag.
+        const BloomResult cold = bloomery(pure_mag, charcoal(1.0), false);
+        check(cold.bloom_iron == 0.0 && cold.slag[EL_FE] > 0.7,
+              "an unlit bloomery makes only slag: reduction needs the reducing envelope");
+
+        // (g) the carbon gate: starve the charcoal and less iron reduces.
+        const double fed  = bloomery(pure_mag, charcoal(1.0)).bloom_iron;
+        const double lean = bloomery(pure_mag, charcoal(0.1)).bloom_iron;
+        check(lean > 0.0 && lean < fed && std::fabs(lean - 0.1 / CARBON_PER_FE) < 1e-9,
+              "too little charcoal reduces too little iron: the bloom is carbon-limited");
     }
 
     // ---- The picture -------------------------------------------------------

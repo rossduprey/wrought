@@ -31,7 +31,7 @@ An AI and a human build the ancestor of the AI, out of the ground, and it learns
 There is one design document, two license files, and `core/` — a few hundred lines of dependency-free C++17 that pans a bucket of river sand. No engine, no renderer, no art.
 
 ```
-cd core && make test        # 69 assertions about the physics
+cd core && make test        # 85 assertions about the physics
 cd core && make pan         # kneel in the river and wash it yourself
 cd core && make ratchet-run # watch the design document lose an argument
 ```
@@ -67,6 +67,8 @@ So Era 1 has no lodestone-shaped hole. Deflocculation is still real and still wo
 The lesson is not *cite your numbers*. We knew it was uncited; it was filed, and the file said so. It is that **an uncited number can be load-bearing for a conclusion three files away, and nothing tells you which one.** That velocity ratio was printed by the instrument, quoted on this page, and listed in the runbook as a settled result. It was a property of an assumption nobody had written down as an assumption — because *sphere* is what you get when nobody says otherwise.
 
 Those corrections are now in the document, dated, next to the sentences they replaced. Including the one on the front page of this file, twice.
+
+And then the bloomery went in, and it too had a number in it that nobody chose. A furnace with no flux can only shed its silica as fayalite slag, Fe₂SiO₄, and every kilogram of silica takes **1.859 kilograms of iron** into the slag with it — a figure that is two atomic weights and nothing else. So a charge yields metal only if its iron outweighs its silica by 1.859 to one. Panned river sand assays a tenth of that, and no amount of washing lifts it past a half: **you cannot smelt what you pan.** This is not a rule we wrote; it is the reason bog iron and black sand were the ores of the Iron Age, and the reason the lodestone — the found magnet of Era 0 — is not a romantic flourish but the literal gate of Era 2. Crush the concentrate to free the magnetite from its quartz, drag the stone through it, and the ratio jumps past twenty. Dig, pan, crush, magnet, fire: that chain, and only that chain, makes iron. The ledger balances element by element, and the wall was sitting in it the whole time.
 
 We are publishing all of it unfinished, because the idea is the deliverable and because we need people who are not us to look at it. See *What we want from you*.
 

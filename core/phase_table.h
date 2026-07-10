@@ -20,6 +20,7 @@ namespace wrought {
 enum PhaseId {
     QUARTZ, FELDSPAR, KAOLINITE, MAGNETITE, HEMATITE,
     GOETHITE, ILMENITE, PYRITE, CALCITE, CARBON,
+    IRON,
     N_PHASE
 };
 
@@ -99,6 +100,13 @@ inline constexpr Phase PHASES[N_PHASE] = {
     {"pyrite",    5.01,  1.0e-4, 1.00, 0.0, "UNVERIFIED", "AUTHORED isometric"},
     {"calcite",   2.71, -1.0e-5, 1.00, 0.0, "UNVERIFIED", "AUTHORED isometric"},
     {"carbon",    1.50, -1.0e-5, 1.00, 0.0, "UNVERIFIED", "AUTHORED isometric"},
+    // Metallic iron: not a mineral in the ground but a *product* -- the bloom
+    // that falls out of the bloomery (smelt.h). It exists in this table so a bloom
+    // has somewhere to live and forging has something to pick up. Density is
+    // alpha-iron, a standard figure. Susceptibility is ferromagnetic and enormous;
+    // 200 is a placeholder that only has to be "the lodestone grabs a bloom", which
+    // it should. AUTHORED. It is inert to every separator here except the magnet.
+    {"iron",      7.87,  2.0e2,   1.00, 0.0, "UNVERIFIED alpha-Fe", "AUTHORED lump"},
 };
 
 } // namespace wrought
