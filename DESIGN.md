@@ -1005,7 +1005,12 @@ above the Fe–FeS eutectic ~988 °C — the contaminant no separator could see,
 only at the anvil. `EL_S` joined the element ledger to make it possible.)* **Iron
 comes out a solid; copper (Era 2b) comes out a liquid and is cast, not forged — so
 this arrow is where the two metals' chains diverge, and shaping is the axis they
-later share.**
+later share.** *(Built 2026-07-10: `smelt_copper()` + `cast()`. The divergence is
+forced by two melting points against one fire — a charcoal heat clears copper's
+1085 °C but not iron's 1538 °C — so state at furnace heat decides cast-vs-forge AND
+clean-vs-stringer, and `draw()`/`hardness()` went metal-neutral so a cast billet
+rejoins on copper's own recryst floor. `EL_CU`, `CUPRITE`, `COPPER` joined the
+ledger and phase table to make it possible.)*
 
 ### Era 2b — Copper, and the payoff of a useless verb
 
@@ -1024,6 +1029,8 @@ steel plate with tapered holes. Wire therefore depends on iron, then on steel.
 
 That dependency is real, it is not a gate we invented, and it is the hinge of the
 entire endgame.
+
+*(Built 2026-07-10, and the build made two scope calls this plan should record. **First: the finding is the melting point, not the reduction temperature.** This section pitched copper as "reduces near 700–800 °C, below iron's requirement" — true, but the load-bearing straddle is the **melting** point, not the reduction onset: a charcoal fire clears copper's melting point (1085 °C) and not iron's (1538 °C), so copper pours liquid and casts while iron stays a solid bloom. That state divergence — cast-vs-forge, and clean-vs-stringer — is what got built and tested, and it is a stronger claim than "copper reduces cooler." **Second: cuprite, not malachite, and cobbing is still unbuilt.** The code models the reducible ore as **cuprite (Cu₂O)** because its oxygen ledger is exact; malachite is credited in prose as the green carbonate that calcines to the same oxide, but its carbonate/hydroxide volatiles were not modelled, so the **cobbing** payoff — visually hand-sorting bright-green malachite, the Era-0 verb waiting three eras — is written here but does **not exist in code yet**. It remains the reason to add malachite as its own phase later. The draw-plate/steel wire dependency above is also still just prose.)*
 
 ### Era 3 — Machines
 

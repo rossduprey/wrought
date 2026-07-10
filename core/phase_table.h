@@ -21,6 +21,7 @@ enum PhaseId {
     QUARTZ, FELDSPAR, KAOLINITE, MAGNETITE, HEMATITE,
     GOETHITE, ILMENITE, PYRITE, CALCITE, CARBON,
     IRON,
+    CUPRITE, COPPER,
     N_PHASE
 };
 
@@ -107,6 +108,21 @@ inline constexpr Phase PHASES[N_PHASE] = {
     // 200 is a placeholder that only has to be "the lodestone grabs a bloom", which
     // it should. AUTHORED. It is inert to every separator here except the magnet.
     {"iron",      7.87,  2.0e2,   1.00, 0.0, "UNVERIFIED alpha-Fe", "AUTHORED lump"},
+    // Cuprite, Cu2O ("ruby copper"): a clean cuprous-oxide copper ore. Malachite,
+    // the green carbonate everyone pictures starting the Bronze Age, calcines to
+    // the same reducible copper oxide on the way up to heat; cuprite is modelled
+    // because its oxygen ledger is exact (no carbonate/hydroxide volatiles to
+    // split), and the finding does not care which oxide the carbon strips. Density
+    // ~6.0 (cuprite is denser than the silicates); diamagnetic-to-weakly-para, and
+    // in any case NOT ferromagnetic -- the lodestone cannot concentrate copper ore,
+    // which is why copper dressing was gravity and hand-sorting, never the magnet.
+    {"cuprite",   6.00, -1.0e-5, 1.00, 0.0, "UNVERIFIED Cu2O", "AUTHORED isometric"},
+    // Metallic copper: the cast product, copper's answer to the iron bloom. It
+    // exists here so a pour has somewhere to live and shaping something to pick up.
+    // Density is standard copper. Susceptibility is diamagnetic -- copper is the
+    // textbook diamagnet, and unlike an iron bloom a copper billet is invisible to
+    // the lodestone. AUTHORED. Inert to every separator here, magnet included.
+    {"copper",    8.96, -1.0e-5, 1.00, 0.0, "UNVERIFIED Cu", "AUTHORED lump"},
 };
 
 } // namespace wrought

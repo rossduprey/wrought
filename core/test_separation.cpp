@@ -1280,7 +1280,7 @@ int main() {
 
         // (c) a draw conserves the metal exactly and carries the stringers along
         // -- shaping removes no slag, it only draws it out along the grain.
-        bool conserved = std::fabs(cold.iron - bar.iron) < 1e-12;
+        bool conserved = std::fabs(cold.metal - bar.iron) < 1e-12;
         for (int e = 0; e < N_ELEM; ++e)
             conserved = conserved && std::fabs(cold.slag[e] - bar.slag[e]) < 1e-12;
         check(conserved, "shaping is pure deformation: the metal and its stringers are conserved, only drawn out");
@@ -1381,6 +1381,92 @@ int main() {
         std::printf("        (bar %.2f%% S: 6 hot blows -> %.0f%% sound (cracked); "
                     "6 cold blows -> %.0f%% sound, %.0f HB (hard))\n",
                     s_frac, 100.0 * soundness(dh), 100.0 * soundness(dc), hardness(dc));
+    }
+
+    // ---- 16. Copper: the second metal, and the fork at the furnace -----------
+    // Copper shares the whole front of the chain with iron and parts at the
+    // furnace. One fire's heat sits above copper's melting point and below iron's,
+    // so copper pours LIQUID (cast, and clean -- slag floats off a melt) while iron
+    // stays a SOLID sponge (forged, and never clean). Then the two rejoin at the
+    // anvil: a cast billet is drawn and hardened by the very same law, on copper's
+    // own lower recrystallization floor. The furnace decides everything, and it
+    // decides it with two melting points nobody chose.
+    {
+        auto charcoal = [](double kg) { Substance c; c.freegrain[CARBON][SAND] = kg; return c; };
+        auto cu_ore = [](double cup, double qz) {
+            Substance o; o.freegrain[CUPRITE][SAND] = cup;
+            if (qz > 0.0) o.freegrain[QUARTZ][SAND] = qz; return o;
+        };
+        auto fe_ore = [](double mag, double qz) {
+            Substance o; o.freegrain[MAGNETITE][SAND] = mag; o.freegrain[QUARTZ][SAND] = qz; return o;
+        };
+
+        const double FURNACE = 1500.0; // a charcoal hearth: above Cu's mp, below Fe's
+
+        // (a) the straddle itself: the same heat that melts copper leaves iron solid.
+        check(FURNACE > TM_COPPER && FURNACE < TM_IRON
+              && smelt_copper(cu_ore(2.0, 1.0), charcoal(1.0), FURNACE).molten,
+              "the furnace straddles the two melting points: one fire pours copper liquid and would leave iron solid");
+
+        // (b) the copper ledger balances, element by element, like the bloomery's.
+        const MeltResult m = smelt_copper(cu_ore(2.0, 1.0), charcoal(1.0), FURNACE);
+        double in_ore[N_ELEM], in_fuel[N_ELEM], in_cu[N_ELEM];
+        assay_elements(cu_ore(2.0, 1.0), in_ore);
+        assay_elements(charcoal(1.0), in_fuel);
+        for (int e = 0; e < N_ELEM; ++e) in_cu[e] = in_ore[e] + in_fuel[e];
+        bool cu_balanced = m.metal_cu > 0.0;
+        for (int e = 0; e < N_ELEM; ++e) {
+            const double metal_e = (e == EL_CU) ? m.metal_cu : 0.0;
+            cu_balanced = cu_balanced && std::fabs(in_cu[e] - (metal_e + m.slag[e] + m.gas[e])) < 1e-12;
+        }
+        check(cu_balanced, "the copper ledger balances: charge = metal + slag + gas, element by element");
+
+        // (c) cast clean: a liquid pour sheds its slag by density, so the billet
+        // escapes the connectivity floor that leaves a wrought iron bar full of
+        // stringers. Same dross in the charge, opposite outcome -- set by state.
+        const Billet cu = cast(smelt_copper(cu_ore(2.0, 1.0), charcoal(1.0), FURNACE));
+        const Bar febar = consolidate(pull_bloom(bloomery(fe_ore(3.0, 1.0), charcoal(2.0))), 8);
+        check(cu.cast_clean && billet_slag_fraction(cu) < 1e-9 && slag_fraction(febar) > 0.005,
+              "cast copper is clean, wrought iron is not: a liquid sheds its slag, a solid sponge traps it");
+
+        // (d) no wall of the iron kind: silica cannot eat copper. Heap silica onto a
+        // copper charge and the metal yield does not move -- there is no cupric
+        // fayalite. (The same silica would drag iron into the slag 1.859:1.)
+        const double bare  = smelt_copper(cu_ore(2.0, 0.0), charcoal(1.0), FURNACE).metal_cu;
+        const double silty = smelt_copper(cu_ore(2.0, 5.0), charcoal(1.0), FURNACE).metal_cu;
+        check(bare > 0.0 && std::fabs(bare - silty) < 1e-12,
+              "copper has no fayalite wall: silica cannot eat the metal, so a copper charge has no Fe/SiO2 gate");
+
+        // (e) state decides cleanliness, not just cast-vs-forge: a furnace hot enough
+        // to REDUCE copper (>800 C) but not to MELT it freezes a slag-trapping
+        // sponge -- the same metal, dirty, because it never poured.
+        const MeltResult warm = smelt_copper(cu_ore(2.0, 1.0), charcoal(1.0), 1200.0);
+        const Billet frozen = cast(warm);
+        check(warm.metal_cu > 0.0 && !warm.molten && !frozen.cast_clean
+              && billet_slag_fraction(frozen) > 0.0,
+              "state decides cleanliness: copper that reduces but never melts freezes a dirty sponge, not a clean cast");
+
+        // (f) the rejoin, with teeth: worked at a heat BETWEEN the two metals' recryst
+        // floors (copper ~543 K, iron ~724 K), the same draw() hardens iron and
+        // anneals copper -- one law, each metal's own floor from its own melting point.
+        const double MID = 650.0;
+        Tool fe = stock(febar);
+        Tool cu2 = stock(cast(smelt_copper(cu_ore(2.0, 1.0), charcoal(1.0), FURNACE)));
+        for (int i = 0; i < 4; ++i) { draw(fe, 0.5, MID); draw(cu2, 0.5, MID); }
+        check(hardness(fe) > H_ANNEALED + 20.0 && std::fabs(hardness(cu2) - H_ANNEALED) < 1e-9,
+              "same law, each metal's own floor: at a heat between them iron cold-works and hardens, copper anneals");
+
+        // ...and copper does harden when worked below ITS floor -- it rejoins the
+        // curve, it just enters it at a lower temperature.
+        Tool cu3 = stock(cast(smelt_copper(cu_ore(2.0, 1.0), charcoal(1.0), FURNACE)));
+        for (int i = 0; i < 4; ++i) draw(cu3, 0.5, 300.0);
+        check(hardness(cu3) > H_ANNEALED + 20.0,
+              "copper rejoins the hardening law: worked below its own recryst floor it work-hardens like any metal");
+
+        std::printf("        (furnace %.0f K: Cu pours liquid, Fe would not; cast billet %.2f%% slag vs wrought %.2f%%; "
+                    "at %.0f K Fe->%.0f HB, Cu stays %.0f HB)\n",
+                    FURNACE, 100.0 * billet_slag_fraction(cu), 100.0 * slag_fraction(febar),
+                    MID, hardness(fe), hardness(cu2));
     }
 
     // ---- The picture -------------------------------------------------------

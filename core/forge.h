@@ -12,6 +12,13 @@
 // finding, RED-SHORT: the hammer is the only tool that can find the sulfur three
 // stages of separation could not remove -- and it finds it by cracking.
 //
+// This file also holds the copper fork. Copper does not consolidate -- it comes
+// out of the furnace LIQUID and is CAST (see CASTING below), skipping the bloom
+// and the connectivity floor entirely. But it REJOINS here: a cast billet is
+// lifted onto the same anvil by the same stock(), drawn by the same draw(), and
+// hardened by the same hardness() law as an iron bar. Iron and copper diverge at
+// the furnace and meet again at the hammer.
+//
 // This is the first process in the project that is DEFORMATION, not separation.
 // Everything before it -- pan, sluice, lodestone, even the bloomery's chemistry --
 // sorts a population of grains by a property. Consolidation does something new: it
@@ -191,6 +198,56 @@ inline double yield(const Bloom& green, const Bar& bar) {
 }
 
 // ------------------------------------------------------------------------
+// CASTING: the copper path from furnace to stock, iron's fork not taken.
+//
+// A bloom is consolidated because it comes out SOLID -- a slag-filled sponge you
+// must hammer dense, and the connectivity floor is the price. Copper comes out
+// LIQUID (smelt.h, if the furnace cleared TM_COPPER), and a liquid does for free
+// what the hammer never fully can: molten copper (~8 g/cm^3) and molten fayalitic
+// slag (~3.7) separate by density, the slag floats, and the billet freezes
+// essentially slag-free. So the copper billet skips consolidation entirely and its
+// slag fraction is ~0, not ~1.5%. The connectivity floor was never about iron; it
+// was about being solid at furnace heat. This is the downstream half of the
+// furnace divergence -- and both halves are decided by the same one bit, molten.
+struct Billet {
+    double metal = 0.0;          // kg cast copper
+    double slag[N_ELEM] {};      // kg entrained slag -- ~0 for a clean liquid pour
+    double drained[N_ELEM] {};   // kg slag that floated off and was skimmed
+    double tm = TM_COPPER;       // the metal's melting point
+    double temperature = 288.0;  // K
+    bool cast_clean = false;     // did it pour liquid (slag floated off) or freeze a sponge
+};
+
+// Cast a copper melt into a billet. If it poured molten, the slag floats off and
+// the billet is clean; if the furnace never reached the melting point it would
+// freeze as a slag-trapping sponge like a bloom -- so the same `molten` bit that
+// makes copper CAST also makes it CLEAN.
+inline Billet cast(const MeltResult& melt) {
+    Billet b;
+    b.metal = melt.metal_cu;
+    b.tm = TM_COPPER;
+    b.temperature = melt.temperature;
+    b.cast_clean = melt.molten;
+    for (int e = 0; e < N_ELEM; ++e) {
+        if (melt.molten) {           // liquid: slag floats off, billet freezes clean
+            b.slag[e]    = 0.0;
+            b.drained[e] = melt.slag[e];
+        } else {                     // never poured: a copper sponge, slag trapped
+            b.slag[e]    = melt.slag[e];
+            b.drained[e] = 0.0;
+        }
+    }
+    return b;
+}
+
+// The billet's impurity in one number, the copper twin of slag_fraction(Bar).
+inline double billet_slag_fraction(const Billet& b) {
+    const double s = slag_mass(b.slag);
+    const double m = b.metal + s;
+    return m > 0.0 ? s / m : 0.0;
+}
+
+// ------------------------------------------------------------------------
 // SHAPING: bar -> tool. The forge's second half.
 //
 // Consolidation was deformation that only densifies -- it drives out slag and
@@ -226,16 +283,20 @@ inline double yield(const Bloom& green, const Bar& bar) {
 // no mass.) This is the last stop of the iron chain; it is also the axis copper
 // SHARES with iron, so it is where the two metals' paths rejoin downstream.
 
-// Iron melts at 1811 K (1538 C). VERIFIED, standard. The recrystallization floor
-// is a fraction of this; the floor's existence, not this value, is load-bearing.
-inline constexpr double TM_IRON = 1811.0;
+// Iron melts at 1811 K (1538 C); the melting points now live in smelt.h, where the
+// furnace reads them to decide a metal's STATE. The recrystallization floor is a
+// fraction of the SAME number -- one melting point, read by both the furnace (cast
+// vs bloom) and the anvil (hot vs cold work). That is the axis copper rejoins on.
 
 // Recrystallization onset as a fraction of the melting point: ~0.35-0.4 Tm for a
-// cold-worked metal (the classic homologous-temperature rule). 0.4 puts it at
-// ~724 K = ~451 C, between a dull-red heat and a black bar. AUTHORED, cited
-// range. It sets WHERE the hot/cold line falls, not that there is one. Issue #23.
+// cold-worked metal (the classic homologous-temperature rule). 0.4 puts iron's
+// floor at ~724 K = ~451 C, between a dull-red heat and a black bar. AUTHORED,
+// cited range. It sets WHERE the hot/cold line falls, not that there is one. And
+// because it is a FRACTION OF THE MELTING POINT, it is metal-specific for free:
+// copper's floor (0.4 * 1358 K = ~543 K) sits far below iron's, so a heat that is
+// cold work for iron can be hot work for copper. Issue #23.
 inline constexpr double RECRYST_FRACTION = 0.4;
-inline constexpr double RECRYST_T = RECRYST_FRACTION * TM_IRON;
+inline constexpr double RECRYST_T = RECRYST_FRACTION * TM_IRON; // iron's floor
 
 // Hardness scale (Brinell): annealed soft iron to heavily cold-worked. Roughly
 // right for ferrite, but AUTHORED and finding-independent -- the result is that
@@ -301,22 +362,39 @@ inline constexpr double CRACK_SCALE = 0.02;
 // unchanged, plus the two things shaping creates -- a form (elongation, length
 // as a multiple of the stock bar) and a history of cold strain that survived.
 struct Tool {
-    double iron = 0.0;          // kg metal, unchanged by pure deformation
+    double metal = 0.0;         // kg metal, unchanged by pure deformation (Fe or Cu)
     double sulfur = 0.0;        // kg S dissolved in the metal (rode in from the bloom)
     double slag[N_ELEM] {};     // the bar's stringers, drawn out along the grain
     double elongation = 1.0;    // length as a multiple of the stock bar
     double cold_strain = 0.0;   // accumulated plastic strain worked in below recryst
     double cracking = 0.0;      // grain-boundary damage from hot-working a sulfurous bar
+    double tm = TM_IRON;        // the metal's melting point; the recryst floor is a fraction of it
     double temperature = 288.0; // K, the piece's current heat
 };
 
-// Lift a consolidated bar onto the anvil. Nothing deforms yet.
+// Lift a consolidated iron bar onto the anvil. Nothing deforms yet.
 inline Tool stock(const Bar& bar) {
     Tool t;
-    t.iron = bar.iron;
+    t.metal = bar.iron;
     t.sulfur = bar.sulfur;
+    t.tm = TM_IRON;
     t.temperature = bar.temperature;
     for (int e = 0; e < N_ELEM; ++e) t.slag[e] = bar.slag[e];
+    return t;
+}
+
+// Lift a cast copper billet onto the SAME anvil. This is the rejoin: a copper
+// billet and an iron bar become the same kind of Tool, worked by the same draw()
+// and hardened by the same hardness() law -- they differ only in the melting point
+// they carry, which sets each metal's recryst floor. Dislocations do not care which
+// metal tangled them; the code says so by not caring which struct fed the stock.
+inline Tool stock(const Billet& billet) {
+    Tool t;
+    t.metal = billet.metal;
+    t.sulfur = 0.0;             // oxide-ore copper carries no sulfur: no red-short
+    t.tm = billet.tm;
+    t.temperature = billet.temperature;
+    for (int e = 0; e < N_ELEM; ++e) t.slag[e] = billet.slag[e];
     return t;
 }
 
@@ -329,13 +407,19 @@ inline void draw(Tool& t, double reduction, double T) {
     const double r = std::fmin(reduction, 1.0 - 1e-9);
     const double eps = -std::log(1.0 - r);   // true strain of this pass
     t.elongation *= std::exp(eps);           // form: won hot or cold
-    if (T < RECRYST_T) t.cold_strain += eps; // hardness: only cold survives
+    // Hardness: only strain below THIS metal's recrystallization floor survives.
+    // The floor is a fraction of the metal's own melting point, so copper (low Tm)
+    // anneals at heats where iron (high Tm) is still cold-working -- same law, same
+    // draw, different floor. That is where the two metals' paths rejoin.
+    const double recryst = RECRYST_FRACTION * t.tm;
+    if (T < recryst) t.cold_strain += eps;
 
     // Red-short: above the Fe-FeS eutectic a sulfurous bar's grain boundaries are
     // wetted by a liquid film, and hot strain tears the metal along them. Below
     // the eutectic the film is solid and the bar holds, however dirty. So the
-    // crack is a HOT failure, and only for metal above the sulfur threshold.
-    const double s_frac = (t.iron + t.sulfur > 0.0) ? t.sulfur / (t.iron + t.sulfur) : 0.0;
+    // crack is a HOT failure, and only for metal above the sulfur threshold. Clean
+    // metal -- copper from oxide ore carries no sulfur -- never triggers it.
+    const double s_frac = (t.metal + t.sulfur > 0.0) ? t.sulfur / (t.metal + t.sulfur) : 0.0;
     if (T >= EUTECTIC_T && s_frac > RED_SHORT_S)
         t.cracking += (s_frac - RED_SHORT_S) / CRACK_SCALE * eps;
 
