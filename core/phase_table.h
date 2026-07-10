@@ -39,24 +39,66 @@ enum PhaseId {
 // citation was needed to see it; only something that tried to use it.
 enum SizeBin { CLAY, SILT, SAND, GRAVEL, N_SIZE };
 
+// The third column is the grain's shape, and it is the one that is easy to
+// misread. `aspect_ratio` is p = (polar semiaxis / equatorial semiaxis) of the
+// oblate spheroid that stands for a grain of this phase. p = 1 is a sphere.
+// p = 0.1 is a plate ten times wider than it is thick.
+//
+// `settling.h` reads it and nothing else does. It buys two things a sphere
+// cannot: the Stokes shape factor, which is exact, and the volume-equivalent
+// diameter, which is what a size bin's diameter is NOT. See the long comment
+// there — the difference between those two readings of a bin is a factor of
+// seven on kaolinite, and it decides whether Era 1 needs deflocculation.
+//
+// Every p = 1.0 here is AUTHORED and every one of them is a lie of convenience:
+// quartz sand is blocky (Wadell sphericity ~0.7), goethite is acicular,
+// specular hematite is a plate. They are 1.0 because no process yet
+// distinguishes them and because a wrong number that is *stated* is worse than
+// an idealisation that is *labelled*. The one that is not 1.0 is kaolinite, and
+// it is not 1.0 because the entire point of clay is that it is not a marble.
+//
+// The direction of the p=1 error is known: giving quartz its real sphericity of
+// 0.8 slows it ~7%, which *narrows* the kaolinite/quartz velocity gap from
+// 6.98x to 6.47x. The finding does not depend on it. Issue: authored-number.
+// A habit has a size, and forgetting that was a defect this table shipped for
+// about an hour. Aspect ratio is a property of a CRYSTAL, and kaolinite crystals
+// are 0.1-4.0 um across — which is to say they exist in the CLAY bin and nowhere
+// else. Applied at every size it produced an 11 mm platelet 1.1 mm thick, which
+// is not a mineral, and a pan test caught it. Coarser kaolinite is an aggregate
+// of platelets stacked into a lump, and a lump is blocky.
+//
+// So `platy_below` is the face diameter above which the habit stops and the
+// grain reverts to a sphere. For kaolinite it is 4.0 um: the top of the measured
+// range, and — not by our arrangement — the top of the CLAY bin.
 struct Phase {
     const char* id;
     double density;                 // g/cm^3
     double magnetic_susceptibility; // volume SI, dimensionless
+    double aspect_ratio;            // p = c/a of the equivalent oblate spheroid
+    double platy_below;             // m; above this face diameter, a grain is a lump
     const char* source;
+    const char* shape_source;
 };
 
 inline constexpr Phase PHASES[N_PHASE] = {
-    {"quartz",    2.65, -1.0e-5, "UNVERIFIED"},
-    {"feldspar",  2.56, -1.0e-5, "UNVERIFIED"},
-    {"kaolinite", 2.60, -1.0e-5, "UNVERIFIED"},
-    {"magnetite", 5.15,  3.0,    "UNVERIFIED"},
-    {"hematite",  5.26,  1.0e-3, "UNVERIFIED"},
-    {"goethite",  4.28,  1.0e-3, "UNVERIFIED"},
-    {"ilmenite",  4.72,  2.0e-3, "UNVERIFIED"},
-    {"pyrite",    5.01,  1.0e-4, "UNVERIFIED"},
-    {"calcite",   2.71, -1.0e-5, "UNVERIFIED"},
-    {"carbon",    1.50, -1.0e-5, "UNVERIFIED"},
+    {"quartz",    2.65, -1.0e-5, 1.00, 0.0, "UNVERIFIED", "AUTHORED isometric"},
+    {"feldspar",  2.56, -1.0e-5, 1.00, 0.0, "UNVERIFIED", "AUTHORED isometric"},
+    // Kaolinite platelets: face diameter 0.1-4.0 um, aspect ratio typically ~10,
+    // ranging 2 (stacked books) to ~36 (single flakes). Ndlovu et al., "A new
+    // method for determining platy particle aspect ratio: A kaolinite case
+    // study", Applied Clay Science 92 (2014) 23-28; Zhang et al., Materials
+    // Letters 158 (2015) 236-239. AUTHORED in the same sense bin_diameter is:
+    // a point taken from a cited distribution, not a number chosen to make
+    // anything come out right. The distribution is wide and the model is
+    // linear in p^(2/3), so this is a tracked issue, not a fact.
+    {"kaolinite", 2.60, -1.0e-5, 0.10, 4.0e-6, "UNVERIFIED", "AUTHORED point, cited range"},
+    {"magnetite", 5.15,  3.0,    1.00, 0.0, "UNVERIFIED", "AUTHORED isometric"},
+    {"hematite",  5.26,  1.0e-3, 1.00, 0.0, "UNVERIFIED", "AUTHORED isometric"},
+    {"goethite",  4.28,  1.0e-3, 1.00, 0.0, "UNVERIFIED", "AUTHORED isometric"},
+    {"ilmenite",  4.72,  2.0e-3, 1.00, 0.0, "UNVERIFIED", "AUTHORED isometric"},
+    {"pyrite",    5.01,  1.0e-4, 1.00, 0.0, "UNVERIFIED", "AUTHORED isometric"},
+    {"calcite",   2.71, -1.0e-5, 1.00, 0.0, "UNVERIFIED", "AUTHORED isometric"},
+    {"carbon",    1.50, -1.0e-5, 1.00, 0.0, "UNVERIFIED", "AUTHORED isometric"},
 };
 
 } // namespace wrought

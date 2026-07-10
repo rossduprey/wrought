@@ -22,11 +22,18 @@
 // the quartile ratio the rest of this project reports — is exactly 3.0, always,
 // for every vessel, every charge and every wait. There is no dial.
 //
-// Three consequences, none of them designed:
+// Three consequences, none of them designed. **Two of the three were wrong**, and
+// they were wrong for one reason two files away: `settling.h` gave kaolinite the
+// drag of a marble. Issue #13 gave it the drag of a plate on 2026-07-10, and what
+// it changed was not this file's algebra -- which never moved -- but every number
+// the algebra was standing on.
 //
 //   * **Patience buys grade. It cannot buy recovery.** The cut is clear/t and t
 //     is free, so a long enough wait rejects anything you like. What a long wait
 //     costs you is the clay itself, which is not weightless and eventually lands.
+//
+//     This one survived, and it is now worth much more than it was: patience buys
+//     grade all the way to **1.000**, because there is something left to reject.
 //
 //   * **The pot buys recovery, and nothing else buys it.** You can only pour off
 //     the water above the sediment, and the sediment's thickness is the charge
@@ -42,6 +49,13 @@
 //     depth sets how much of your clay is still up there when you pour it. It
 //     took the program printing both to notice.)*
 //
+//     *(And the algebra was right the first time. A kaolinite PLATELET's front
+//     falls 1.3 mm in four hours, not 8.6 mm, so against a 50 mm hollow it is
+//     negligible and depth cancels as the algebra always said it did: 3.0x
+//     collapses to 1.12x. The correction above was published to cover for a
+//     defect in `settling.h`, and it is the only entry in this project's record
+//     of its own errors that is itself an error. It stays. -- 2026-07-10, #13.)*
+//
 //   * **Re-decanting the liquor is a tax, not a process.** The first pour throws
 //     away everything that settles. What is left is one velocity class, and no
 //     velocity separator can divide a single velocity class -- so the second
@@ -56,10 +70,27 @@
 //     does not. It fell off a cliff in a scratch probe that held the pour
 //     fraction at a constant 0.80 instead of deriving it from the sediment.)
 //
+//     *(Era 0's law is sound and it was applied to a false premise. The clay bin
+//     is NOT one velocity class: clay-sized quartz falls 6.98x faster than a
+//     clay-sized kaolinite platelet. It was one velocity class only while both
+//     were spheres of one diameter, at which point nothing distinguished them but
+//     a 1.9% difference in density. Re-decanting is a cheap process: +0.013 grade
+//     for -2.1% recovery over three passes. The paragraph above is a correct
+//     argument from a wrong fact, which is the most expensive kind, and it stood
+//     for a day. -- 2026-07-10, #13.)*
+//
 // Not modelled: hindered settling (a dense suspension settles slower than a
 // dilute one, Richardson-Zaki), and flocculation (a real potter deflocculates to
 // hold clay up and flocculates to drop it, and a floc falls as one big grain).
 // Both are absent. Both would make levigation easier than it is here.
+//
+// Deflocculation was Era 1's missing lodestone while levigation could not divide
+// the clay bin (#15). It can. Deflocculation is now an **improvement** rather
+// than a **requirement**: the hollow reaches pure kaolinite in 16 hours at 10.6%
+// recovery, and the large pot in eleven days at 43.5%. Holding the clay up by
+// surface charge is what buys you both at once. That is a better set piece than
+// the one it replaces, because the player has a working process to improve rather
+// than a wall to be handed a key for.
 
 namespace wrought {
 
@@ -89,11 +120,12 @@ inline double settled_fraction(double v, double depth, double t) {
 // How deep the settled solids lie. Reuses the packed-wet-sand density the bed
 // already needed; a sediment and a bed are the same object seen from two sides.
 inline double sediment_thickness(const Substance& mud, const Vessel& ves, double t) {
+    const double T = mud.temperature;
     double settled = 0.0;
     for (int p = 0; p < N_PHASE; ++p)
         for (int s = 0; s < N_SIZE; ++s) {
-            settled += mud.freegrain[p][s] * settled_fraction(free_velocity(p, s), ves.depth, t);
-            settled += mud.composite[p][s] * settled_fraction(composite_velocity(p, s), ves.depth, t);
+            settled += mud.freegrain[p][s] * settled_fraction(free_velocity(p, s, T), ves.depth, t);
+            settled += mud.composite[p][s] * settled_fraction(composite_velocity(p, s, T), ves.depth, t);
         }
     return settled / (BULK_DENSITY * ves.area());
 }
@@ -122,11 +154,13 @@ struct DecantResult {
 
 inline DecantResult decant(const Substance& mud, const Vessel& ves, double seconds) {
     DecantResult out;
+    const double T = mud.temperature;
+    out.liquor.temperature = out.sediment.temperature = T;
     const double clear = clear_depth(mud, ves, seconds);
     for (int p = 0; p < N_PHASE; ++p)
         for (int s = 0; s < N_SIZE; ++s) {
-            const double pf = poured_fraction(free_velocity(p, s), clear, ves.depth, seconds);
-            const double pc = poured_fraction(composite_velocity(p, s), clear, ves.depth, seconds);
+            const double pf = poured_fraction(free_velocity(p, s, T), clear, ves.depth, seconds);
+            const double pc = poured_fraction(composite_velocity(p, s, T), clear, ves.depth, seconds);
             out.liquor.freegrain[p][s]   = mud.freegrain[p][s] * pf;
             out.sediment.freegrain[p][s] = mud.freegrain[p][s] * (1.0 - pf);
             out.liquor.composite[p][s]   = mud.composite[p][s] * pc;

@@ -197,13 +197,28 @@ int main() {
               reynolds(settling_velocity(PHASES[QUARTZ].density, d_grav), d_grav) > 1000.0,
               "the bins straddle the creeping-flow and Newton regimes: one correlation cannot be skipped");
 
+        // This assertion used to have no shape clause, and it passed for the wrong
+        // reason: every grain was a sphere, so "at equal shape" was vacuously true
+        // everywhere. It is the third test in this project caught passing for the
+        // wrong reason, and like the other two it was caught by something trying
+        // to use the model rather than by reading it. *(Amended 2026-07-10, #13.)*
         bool by_density = true;
         for (int s = 0; s < N_SIZE; ++s)
             for (int p = 0; p < N_PHASE; ++p)
                 for (int q = 0; q < N_PHASE; ++q)
-                    if (PHASES[p].density > PHASES[q].density && free_velocity(p, s) <= free_velocity(q, s))
+                    if (grain_aspect_ratio(p, s) == grain_aspect_ratio(q, s)
+                        && PHASES[p].density > PHASES[q].density
+                        && free_velocity(p, s) <= free_velocity(q, s))
                         by_density = false;
-        check(by_density, "within one size class, velocity ranks by density: this is what a pan reads");
+        check(by_density, "at equal shape, velocity ranks by density within a size class");
+
+        // And shape outranks density, which is the whole of why clay is clay.
+        // Kaolinite is denser than feldspar and falls a quarter as fast.
+        check(PHASES[KAOLINITE].density > PHASES[FELDSPAR].density
+              && free_velocity(KAOLINITE, CLAY) < 0.5 * free_velocity(FELDSPAR, CLAY),
+              "but shape outranks density: the denser platelet loses to the lighter lump");
+        std::printf("        (kaolinite %.4e m/s at rho 2.60; feldspar %.4e at rho 2.56)\n",
+                    free_velocity(KAOLINITE, CLAY), free_velocity(FELDSPAR, CLAY));
 
         bool size_dominates = true;
         for (int s = 0; s + 1 < N_SIZE; ++s) {
@@ -232,20 +247,95 @@ int main() {
         check(std::fabs(vm - vh) / vh < 0.02,
               "magnetite and hematite settle within 2% of each other: no gravity device separates them");
 
+        // ---- 1b. Shape ---------------------------------------------------------
+        // The Perrin factor is exact, so it can be checked against a result from a
+        // different calculation in a different century: the orientation-averaged
+        // Stokes friction of a thin circular disk of radius a is exactly 12*mu*a.
+        // Nothing in stokes_shape_factor() knows that. It converges on it anyway.
+        bool disk_limit = true;
+        for (double p : {1e-3, 1e-4, 1e-5}) {
+            // f_tot = f_P * 6 pi mu R, with R = a p^(1/3); so f_tot/(mu a) = 6 pi p^(1/3) / K1.
+            const double ftot = 6.0 * M_PI * std::cbrt(p) / stokes_shape_factor(p);
+            if (std::fabs(ftot - 12.0) > 1e-2) disk_limit = false;
+        }
+        check(disk_limit, "the platelet's exact drag converges on the thin-disk result 12*mu*a");
+
+        // A sphere must be a sphere. Every p = 1 phase keeps the velocity it had
+        // before shape existed, and that is what makes this change safe.
+        check(std::fabs(stokes_shape_factor(1.0) - 1.0) < 1e-15
+              && std::fabs(oblate_sphericity(1.0) - 1.0) < 1e-15
+              && std::fabs(newton_shape_factor(1.0) - 1.0) < 1e-15
+              && std::fabs(drag_coefficient(17.0, 1.0, 1.0) - sphere_drag_coefficient(17.0)) < 1e-15,
+              "at p = 1 every shape factor is 1 and the drag law is the sphere's, exactly");
+
+        // Ganser's rescaling is exact in the Stokes limit by construction: the K2
+        // that stretches the Newton regime cancels out of the creeping one. What is
+        // left over at finite Re is Schiller & Naumann's fitted correction, and it
+        // dies with Re -- 4.5e-5 at Re 1e-6, 8e-8 at Re 1e-10 -- rather than being
+        // driven to zero by hand.
+        {
+            const double K1 = stokes_shape_factor(0.1);
+            const double K2 = newton_shape_factor(oblate_sphericity(0.1));
+            const double near = std::fabs(drag_coefficient(1e-6,  K1, K2) * 1e-6  * K1 / 24.0 - 1.0);
+            const double far  = std::fabs(drag_coefficient(1e-10, K1, K2) * 1e-10 * K1 / 24.0 - 1.0);
+            check(far < 1e-6 && far < near,
+                  "and as Re -> 0 the shaped drag law is exactly 24/(Re*K1): no fit survives there");
+        }
+
+        // Nearly all of the 6.98x is volume, not drag. A plate of face diameter d
+        // has the volume of a sphere of 0.464 d, and velocity goes as d^2.
+        check(std::fabs(stokes_shape_factor(0.1) - 0.6860) < 1e-3
+              && std::fabs(free_velocity(QUARTZ, CLAY) / free_velocity(KAOLINITE, CLAY) - 6.977) < 1e-2,
+              "a 10:1 plate loses 1.46x to drag and 4.8x to volume, for 6.98x in the clay bin");
+
+        // ---- 1c. Water ---------------------------------------------------------
+        // Kell's polynomial is a fit to density. It was never given the temperature
+        // of maximum density, and it puts it at 3.983 C.
+        check(std::fabs(water_density(273.15) - 999.8395) < 1e-3
+              && std::fabs(water_density(293.15) - 998.2071) < 5e-3
+              && std::fabs(water_viscosity(293.15) - 1.0016e-3) < 1e-5,
+              "the water correlations reproduce published density and viscosity at 0 C and 20 C");
+
+        double rho_max = 0.0, t_max = 0.0;
+        for (double t = 0.0; t < 10.0; t += 0.001)
+            if (water_density(t + 273.15) > rho_max) { rho_max = water_density(t + 273.15); t_max = t; }
+        check(std::fabs(t_max - 3.98) < 0.01,
+              "and water is densest at 3.98 C, which nobody fitted and nobody typed in");
+
+        // Substance::temperature stopped being decoration on 2026-07-10.
+        {
+            Substance cold; cold.temperature = 274.15;   // snowmelt
+            Substance warm; warm.temperature = 313.15;   // a hot spring
+            const double v_cold = free_velocity(KAOLINITE, CLAY, cold.temperature);
+            const double v_warm = free_velocity(KAOLINITE, CLAY, warm.temperature);
+            check(v_warm > 2.5 * v_cold,
+                  "clay falls more than twice as fast in a hot spring as in a snowmelt creek");
+            std::printf("        (kaolinite in clay: %.4e m/s at 1 C, %.4e at 40 C, %.2fx)\n",
+                        v_cold, v_warm, v_warm / v_cold);
+        }
+
         // Levigation is the one process in the design that quotes settling times,
         // and it is also the one place Stokes is exact. So the times are not a
         // fact about clay. They are a fact about clay and the depth of your hole.
+        // The clay time is now a fact about clay, the depth of your hole, AND the
+        // grain's shape. A 2 um kaolinite platelet takes 61 hours to fall through
+        // 0.10 m where a 2 um kaolinite sphere -- which does not exist -- takes 9.1.
+        // DESIGN.md's table quoted the sphere. *(2026-07-10, #13.)*
         const double DEPTH = 0.10; // m of standing water. AUTHORED: it's a puddle.
         const double d_sand_fine = 62.5e-6, d_silt = 20.0e-6, d_clay = 2.0e-6;
+        const double p_clay = PHASES[KAOLINITE].aspect_ratio;
         const double t_sand = DEPTH / stokes_velocity(PHASES[QUARTZ].density, d_sand_fine);
         const double t_silt = DEPTH / stokes_velocity(PHASES[QUARTZ].density, d_silt);
-        const double t_clay = DEPTH / stokes_velocity(PHASES[KAOLINITE].density, d_clay);
+        const double t_clay = DEPTH / stokes_velocity(PHASES[KAOLINITE].density, d_clay, p_clay);
+        const double t_sphere = DEPTH / stokes_velocity(PHASES[KAOLINITE].density, d_clay);
         check(reynolds(stokes_velocity(PHASES[QUARTZ].density, d_sand_fine), d_sand_fine) < 1.0,
               "levigation lives entirely in creeping flow, so its settling times are exactly derivable");
         check(t_sand < t_silt && t_silt < t_clay,
               "levigation separates by settling time, and the order is sand, silt, clay");
-        std::printf("        (0.10 m of water: sand %.0f s | silt %.0f s | clay %.1f h)\n",
-                    t_sand, t_silt, t_clay / 3600.0);
+        check(std::fabs(t_clay / t_sphere - 6.77) < 0.05,
+              "and a platelet takes 6.8x as long to fall as the sphere that never existed");
+        std::printf("        (0.10 m of water: sand %.0f s | silt %.0f s | clay %.1f h, was %.1f h)\n",
+                    t_sand, t_silt, t_clay / 3600.0, t_sphere / 3600.0);
     }
 
     // ---- 1. Conservation ---------------------------------------------------
@@ -631,23 +721,45 @@ int main() {
         check(liq1h.grade(KAOLINITE) > 3.0 * dirt.grade(KAOLINITE) && coarse < 1e-9,
               "one hour in a hole rejects every grain of sand and triples the clay grade");
 
-        // Volume buys recovery -- and so does depth, which the algebra says it
-        // should not, until you remember the clay is falling too.
+        // Volume buys recovery, and depth buys almost nothing -- which is what the
+        // algebra said in the first place.
+        //
+        // *(This assertion used to read "at equal volume a deep vessel beats a
+        // shallow one: the clay is settling too", and demanded r_deep > 3 * r_flat.
+        // It measured 19.5% against 4.8% and levigate.h carries a dated correction
+        // admitting the algebra had been wrong. The algebra was not wrong. Clay was
+        // a sphere, and a spherical kaolinite grain falls 6.98x too fast, so its
+        // front travelled far enough in four hours for depth to matter. Give the
+        // platelet its real drag and its front moves 1.3 mm in four hours against a
+        // 50 mm hollow, depth cancels out of the pour fraction as it always should
+        // have, and 3.0x collapses to 1.12x. A correction was published to cover for
+        // a defect one file over. Both stay, dated. -- 2026-07-10, #13.)*
         const Vessel flat{0.05, 0.20, "flat"}, deep{0.20, 0.10, "deep"};   // equal volume
         const double r_flat = recovery(dirt, decant(dirt, flat, 14400.0).liquor, KAOLINITE);
         const double r_deep = recovery(dirt, decant(dirt, deep, 14400.0).liquor, KAOLINITE);
-        check(std::fabs(flat.volume() - deep.volume()) < 1e-9 && r_deep > 3.0 * r_flat,
-              "at equal volume a deep vessel beats a shallow one: the clay is settling too");
-        std::printf("        (equal %.1f L: deep recovers %.3f, flat %.3f)\n",
-                    flat.volume() * 1000, r_deep, r_flat);
+        check(std::fabs(flat.volume() - deep.volume()) < 1e-9
+              && r_deep > r_flat && r_deep < 1.25 * r_flat,
+              "at equal volume depth is nearly free: the clay is barely settling at all");
+        std::printf("        (equal %.1f L: deep recovers %.3f, flat %.3f -- was 3.0x, now %.2fx)\n",
+                    flat.volume() * 1000, r_deep, r_flat, r_deep / r_flat);
 
-        // A second decant cannot separate a single velocity class. It only taxes it.
+        // A second decant divides the clay bin, because the clay bin is not one
+        // velocity class.
+        //
+        // *(This read "re-decanting the liquor is a tax: it cannot divide one
+        // velocity class", and measured +0.0001 grade for -4.5% recovery per pass.
+        // That was Era 0's law -- no velocity separator divides one velocity class
+        // -- correctly applied to a premise that was false. Clay-sized kaolinite and
+        // clay-sized quartz are not one velocity class; they were one velocity class
+        // only while both were spheres of the same diameter, at which point nothing
+        // but their densities differed and their densities differ by 1.9%. The old
+        // claim and its number stay. -- 2026-07-10, #13.)*
         Substance stage = decant(dirt, HOLLOW, 3600.0).liquor;
         const double g0 = stage.grade(KAOLINITE), r0 = recovery(dirt, stage, KAOLINITE);
         for (int i = 0; i < 3; ++i) stage = decant(stage, HOLLOW, 3600.0).liquor;
         const double g3 = stage.grade(KAOLINITE), r3 = recovery(dirt, stage, KAOLINITE);
-        check(g3 - g0 < 1e-3 && r3 < 0.90 * r0,
-              "re-decanting the liquor is a tax: it cannot divide one velocity class");
+        check(g3 > g0 + 1e-3 && r3 > 0.90 * r0,
+              "re-decanting buys grade cheaply: the clay bin is two velocity classes");
         std::printf("        (3 more decants: grade %.6f -> %.6f, recovery %.4f -> %.4f)\n",
                     g0, g3, r0, r3);
 
@@ -681,39 +793,83 @@ int main() {
         std::printf("        (stone-picked dirt %.4f -> 60 s %.4f -> 4 h %.4f)\n",
                     fire_pan(cobbed).sharpness, s_minute, s_day);
 
-        // Because the grade ceiling was never a property of the tool.
+        // And the grade ceiling is not a ceiling, because levigation separates.
+        //
+        // *(This read "every vessel and every wait lands on the same grade: the
+        // dirt's own clay bin", pinned at 0.843, and it was the single result this
+        // project's Era 1 was built around: levigation authors nothing, cuts on a
+        // velocity ratio of 1.031x, cannot divide the clay bin, and therefore leaves
+        // a lodestone-shaped hole that only deflocculation can fill (#15). Every
+        // step of that was sound except the 1.031x, which was the ratio between two
+        // SPHERES of equal diameter and unequal density -- i.e. it was a fact about
+        // an assumption. Kaolinite is a platelet. The ratio is 6.977x, the clay bin
+        // divides, and the hole is not a hole. -- 2026-07-10, #13.)*
         double cb = 0.0;
         for (int p = 0; p < N_PHASE; ++p) cb += dirt.freegrain[p][CLAY];
-        const double ceiling = dirt.freegrain[KAOLINITE][CLAY] / cb;
-        bool pinned = true;
+        const double bin_grade = dirt.freegrain[KAOLINITE][CLAY] / cb;
+        bool beats_bin = false;
         for (const Vessel& v : {HOLLOW, Vessel{0.30, 0.15, "pot"}, Vessel{0.40, 0.30, "vat"}})
             for (double t : {3600.0, 14400.0}) {
                 const Substance liq = decant(dirt, v, t).liquor;
-                if (liq.total_mass() > 1e-9 && std::fabs(liq.grade(KAOLINITE) - ceiling) > 0.01) pinned = false;
+                if (liq.total_mass() > 1e-9 && liq.grade(KAOLINITE) > bin_grade + 0.01) beats_bin = true;
             }
-        check(pinned, "every vessel and every wait lands on the same grade: the dirt's own clay bin");
-        std::printf("        (ceiling %.4f; kaolinite/quartz velocity ratio in clay is %.3fx --\n"
-                    "         the same 1.03x that makes magnetite indistinguishable from hematite)\n",
-                    ceiling, free_velocity(QUARTZ, CLAY) / free_velocity(KAOLINITE, CLAY));
+        check(beats_bin, "levigation lifts the clay above the bin it came from: it is a separator");
+        std::printf("        (the dirt's own clay bin is %.4f; a 4 h hollow returns %.4f;\n"
+                    "         kaolinite/quartz velocity ratio in clay is %.3fx, not 1.03x)\n",
+                    bin_grade, decant(dirt, HOLLOW, 14400.0).liquor.grade(KAOLINITE),
+                    free_velocity(QUARTZ, CLAY) / free_velocity(KAOLINITE, CLAY));
 
-        // Grade pinned + recovery raised = the curve moved OUTWARD. A bigger pot
-        // is a better tool by this project's own definition, and it is not
-        // throughput: it digs no more dirt, it loses less of the clay in what it
-        // has. Throughput would be a bigger shovel, and a bigger shovel moves
-        // nothing. That distinction is one the README got wrong for an hour.
+        // What replaces the ceiling is a curve, which is what every other separator
+        // in this project has. Levigation had only a recovery axis until today.
+        const Substance liq_hollow = decant(dirt, HOLLOW, 14400.0).liquor;
+        const Substance liq_wide   = decant(dirt, Vessel{0.05, 0.40, "wide"}, 14400.0).liquor;
+        check(liq_hollow.grade(KAOLINITE) > liq_wide.grade(KAOLINITE)
+              && recovery(dirt, liq_wide, KAOLINITE) > recovery(dirt, liq_hollow, KAOLINITE),
+              "and grade trades against recovery across vessels: levigation has a curve now");
+
+        // The curve moved OUTWARD. A bigger pot is a better tool by this project's
+        // own definition, and it is not throughput: it digs no more dirt, it loses
+        // less of the clay in what it has. Throughput would be a bigger shovel, and
+        // a bigger shovel moves nothing. That distinction is one the README got
+        // wrong for an hour.
+        //
+        // *(The assertion used to be "same grade, an order more recovery", which
+        // was only sayable while every vessel landed on 0.843. Now that grade moves,
+        // more recovery at less grade is a slide ALONG the curve, not a move of it,
+        // and the honest test is the one this project's own README specifies:
+        // better recovery at a MATCHED grade. The pot wins at every matched grade,
+        // so the finding stands and its old proof does not. -- 2026-07-10, #13.)*
         const Vessel pot{0.30, 0.15, "pot"};
-        const Substance lh = decant(dirt, HOLLOW, 14400.0).liquor;
-        const Substance lp = decant(dirt, pot,    14400.0).liquor;
-        const double rec_h = recovery(dirt, lh, KAOLINITE), rec_p = recovery(dirt, lp, KAOLINITE);
-        check(std::fabs(lp.grade(KAOLINITE) - lh.grade(KAOLINITE)) < 0.01 && rec_p > 10.0 * rec_h,
-              "a bigger pot moves the curve outward: same grade, an order more recovery");
+        auto lev_frontier = [&](const Vessel& v) {
+            std::vector<Point> f;
+            for (double t : {60.0, 300.0, 900.0, 3600.0, 14400.0, 57600.0, 230400.0, 921600.0}) {
+                const Substance liq = decant(dirt, v, t).liquor;
+                if (liq.total_mass() < 1e-9) continue;
+                f.push_back({levigation_cut(clear_depth(dirt, v, t), t),
+                             recovery(dirt, liq, KAOLINITE), liq.grade(KAOLINITE)});
+            }
+            return f;
+        };
+        const auto fh = lev_frontier(HOLLOW), fp = lev_frontier(pot);
+        bool pot_dominates = !fh.empty() && !fp.empty();
+        double matched = -1.0;
+        for (const auto& a : fh) {           // for every grade the hollow can reach...
+            double best = -1.0;
+            for (const auto& b : fp) if (b.grade >= a.grade - 1e-9) best = std::fmax(best, b.rec);
+            if (best <= a.rec) pot_dominates = false;   // ...the pot recovers more of it
+            if (std::fabs(a.grade - fh.back().grade) < 1e-12) matched = best;
+        }
+        check(pot_dominates,
+              "a bigger pot moves the curve outward: more recovery at every matched grade");
+        std::printf("        (at the hollow's purest grade %.4f: hollow recovers %.4f, pot %.4f)\n",
+                    fh.back().grade, fh.back().rec, matched);
 
         Substance big = dirt; big.add(dirt);   // a bigger shovel: twice the charge
-        const Substance lb = decant(big, HOLLOW, 14400.0).liquor;
-        check(recovery(big, lb, KAOLINITE) < rec_h,
+        const double rec_p = recovery(dirt, decant(dirt, pot, 14400.0).liquor, KAOLINITE);
+        check(recovery(big, decant(big, pot, 14400.0).liquor, KAOLINITE) < rec_p,
               "and a bigger shovel moves nothing outward: that is what throughput is");
-        std::printf("        (recovery: hollow %.4f, pot %.4f, hollow with a double charge %.4f)\n",
-                    rec_h, rec_p, recovery(big, lb, KAOLINITE));
+        std::printf("        (at 4 h: pot recovers %.4f, pot with a double charge %.4f)\n",
+                    rec_p, recovery(big, decant(big, pot, 14400.0).liquor, KAOLINITE));
     }
 
     // ---- The picture -------------------------------------------------------

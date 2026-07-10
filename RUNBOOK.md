@@ -12,7 +12,7 @@ Debian 13. `g++ 14.2.0`, `GNU Make 4.4.1`. No dependencies, no build system beyo
 
 ```
 cd core
-make test          # 52 assertions. Must print "ok (0 failures)".
+make test          # 62 assertions. Must print "ok (0 failures)".
 make ratchet-run   # a measurement, not a test. Allowed to come out badly.
 make pan           # play it
 make clean
@@ -30,9 +30,9 @@ Read them in this order. Each one only knows about the ones above it.
 
 | file | owns |
 |---|---|
-| `phase_table.h` | Ten minerals, four Wentworth size bins. Densities, susceptibilities. Every number `UNVERIFIED`. |
+| `phase_table.h` | Ten minerals, four Wentworth size bins. Densities, susceptibilities, aspect ratios. Every number `UNVERIFIED` or `AUTHORED`. |
 | `substance.h` | `Substance`: a `[phase][size]` mass matrix, twice — free grains and composites. `grade()`. No position, no vertical dimension, no volume. |
-| `settling.h` | Terminal velocity from a force balance, solved as a damped fixed point. `free_velocity(p, s)` is the number the whole project turns on. |
+| `settling.h` | Terminal velocity from a force balance, solved as a damped fixed point. Water properties from temperature; grain shape from the aspect ratio. `free_velocity(p, s, T)` is the number the whole project turns on, and the long comment on what a bin diameter *means* is the most load-bearing paragraph in `core/`. |
 | `separate.h` | The Tromp partition, `9^σ` imperfection, screening, crushing, closed circuit, the bed (`exposed()`), `recovery()`. |
 | `levigate.h` | The batch decant. Its partition is a ramp and it is exact — there is no authored sharpness in this file. |
 | `fire.h` | The two bridges from a body of clay to a tool: grit → sharpness, clay → vessel. Both authored. Both are issues. |
@@ -73,14 +73,16 @@ Commit messages are lowercase, `area: what changed`, and they are allowed to be 
 
 Era 0 (hands, pan, sluice, lodestone) and the first half of Era 1 (levigation, fired pot) are implemented and measured. Nothing else exists.
 
-Four results are settled. Each has a way it could be un-settled, and that is written down because a fresh reader will otherwise treat them as load-bearing when two of them are provisional:
+**This section said, on 2026-07-09, that #13 was "the single most dangerous uncited number in the project — it can reverse a finding rather than refine one." On 2026-07-10 it was done, and it did.** One of the four settled results below is now struck through. Read that as encouragement: the paragraph was right, the work was worth prioritising, and the way to find out was to go and do the arithmetic. Two of the remaining three have a way they could be un-settled, and it is written down because a fresh reader will otherwise treat them as load-bearing when they are provisional:
 
-- **Progression is a staircase, not a ratchet.** You do not refine a tool into a better tool; you invent a different mechanism with its own irreducible sharpness. *Overturned if* the grit → sharpness bridge in `fire.h` has the wrong functional form — see **#10**. Its magnitude is safe by three orders of magnitude; its exponent is not.
-- **Levigation authors nothing.** Its imperfection is exactly 3.0 for every vessel, charge and wait, and even the pour fraction is derived. Nothing to overturn — it is algebra.
-- **Era 1 has a lodestone-shaped hole.** Levigation cannot separate clay from clay-sized quartz; the velocity ratio is 1.031×, the same 1.03× that hides magnetite in hematite. See **#15**. *Closed by* **#13** if kaolinite is given the drag of a platelet rather than of a sphere, which is the single most dangerous uncited number in the project — it can reverse a finding rather than refine one.
-- **Throughput is a bigger shovel.** More mass per hour is not progression. A bigger pot is, because it moves the curve outward at matched grade. This distinction was got wrong once already, in the direction of thinking the pot's loop was illegal.
+- **Progression is a staircase, not a ratchet.** You do not refine a tool into a better tool; you invent a different mechanism with its own irreducible sharpness. *Overturned if* the grit → sharpness bridge in `fire.h` has the wrong functional form — see **#10**. Its magnitude is safe by three orders of magnitude; its exponent is not. *(Survived #13 untouched: σ is 0.5500 at every generation, before and after. This was the obvious thing to fear and it did not happen — sand is what blurs a pan, and a clay platelet has no opinion about sand.)*
+- **Levigation authors nothing.** Its imperfection is exactly 3.0 for every vessel, charge and wait, and even the pour fraction is derived. Nothing to overturn — it is algebra. *(Survived #13: the algebra never moved. Every number it stood on did.)*
+- ~~**Era 1 has a lodestone-shaped hole.** Levigation cannot separate clay from clay-sized quartz; the velocity ratio is 1.031×, the same 1.03× that hides magnetite in hematite.~~ **Overturned 2026-07-10 by #13.** The 1.031× was the ratio between two *spheres* of equal diameter and unequal density; kaolinite is a platelet and the real ratio is **6.977×**. Levigation divides the clay bin, reaches grade 1.000 given patience, and has a grade/recovery curve like every other separator here. Deflocculation (**#15**) survives as an *improvement*, not a *requirement*.
+- **Throughput is a bigger shovel.** More mass per hour is not progression. A bigger pot is, because it moves the curve outward at matched grade. This distinction was got wrong once already, in the direction of thinking the pot's loop was illegal. *(Survived #13, but its old proof did not: "same grade, more recovery" was only sayable while grade was pinned. The pot now wins at every matched grade, which is the real test and the one §2a specifies.)*
 
-The next piece of work is either **Phase A step 3 (smelt)** — slag falls out of a bloomery and the ledger balances — or **#13 first**, on the grounds that #13 can invalidate the finding `README.md`'s front page is currently built around. Smelt is downstream of nothing and cannot invalidate anything already written; #13 can, and it grows more expensive the longer the front page stands on it.
+Two habits earned their keep on 2026-07-10 and are worth stating as rules rather than as anecdotes. **An uncited number can be load-bearing for a conclusion in a different file, and nothing in the code will tell you which one** — the velocity ratio that Era 1 rested on was a property of the word "sphere", which nobody had ever written down as an assumption. And **a correction can be wrong.** `levigate.h` carried a dated, self-flagellating note admitting its algebra had been too clever about vessel depth; the algebra was right, and the note was covering for a defect one file over. Both stay, both dated. Do not assume the most recent sentence is the true one.
+
+The next piece of work is **Phase A step 3 (smelt)** — slag falls out of a bloomery and the ledger balances. It is downstream of nothing and cannot invalidate anything already written, which is now the whole of what is left to choose from: **#13 is closed.** Before starting it, glance at **#10**, the grit → sharpness bridge, which is the last authored number a finding on the front page rests on.
 
 ---
 

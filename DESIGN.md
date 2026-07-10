@@ -257,15 +257,131 @@ that ratio the **imperfection** of a separation and measures it. It is a number
 somebody can hand us, unlike a σ we invented.
 
 The velocity itself is not tabulated. It is solved, per particle class, from the
-force balance on a falling sphere:
+force balance on a falling grain:
 
 ```
-(π/6)·d³·(ρp − ρf)·g  =  Cd(Re) · (π/8) · ρf · d² · v²
+(π/6)·dᵥ³·(ρp − ρf)·g  =  Cd(Re) · (π/8) · ρf · dᵥ² · v²
 ```
 
 `Cd` depends on Reynolds number depends on `v`, so this is a fixed point, not a
 formula. We iterate it, with Schiller–Naumann below `Re = 1000` and Newton's flat
 0.44 above.
+
+### Shape — the column the phase table did not have
+
+*(Added 2026-07-10, issue #13. It says "a falling grain" above. It said "a falling
+**sphere**" until this section existed, and that word cost the project its largest
+reversal. See Era 1.)*
+
+A grain has a **shape**, and for exactly one mineral in this game the shape is the
+whole point. Kaolinite is a platelet roughly ten times wider than it is thick;
+that is why clay is plastic, why it stays up in water, and why there is a pottery
+era at all. Quartz and magnetite are blocky and near-isometric. Modelling all of
+them as spheres is not a small idealisation — it is the erasure of the one property
+the second era of the game is about.
+
+Shape enters in **two** places, and only one of them is drag:
+
+**1. The volume-equivalent diameter, which is the big one.** A size bin's diameter
+is a *linear* dimension — a sieve aperture, an intermediate axis, the number a
+mineralogist reports. For a plate that is the **face** diameter. Its volume is
+that of a sphere of diameter `d·p^(1/3)`, where `p` is the aspect ratio (polar over
+equatorial semiaxis; `p = 1` is a sphere). At `p = 0.1` that is `0.464·d`, and
+velocity goes as `d²`, so the plate loses **4.8×** before drag is even considered.
+
+That bin diameters are face diameters rather than volume-equivalent or
+settling-equivalent diameters is a **bridge**, it is stated out loud in
+`core/settling.h`, and it is worth a factor of seven. The alternative readings were
+weighed and rejected there: a settling-equivalent diameter makes "a velocity
+separator cannot separate within a size class" true by *definition* rather than by
+physics, which would let the bin definition do the work the force balance exists to
+do. The empirical check is that measured kaolinite face diameters (0.1–4.0 µm) land
+on the CLAY bin (0.2–3.9 µm).
+
+**2. Drag, which is exact and which is smaller than you would guess.** In creeping
+flow the drag on an oblate spheroid has a closed-form solution — Oberbeck (1876),
+tabulated in Happel & Brenner, *Low Reynolds Number Hydrodynamics* (1965) ch. 5,
+and usually met as the **Perrin translational friction factor** (Perrin 1936):
+
+```
+ξ = √(1 − p²)/p ,   S = 2·arctan(ξ)/ξ ,   K₁ = S / (2·p^(2/3))
+```
+
+`K₁` is the ratio of the platelet's settling velocity to that of the sphere of
+equal volume, orientation-averaged. It is **exact**: no fit, no free parameter. It
+is the second thing in this project, after levigation's ramp, to have none. At
+`p = 0.1` it is **0.686** — a 1.46× slowdown. Shape's drag effect is *weak*; shape's
+volume effect is *strong*; and conflating them is how you talk yourself into
+expecting a 3× answer and getting 6.98×.
+
+`K₁` is checked, not trusted: as `p → 0` the total friction must approach the exact
+thin-disk result `12·μ·a`, computed in a different century by a different method.
+It does, to five figures. That assertion is in the suite.
+
+**Joining the two regimes.** Ganser (1993), *Powder Technology* 77:143–152, proposes
+that a shaped particle's drag curve is the sphere's, rescaled on both axes:
+
+```
+Cd(Re) = K₂ · Cd_sphere(Re · K₁ · K₂)
+```
+
+with `K₁` the Stokes-regime shape factor above and `K₂ = 10^(1.8148·(−log₁₀ φ)^0.5743)`
+the Newton-regime one, `φ` being sphericity — which for a spheroid is pure geometry
+and needs no citation. That rescaling is exact in both limits by construction:
+`Cd → 24/(Re·K₁)` as `Re → 0`, and `Cd → 0.44·K₂` as `Re → ∞`.
+
+**We use Ganser's rescaling and not Ganser's curve**, and the reason is measured.
+His fitted sphere law, at `K₁ = K₂ = 1`, gives `Cd = 2.43` at `Re = 17` — which is
+the SAND bin, which is what a pan works — where Schiller–Naumann gives 2.88 and the
+standard drag curve gives about 2.85. Adopting his equation wholesale would have
+moved the sluice's enrichment from 33.7× to 39.6× by making the **sphere** case
+worse in order to fix the **platelet** case. Instead `K₁` and `K₂` rescale the sphere
+law that was already here, and **every `p = 1` phase keeps the velocity it had.**
+Nine of the ten minerals are numerically untouched by this change. Only clay moved.
+
+Nor do we use Ganser's `K₁` correlation, `(1/3 + (2/3)·φ^−0.5)⁻¹`: for the one phase
+where `K₁ ≠ 1` we have the exact value, and an exact number does not need a fit.
+Dioguardi et al. (2018), *JGR Solid Earth* 123:144–156, measure Ganser
+underestimating `Cd` below `Re = 0.1` for irregular grains — which is precisely the
+regime clay lives in (`Re ≈ 5×10⁻⁷`), and precisely why the exact solution is worth
+having there.
+
+**A habit has a size.** Aspect ratio is a property of a *crystal*, and kaolinite
+crystals are 0.1–4.0 µm across. Applied at every size bin it produces an 11 mm
+platelet 1.1 mm thick, which is not a mineral; a pan test caught that within the
+hour. Above 4.0 µm, kaolinite is an *aggregate* of stacked platelets — a lump — and
+falls as one. Composite grains take `p = 1` for the same reason: a composite is two
+minerals grown together, and a lump is blocky whatever its constituents cleave like.
+**Liberation gives a grain its shape back.**
+
+**Nine authored ones.** Every phase but kaolinite carries `p = 1.0`, and every one
+of those is a labelled idealisation rather than a measurement: quartz sand is blocky
+(Wadell sphericity ≈ 0.7), goethite is acicular, specular hematite is a plate. The
+direction of that error is known and small — giving quartz its real sphericity slows
+it ~7% and *narrows* the kaolinite/quartz gap from 6.98× to 6.47×, changing no
+conclusion. They are 1.0 because no process yet distinguishes them, and they are
+tracked as `authored-number` rather than quietly rounded to a fact.
+
+### Water is not a constant
+
+*(Added 2026-07-10, issue #13.)* `Substance` has always carried a `temperature`, and
+until #13 nothing read it. Water density and viscosity were frozen at 288 K, so a
+snowmelt creek and a hot spring panned identically.
+
+- **Density:** Kell (1975), *J. Chem. Eng. Data* 20(1):97–105. A fifth-order rational
+  polynomial, ±0.02 kg/m³ over 0–100 °C.
+- **Viscosity:** the Vogel–Fulcher–Tammann form `μ = 2.414×10⁻⁵ · 10^(247.8/(T−140))`
+  Pa·s, within 2.5% over 0–370 °C. Better than that where it matters (−0.13% at
+  15 °C) and worse at the freezing point (−2.14% at 0 °C), which we keep, because the
+  alternative is the full IAPWS formulation and nothing in this game runs on ice water.
+
+Neither is taken on trust. The suite checks both against published values, and then
+checks Kell's polynomial against a number it was never given: **liquid water is
+densest at 3.98 °C.** The fit puts the maximum at 3.983 °C. Nobody typed that in.
+
+Viscosity roughly halves between 1 °C and 40 °C, so clay falls **2.62× faster in a
+hot spring than in a snowmelt creek**, and levigation is a seasonal process. That
+mechanic cost nothing. The number was already in the struct.
 
 **And that solve was not optional.** The obvious shortcut is Stokes' law, and
 issue #8 originally proposed exactly that: derive the settling numbers rather
@@ -520,7 +636,7 @@ whole fines bin. So we can just compute them. Through **0.10 m** of standing wat
 |---|---|---|
 | fine sand | 62.5 µm | 32 s |
 | silt | 20 µm | 5 min |
-| clay | 2 µm | **9.1 h** |
+| clay | 2 µm | **9.1 h** → **61 h** |
 
 Sand and silt were right. Clay was wrong by a factor of nine — and more to the
 point, **the time is not a property of the clay.** It scales linearly with the
@@ -528,6 +644,16 @@ depth of the hole. A deep pit takes all day; a shallow puddle takes an afternoon
 The number the design quoted as a mineral constant is a number the character
 chooses when he digs, which is a far better mechanic than the one we wrote down,
 and we did not invent it. It was sitting inside `d²`.
+
+*(Corrected again 2026-07-10, by issue #13, and the correction above was itself
+computed on a sphere.* **A 2 µm kaolinite crystal is not a sphere. It is a plate
+about ten times wider than it is thick,** *and it takes* **61 hours**, *not 9.1, to
+fall through 0.10 m. Two thirds of that factor is not drag at all: a plate of face
+diameter d has the volume of a sphere of diameter 0.464 d, and settling velocity
+goes as d². The drag of the plate itself only costs another 1.46×. So the time is
+not a property of the clay, nor only of the depth of the hole —* **it is a property
+of the shape of the crystal**, *and shape was the one column the phase table did
+not have. See "Shape" below.)*
 
 Pinch it into a shallow bowl with your fingers (no wheel). Dry it. Fire it in an
 open pit. You have low-fired earthenware: porous, fragile, warped.
@@ -602,6 +728,14 @@ has. The word doing the damage was "purity", which we had been using as shorthan
 for a two-axis law, and which quietly demoted half of it. Corrected here and on the
 front page.)*
 
+*(And the phrase "at an identical grade of 0.843" is dead, killed by #13 on
+2026-07-10. Grade is no longer identical across vessels, because levigation now
+separates. The conclusion is unharmed and its proof had to be rebuilt: the pot
+recovers more clay than the hollow at* **every matched grade**, *which is the
+§2a test, rather than at one grade that happened to be pinned. At the hollow's
+purest — 0.937 — the hollow recovers 20.9% and the pot 62.5%. The old assertion
+was true by a coincidence, and a coincidence is not a proof.)*
+
 So the vessel *is* a better tool, by the project's own definition, and Era 1 does
 earn its progression. What it does not do is feed that progression back into the
 pan, which is the loop the ratchet claimed and the measurement denies.
@@ -618,6 +752,60 @@ surface chemistry rather than on settling velocity: **deflocculation**. Stir cla
 into water with a little wood ash and the platelets repel each other and stay up;
 the quartz does not care and falls. We do not model it, `settling.h` says so out
 loud, and it is now the most valuable unbuilt thing in Era 1.
+
+> ### The paragraph above is wrong, and this is how
+> *(2026-07-10. Issue #13. This is the largest reversal in the project so far, and
+> the sentence that caused it was in a different file and looked like housekeeping.)*
+>
+> Every step of that argument is sound except the number, and the number was not a
+> measurement. **1.031× is the ratio of settling velocities of two spheres of equal
+> diameter whose densities differ by 1.9%.** It is quartz over kaolinite because
+> quartz is 2.65 and kaolinite is 2.60, and it is nothing else. It never contained
+> any information about clay.
+>
+> `settling.h` solved the force balance on a sphere. Kaolinite is a **platelet**,
+> ten times wider than it is thick — that is the defining fact about clay, it is why
+> clay is plastic, why it stays in suspension, and why a potter can throw it. We
+> were modelling the defining property of clay with the drag of a marble, said so in
+> a comment, filed it as an issue, and then reasoned as though the comment were not
+> there.
+>
+> Give kaolinite its real shape and the ratio is **6.977×**, of which only 1.46×
+> is drag: the rest is that a plate of face diameter *d* has the volume of a sphere
+> of diameter 0.464 *d*. The clay bin is not one velocity class. It is two, they are
+> seven-fold apart, and **levigation divides them.**
+>
+> So:
+>
+> - The grade ceiling is not a ceiling. A hollow reaches **1.000** kaolinite in
+>   sixteen hours at 10.6% recovery; a large pot reaches it in eleven days at 43.5%.
+>   Potters levigate dirt and get clay pure enough to throw, which is what the model
+>   now does and what it previously said was impossible.
+> - Levigation has a **grade/recovery curve**, like every other separator here. It
+>   had only a recovery axis before, and we wrote three paragraphs explaining why.
+> - **Era 1 has no lodestone-shaped hole.** Deflocculation is still real, still what
+>   every potter does, and still worth building — but as an **improvement** that
+>   moves the curve, not as a **requirement** without which the era does not
+>   function. Those are the two design facts issue #15 said we could not tell apart,
+>   and now we can. It is the better of the two: the player improves a process he
+>   already has instead of being handed a key to a wall.
+> - **Re-decanting is a process, not a tax.** +0.013 grade for −2.1% recovery over
+>   three passes, where the old model measured +0.0001 for −4.5%.
+>
+> What survives untouched: the staircase. σ is 0.5500 at generation 0, 1, 2 and 5,
+> exactly as before, because the only thing coarse enough to blur a pan is sand, and
+> nothing about a clay platelet changes when sand falls out of standing water. The
+> ratchet still turns exactly once. **The measurement that broke the design's central
+> claim was not itself broken by this** — which is worth something, because it was
+> the obvious thing to fear.
+>
+> The lesson is not "cite your numbers." We knew the number was uncited; it was
+> filed as issue #13 and the file said so in a comment. The lesson is that **an
+> uncited number can be load-bearing for a conclusion three files away, and nothing
+> in the code will tell you which one.** The velocity ratio was printed in the
+> ratchet's output, quoted in the README's front page, and named in the RUNBOOK as a
+> settled result. It was a property of an assumption nobody had written down as an
+> assumption, because "sphere" is what you get when nobody says otherwise.
 
 So the paragraph above survives only as its last sentence — *every tool is made
 from something you separated* — which is true, and load-bearing, and is a **gate**

@@ -136,10 +136,11 @@ static Substance wash_tick(Substance& pan, double cut, Substance& out_lost) {
     const Substance top = exposed(pan, cut, skin_mass());
 
     Substance gone;
+    const double T = pan.temperature;
     for (int p = 0; p < N_PHASE; ++p)
         for (int s = 0; s < N_SIZE; ++s) {
-            const double rf = std::pow(partition(free_velocity(p, s), sp), e);
-            const double rc = std::pow(partition(composite_velocity(p, s), sp), e);
+            const double rf = std::pow(partition(free_velocity(p, s, T), sp), e);
+            const double rc = std::pow(partition(composite_velocity(p, s, T), sp), e);
             gone.freegrain[p][s] = top.freegrain[p][s] * (1.0 - rf);
             gone.composite[p][s] = top.composite[p][s] * (1.0 - rc);
             pan.freegrain[p][s] -= gone.freegrain[p][s];

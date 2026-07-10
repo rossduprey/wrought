@@ -125,9 +125,14 @@ int main() {
     rate("pot from a 1-hour decant", decant(dirt, HOLLOW, 3600.0).liquor);
     rate("pot from a 4-hour decant", decant(dirt, HOLLOW, 14400.0).liquor);
 
-    // -- 4b. Where the grade ceiling comes from -----------------------------
-    // Nowhere in the tool. It is arithmetic on the deposit's clay bin, because
-    // clay-sized quartz and clay-sized kaolinite fall at the same speed.
+    // -- 4b. Where the grade ceiling came from, until it stopped being one ---
+    // This instrument was written to show that the clay grade was arithmetic on
+    // the deposit's clay bin and not a property of any tool, because clay-sized
+    // quartz and clay-sized kaolinite fell at the same speed. They do not. They
+    // fell at the same speed because both were modelled as spheres of the same
+    // diameter, and a kaolinite crystal is a plate. At 6.98x the bin divides, the
+    // ceiling is a curve, and levigation reaches pure kaolinite if you wait.
+    // *(2026-07-10, #13. The instrument kept its table and lost its point.)*
     std::printf("\nthe clay bin of the dirt, before any process touches it:\n");
     double cb = 0.0;
     for (int p = 0; p < N_PHASE; ++p) cb += dirt.freegrain[p][CLAY];
@@ -137,6 +142,24 @@ int main() {
                         dirt.freegrain[p][CLAY] * 1000, 100 * dirt.freegrain[p][CLAY] / cb);
     std::printf("  kaolinite/quartz velocity ratio in the clay bin: %.3fx\n",
                 free_velocity(QUARTZ, CLAY) / free_velocity(KAOLINITE, CLAY));
+    std::printf("  (it was 1.031x while kaolinite was a sphere, and that was the whole\n"
+                "   argument for Era 1's lodestone-shaped hole. See issue #15.)\n");
+
+    // -- 4c. What levigation can actually reach, given patience --------------
+    std::printf("\nthe grade/recovery curve levigation did not have yesterday:\n");
+    std::printf("  %-14s %-10s %-10s %-10s\n", "vessel", "wait", "grade", "recovery");
+    const Vessel vessels[2] = {HOLLOW, Vessel{0.30, 0.15, "large pot"}};
+    const char* names[2] = {"hollow", "large pot"};
+    for (int i = 0; i < 2; ++i)
+        for (double t : {3600.0, 14400.0, 57600.0, 230400.0, 921600.0}) {
+            const Substance liq = decant(dirt, vessels[i], t).liquor;
+            if (liq.total_mass() < 1e-9) continue;
+            char wait[16];
+            if (t < 86400.0) std::snprintf(wait, sizeof wait, "%.0f h", t / 3600.0);
+            else             std::snprintf(wait, sizeof wait, "%.0f d", t / 86400.0);
+            std::printf("  %-14s %-10s %-10.4f %-10.4f\n",
+                        names[i], wait, liq.grade(KAOLINITE), recovery(dirt, liq, KAOLINITE));
+        }
 
     // -- 5. So what would a better pan actually take? ------------------------
     std::printf("\nwhat sharpness is worth what, magnetite over quartz in sand:\n");

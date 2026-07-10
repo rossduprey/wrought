@@ -70,16 +70,17 @@ inline SeparationResult separate(const Substance& in, const SeparatorParams& sp)
     SeparationResult out;
     out.concentrate.temperature = out.tailings.temperature = in.temperature;
 
+    const double T = in.temperature;
     for (int p = 0; p < N_PHASE; ++p)
         for (int s = 0; s < N_SIZE; ++s) {
-            const double cf = in.freegrain[p][s] * partition(free_velocity(p, s), sp);
+            const double cf = in.freegrain[p][s] * partition(free_velocity(p, s, T), sp);
             out.concentrate.freegrain[p][s] = cf;
             out.tailings.freegrain[p][s]    = in.freegrain[p][s] - cf;
 
             // A composite reports as one particle, at one velocity, and its
             // gangue is not consulted. This is where the grade ceiling comes
             // from.
-            const double cc = in.composite[p][s] * partition(composite_velocity(p, s), sp);
+            const double cc = in.composite[p][s] * partition(composite_velocity(p, s, T), sp);
             out.concentrate.composite[p][s] = cc;
             out.tailings.composite[p][s]    = in.composite[p][s] - cc;
         }
@@ -139,11 +140,12 @@ inline Substance exposed(const Substance& pan, double v_mix, double skin) {
     Substance top;
     if (v_mix <= 0.0 || skin <= 0.0) return top;
 
+    const double T = pan.temperature;
     double w[N_PHASE][N_SIZE][2], total = 0.0;
     for (int p = 0; p < N_PHASE; ++p)
         for (int s = 0; s < N_SIZE; ++s) {
-            w[p][s][0] = std::exp(-free_velocity(p, s) / v_mix);
-            w[p][s][1] = std::exp(-composite_velocity(p, s) / v_mix);
+            w[p][s][0] = std::exp(-free_velocity(p, s, T) / v_mix);
+            w[p][s][1] = std::exp(-composite_velocity(p, s, T) / v_mix);
             total += pan.freegrain[p][s] * w[p][s][0] + pan.composite[p][s] * w[p][s][1];
         }
     if (total <= 0.0) return top;

@@ -29,7 +29,7 @@ An AI and a human build the ancestor of the AI, out of the ground, and it learns
 There is one design document, two license files, and `core/` — a few hundred lines of dependency-free C++17 that pans a bucket of river sand. No engine, no renderer, no art.
 
 ```
-cd core && make test        # 52 assertions about the physics
+cd core && make test        # 62 assertions about the physics
 cd core && make pan         # kneel in the river and wash it yourself
 cd core && make ratchet-run # watch the design document lose an argument
 ```
@@ -56,7 +56,15 @@ And levigation, once written, authors nothing. A batch decant's partition functi
 
 With that in hand the loop ran, and did not turn. The clay grade pins at 0.843 in every vessel at every wait, because it was never a property of the tool — it is the composition of the deposit's clay-sized fraction, and clay-sized quartz and clay-sized kaolinite fall at speeds differing by **1.031×**. That is the same 1.03× that makes magnetite indistinguishable from hematite and put the lodestone in Era 0. So Era 1 has a lodestone-shaped hole, and the tool that fills it is real: **deflocculation**, which separates on surface chemistry instead of settling velocity, which every potter on earth does with a handful of wood ash, and which we do not model.
 
-Those corrections are now in the document, dated, next to the sentences they replaced. Including the one on the front page of this file.
+**Then we went and checked the 1.031×, and the paragraph you just read is wrong.** It is not a fact about clay. It is the ratio of settling velocities of two *spheres* of equal diameter whose densities differ by 1.9% — because `settling.h` solved the force balance on a sphere, and **kaolinite is a platelet.** Ten times wider than it is thick. That is the defining property of clay: it is why clay is plastic, why it stays up in water, why a potter can throw it. We were modelling it with the drag of a marble. We had said so, in a comment, and filed it as [issue #13](https://github.com/rossduprey/wrought/issues/13), and then reasoned for a day as though the comment were not there.
+
+Give the plate its real drag — [Perrin's exact creeping-flow solution](DESIGN.md), which has no fitted parameter in it and which converges on the thin-disk result computed in 1876 — and the ratio is **6.977×**. Only 1.46× of that is drag. The rest is that a plate of face diameter *d* has the volume of a sphere of diameter 0.464 *d*, and velocity goes as *d*². **The clay bin is two velocity classes, not one, and levigation divides them.** A hollow scraped in the bank reaches pure kaolinite in sixteen hours. Potters levigate dirt and get clay pure enough to throw, which is what the model now does and what the paragraph above declares impossible.
+
+So Era 1 has no lodestone-shaped hole. Deflocculation is still real and still worth building, as an **improvement** that moves a curve rather than a **requirement** without which the era does not function — and that is the better set piece, because the player improves a process he has instead of being handed a key to a wall. The staircase is untouched: σ is 0.5500 at generation 0, 1, 2 and 5, exactly as before, because the only thing coarse enough to blur a pan is sand, and nothing about a platelet changes when sand falls out of standing water.
+
+The lesson is not *cite your numbers*. We knew it was uncited; it was filed, and the file said so. It is that **an uncited number can be load-bearing for a conclusion three files away, and nothing tells you which one.** That velocity ratio was printed by the instrument, quoted on this page, and listed in the runbook as a settled result. It was a property of an assumption nobody had written down as an assumption — because *sphere* is what you get when nobody says otherwise.
+
+Those corrections are now in the document, dated, next to the sentences they replaced. Including the one on the front page of this file, twice.
 
 We are publishing all of it unfinished, because the idea is the deliverable and because we need people who are not us to look at it. See *What we want from you*.
 
@@ -80,7 +88,7 @@ Three things, as far as we can tell, do not exist anywhere:
 
 2. **Grade/recovery as the progression axis.** Grade trades against recovery, always: pan hard and what's left is clean but half of it went over the lip; pan gently and you keep everything, including the quartz you will pay for later in slag. This is the central law of mineral processing and it has been measured ten thousand times. A better tool does not make more iron appear — **it moves the curve.** No game has been built on this.
 
-   Progression is **the curve**, which has two axes: better grade at a matched recovery, or better recovery at a matched grade. It is never mass per hour. *(This sentence used to read "progression is purity, not throughput," and step 2 caught it. A fired pot returns 68% of the clay in a charge where a scraped hollow returns 4.8%, at an identical grade of 0.843 — that is the recovery axis moving outward, and for an hour we mistook it for throughput and thought we had contradicted ourselves. We had not. **Throughput is a bigger shovel:** more dirt per hour, same curve, no progression. A bigger pot digs no more dirt. It loses less of the clay in the dirt it already has.)*
+   Progression is **the curve**, which has two axes: better grade at a matched recovery, or better recovery at a matched grade. It is never mass per hour. *(This sentence used to read "progression is purity, not throughput," and step 2 caught it. A fired pot returns 68% of the clay in a charge where a scraped hollow returns 4.8%, at an identical grade of 0.843 — that is the recovery axis moving outward, and for an hour we mistook it for throughput and thought we had contradicted ourselves. We had not. **Throughput is a bigger shovel:** more dirt per hour, same curve, no progression. A bigger pot digs no more dirt. It loses less of the clay in the dirt it already has.)* *(And "at an identical grade of 0.843" died with the sphere. Grade is not identical across vessels any more, because levigation separates. The conclusion is unharmed and its proof had to be rebuilt on the definition above: the pot recovers more clay than the hollow at **every matched grade** — 62.5% against 20.9% at the hollow's purest — rather than at one grade that happened to be pinned. The old assertion was true by a coincidence, and a coincidence is not a proof.)*
 
    We do not author that curve, because a curve you author is a curve you balance. A separator is a partition function: the probability a particle reports to the concentrate, given the speed at which it falls through water — which is its density and its size, together, solved from a force balance rather than looked up. The operator picks the cut; the tool sets how sharp it is. The curve is the *output*.
 
