@@ -1248,6 +1248,64 @@ int main() {
         }
     }
 
+    // ---- 14. Shaping: form is free, hardness is only cold --------------------
+    // The forge's second half. A consolidated bar is drawn to a form; the same
+    // strain gives that form at any heat, but only strain worked in cold (below
+    // the recrystallization floor) hardens it. Two ends of the same heat.
+    {
+        auto charcoal = [](double kg) { Substance c; c.freegrain[CARBON][SAND] = kg; return c; };
+        auto ore_at = [](double mag, double qz) {
+            Substance o; o.freegrain[MAGNETITE][SAND] = mag; o.freegrain[QUARTZ][SAND] = qz; return o;
+        };
+        const Bloom green = pull_bloom(bloomery(ore_at(3.0, 1.0), charcoal(2.0)));
+        const Bar   bar   = consolidate(green, 6);
+
+        const double HOT  = RECRYST_T + 500.0; // welding heat, well above the floor
+        const double COLD = RECRYST_T - 400.0; // black bar, well below it
+
+        // Same schedule of reductions, once hot and once cold.
+        Tool hot = stock(bar), cold = stock(bar);
+        for (int i = 0; i < 4; ++i) { draw(hot, 0.5, HOT); draw(cold, 0.5, COLD); }
+
+        // (a) form is free at any heat: identical reductions give identical
+        // elongation whether the metal was hot or cold.
+        check(std::fabs(hot.elongation - cold.elongation) < 1e-9 && hot.elongation > 1.0,
+              "form is free at any heat: the same reduction draws the same length hot or cold");
+
+        // (b) hardness is only cold: the hot piece stays annealed-soft; the cold
+        // one, worked to the same shape, comes out much harder.
+        check(std::fabs(hardness(hot) - H_ANNEALED) < 1e-9
+              && hardness(cold) > hardness(hot) + 50.0,
+              "hardness is only cold: hot work leaves the metal soft, cold work hardens it");
+
+        // (c) a draw conserves the metal exactly and carries the stringers along
+        // -- shaping removes no slag, it only draws it out along the grain.
+        bool conserved = std::fabs(cold.iron - bar.iron) < 1e-12;
+        for (int e = 0; e < N_ELEM; ++e)
+            conserved = conserved && std::fabs(cold.slag[e] - bar.slag[e]) < 1e-12;
+        check(conserved, "shaping is pure deformation: the metal and its stringers are conserved, only drawn out");
+
+        // (d) hardening is monotone in cold strain and saturates -- dislocation
+        // density has a ceiling, so the last bites of cold work buy almost nothing.
+        Tool a = stock(bar), b = stock(bar), c = stock(bar);
+        draw(a, 0.5, COLD);                    // one cold bite
+        for (int i = 0; i < 4; ++i) draw(b, 0.5, COLD);   // four
+        for (int i = 0; i < 20; ++i) draw(c, 0.5, COLD);  // twenty
+        check(hardness(b) > hardness(a) && hardness(c) > hardness(b)
+              && (hardness(c) - hardness(b)) < 0.1 * (hardness(b) - hardness(a)),
+              "cold hardening is monotone and saturating: it climbs, then the anvil stops paying");
+
+        // (e) a single draw obeys volume conservation exactly: reduce the section
+        // by r and the length grows by 1/(1-r).
+        Tool one = stock(bar);
+        draw(one, 0.6, HOT);
+        check(std::fabs(one.elongation - 1.0 / (1.0 - 0.6)) < 1e-12,
+              "a draw conserves volume: section down by r, length up by 1/(1-r)");
+
+        std::printf("        (4x r=0.5: elong %.1fx both; hot %.0f HB (soft), cold %.0f HB (hard))\n",
+                    hot.elongation, hardness(hot), hardness(cold));
+    }
+
     // ---- The picture -------------------------------------------------------
     std::printf("\n  settling velocity, m/s (free grains)\n  %-10s %10s %10s %10s %10s\n",
                 "phase", sz(0), sz(1), sz(2), sz(3));

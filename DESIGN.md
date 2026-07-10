@@ -989,8 +989,13 @@ slag-filled sponge, and hammering can only drain slag through pores that still
 connect; below the percolation threshold the rest is trapped as stringers. So a
 wrought bar is never clean — ~1.5%, set by geometry, not effort — and driving it
 cleaner scales iron away, the grade/recovery law a fourth time. See Phase A step 4.
-**Iron comes out a solid; copper (Era 2b) comes out a liquid and is cast, not
-forged — so this arrow is where the two metals' chains diverge.**
+*(And the tool, same day, same file: the `bar → tool` arrow — **shaping** — is the
+forge's second half. Form is free at any heat because it is volume conservation;
+hardness is only cold, because above the recrystallization floor, ~0.4 of iron's
+melting point, the metal re-grows grain as fast as the hammer tangles it. Form and
+hardness are won at opposite ends of the heat.)* **Iron comes out a solid; copper
+(Era 2b) comes out a liquid and is cast, not forged — so this arrow is where the
+two metals' chains diverge, and shaping is the axis they later share.**
 
 ### Era 2b — Copper, and the payoff of a useless verb
 
@@ -1705,6 +1710,31 @@ Deliverable, in order, in a console harness with no UE editor and no renderer:
    speed), tracked as issue #22. The two floors are derived: connectivity is
    geometry, and the slag a porosity holds is volume arithmetic against two
    densities. Neither finding depends on an authored number's value, only its sign.
+
+5. **Then** shape: draw the bar to a tool, and harden it.
+
+   *(Done 2026-07-10. `core/forge.h`, same file, second half.)* Consolidation
+   only densified; shaping gives a **form** and, done cold, **work-hardens** it.
+   The single control that couples the two is temperature, and that coupling is
+   the finding:
+
+   - **Form is free at any heat; hardness is only cold.** A draw reduces the
+     section and lengthens the piece by exactly the volume-conserving amount —
+     hot or cold, form does not care. Hardness does: it is dislocations piling up,
+     and above the **recrystallization floor** (~0.4 of iron's melting point,
+     ~450 °C) the metal re-grows fresh grain as fast as the hammer tangles it, so
+     hot work leaves *no* hardness behind. Only cold strain accumulates, and it is
+     monotone and saturating. `core/` confirms all of it: the same four reductions
+     give the same elongation hot and cold, but leave the metal annealed-soft hot
+     and much harder cold, and the last cold bites buy almost nothing.
+
+   The floor is derived — a fraction of a melting point, the fayalite wall's and
+   the connectivity floor's kin — and what is authored is the hardening *rate* and
+   *ceiling* (issue #23), exactly as the drain and scale rates were for
+   consolidation. The smith's bind falls straight out: metal moves easily hot but
+   a hard edge can only be beaten in cold, so form and hardness are won at opposite
+   ends of the fire. This is also the axis **copper shares** with iron — the two
+   chains diverge at the furnace (forge vs. cast) and rejoin here, at shaping.
 
 If it isn't interesting to reason about here, more art won't save it.
 

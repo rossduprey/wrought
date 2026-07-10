@@ -4,7 +4,11 @@
 #include <algorithm>
 #include "smelt.h"
 
-// The forge. Phase A step 4: a spongy bloom becomes a solid bar.
+// The forge. Phase A step 4: a spongy bloom becomes a solid bar, and the bar
+// becomes a shaped tool. The forge has two halves and this file holds both:
+// CONSOLIDATION (bloom -> bar), which densifies, and SHAPING (bar -> tool),
+// which gives a form and hardens it. They are the same anvil and the same verb;
+// what changes is what the hammer is for.
 //
 // This is the first process in the project that is DEFORMATION, not separation.
 // Everything before it -- pan, sluice, lodestone, even the bloomery's chemistry --
@@ -178,6 +182,107 @@ inline double slag_fraction(const Bar& bar) {
 // Metal kept, as a fraction of the iron that entered as a bloom.
 inline double yield(const Bloom& green, const Bar& bar) {
     return green.iron > 0.0 ? bar.iron / green.iron : 0.0;
+}
+
+// ------------------------------------------------------------------------
+// SHAPING: bar -> tool. The forge's second half.
+//
+// Consolidation was deformation that only densifies -- it drives out slag and
+// closes pores but leaves a shapeless lump. Shaping is deformation that gives a
+// FORM (a bar drawn to a rod, a rod to a blade) and, if done cold, WORK-HARDENS
+// it. The single control that couples the two is TEMPERATURE, and that coupling
+// is the whole finding of this half:
+//
+//   FORM IS FREE AT ANY HEAT; HARDNESS IS ONLY COLD. Plastic strain always
+//   gives form -- squeeze the section and the piece gets longer, hot or cold,
+//   because volume is conserved. But hardness comes from dislocations piling up
+//   in the crystal, and above the recrystallization temperature (~0.4 of iron's
+//   melting point, ~450 C) the metal re-grows fresh grains as fast as the hammer
+//   tangles them, so hot work leaves NO hardness behind. Only strain put in
+//   below that floor survives. So the smith faces a bind that is not a matter of
+//   skill: to move a lot of metal you work it hot, where it flows -- but a tool
+//   needs a hard edge, and hardness can only be beaten in cold, in small bites,
+//   near the end. Form and hardness are won at opposite ends of the heat.
+//
+// The recrystallization floor is the shaping-side analogue of the fayalite wall
+// and the connectivity floor: a real temperature (a fraction of a melting point,
+// both VERIFIED), not an authored knob. What is AUTHORED is the hardening RATE
+// and its ceiling -- how fast dislocations accumulate and how hard the metal can
+// get -- exactly as the drain and scale rates were for consolidation. The
+// findings depend on the recryst floor's existence and on hardening being
+// monotone and saturating, not on the numbers' values (issue #23).
+//
+// Shaping is PURE deformation: it conserves the metal exactly and removes no
+// slag -- the stringers do not leave, they get drawn out ALONG the piece, which
+// is why a wrought bar tears along its length and why the grain follows the
+// form. (Surface scale during shaping reheats is the same oxidation already
+// modelled per-heat in consolidate(); it is not re-charged here, so a draw moves
+// no mass.) This is the last stop of the iron chain; it is also the axis copper
+// SHARES with iron, so it is where the two metals' paths rejoin downstream.
+
+// Iron melts at 1811 K (1538 C). VERIFIED, standard. The recrystallization floor
+// is a fraction of this; the floor's existence, not this value, is load-bearing.
+inline constexpr double TM_IRON = 1811.0;
+
+// Recrystallization onset as a fraction of the melting point: ~0.35-0.4 Tm for a
+// cold-worked metal (the classic homologous-temperature rule). 0.4 puts it at
+// ~724 K = ~451 C, between a dull-red heat and a black bar. AUTHORED, cited
+// range. It sets WHERE the hot/cold line falls, not that there is one. Issue #23.
+inline constexpr double RECRYST_FRACTION = 0.4;
+inline constexpr double RECRYST_T = RECRYST_FRACTION * TM_IRON;
+
+// Hardness scale (Brinell): annealed soft iron to heavily cold-worked. Roughly
+// right for ferrite, but AUTHORED and finding-independent -- the result is that
+// cold work is HARDER than hot and that it SATURATES, which needs only
+// H_SATURATED > H_ANNEALED, not either value. Issue #23.
+inline constexpr double H_ANNEALED  = 90.0;
+inline constexpr double H_SATURATED = 220.0;
+
+// Retained-cold-strain e-folding of the hardening curve: dislocation density
+// saturates, so hardness approaches its ceiling exponentially in accumulated
+// cold strain. AUTHORED. Its sign and finiteness give monotone-and-saturating;
+// its size only sets how fast. Issue #23.
+inline constexpr double STRAIN_SCALE = 0.6;
+
+// A shaped piece. Pure deformation: it carries the bar's metal and stringers
+// unchanged, plus the two things shaping creates -- a form (elongation, length
+// as a multiple of the stock bar) and a history of cold strain that survived.
+struct Tool {
+    double iron = 0.0;          // kg metal, unchanged by pure deformation
+    double slag[N_ELEM] {};     // the bar's stringers, drawn out along the grain
+    double elongation = 1.0;    // length as a multiple of the stock bar
+    double cold_strain = 0.0;   // accumulated plastic strain worked in below recryst
+    double temperature = 288.0; // K, the piece's current heat
+};
+
+// Lift a consolidated bar onto the anvil. Nothing deforms yet.
+inline Tool stock(const Bar& bar) {
+    Tool t;
+    t.iron = bar.iron;
+    t.temperature = bar.temperature;
+    for (int e = 0; e < N_ELEM; ++e) t.slag[e] = bar.slag[e];
+    return t;
+}
+
+// One hammer pass at temperature `T`: reduce the cross-section by fraction
+// `reduction` (0..1). Volume conservation turns that into elongation for free at
+// any heat; only strain put in below the recrystallization floor accumulates as
+// the cold strain that hardens. Metal and slag are untouched -- pure deformation.
+inline void draw(Tool& t, double reduction, double T) {
+    if (reduction <= 0.0) { t.temperature = T; return; }
+    const double r = std::fmin(reduction, 1.0 - 1e-9);
+    const double eps = -std::log(1.0 - r);   // true strain of this pass
+    t.elongation *= std::exp(eps);           // form: won hot or cold
+    if (T < RECRYST_T) t.cold_strain += eps; // hardness: only cold survives
+    t.temperature = T;
+}
+
+// Brinell hardness of the piece: from the annealed floor toward a saturated
+// ceiling, exponential in the retained cold strain. Worked hot only, it stays
+// soft; worked cold, it climbs and levels off. DERIVED form, AUTHORED scale.
+inline double hardness(const Tool& t) {
+    return H_ANNEALED + (H_SATURATED - H_ANNEALED) *
+           (1.0 - std::exp(-t.cold_strain / STRAIN_SCALE));
 }
 
 } // namespace wrought
