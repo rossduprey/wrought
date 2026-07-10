@@ -13,10 +13,14 @@
 using namespace wrought;
 
 // Dirt from the bank. Not river sand -- this is what you dig when you want clay,
-// and its clay-sized fraction is mostly, but not entirely, kaolinite. The part
-// that is not is the grit you will never get out, because a clay-sized quartz
-// grain and a clay-sized kaolinite platelet fall through water at speeds that
-// differ by two percent.
+// and its clay-sized fraction is mostly, but not entirely, kaolinite.
+//
+// *(This comment used to end: "The part that is not is the grit you will never get
+// out, because a clay-sized quartz grain and a clay-sized kaolinite platelet fall
+// through water at speeds that differ by two percent." They differ by 698%. The
+// two percent was the difference between their densities, which is all that was
+// left once `settling.h` had made them both spheres of one diameter. You get the
+// grit out by waiting. -- 2026-07-10, #13.)*
 static Substance bank_dirt(double kg = 10.0) {
     Substance s;
     auto put = [&](int p, double frac, const double psd[N_SIZE]) {
@@ -84,15 +88,18 @@ int main() {
     // Gen -1 is the pot you would have pinched from the dirt as you dug it, if
     // nobody had told you to levigate. It is the control, and it is the only
     // rung on the ladder.
+    const double d_cut = cut_diameter(PAN.cut_velocity);
+    auto shelter = [&](const Substance& b) { return sheltered_fraction(grit_diameter(b), d_cut); };
+
     const SeparatorParams raw_pan = fire_pan(dirt);
     std::printf("\nthe ratchet: levigate, fire a pot, levigate in the pot, fire again.\n");
-    std::printf("  %-16s %10s %10s %12s %10s %10s\n",
-                "gen", "vessel L", "clay grade", "grit um", "sigma", "9^sigma");
-    std::printf("  %-16s %10s %10.4f %12.1f %10.4f %10.3f\n",
+    std::printf("  %-16s %10s %10s %12s %10s %10s %9s\n",
+                "gen", "vessel L", "clay grade", "grit um", "sigma", "9^sigma", "shelter");
+    std::printf("  %-16s %10s %10.4f %12.1f %10.4f %10.3f %8.1f%%\n",
                 "-1 (unlevigated)", "-", clay_grade(dirt), grit_diameter(dirt) * 1e6,
-                raw_pan.sharpness, imperfection(raw_pan));
-    std::printf("  %-16s %10s %10s %12s %10.4f %10.3f   <- for comparison\n",
-                "(cupped hands)", "-", "-", "-", HANDS.sharpness, imperfection(HANDS));
+                raw_pan.sharpness, imperfection(raw_pan), 100.0 * shelter(dirt));
+    std::printf("  %-16s %10s %10s %12s %10.4f %10.3f %8.1f%%   <- for comparison\n",
+                "(cupped hands)", "-", "-", "-", HANDS.sharpness, imperfection(HANDS), 0.0);
 
     Vessel ves = HOLLOW;
     for (int gen = 0; gen < 6; ++gen) {
@@ -100,30 +107,42 @@ int main() {
         if (body.total_mass() < 1e-9) { std::printf("  gen %d: nothing poured\n", gen); break; }
         const SeparatorParams pan = fire_pan(body);
         char label[32]; std::snprintf(label, sizeof label, "%d", gen);
-        std::printf("  %-16s %10.2f %10.4f %12.3f %10.4f %10.3f\n",
+        std::printf("  %-16s %10.2f %10.4f %12.3f %10.4f %10.3f %8.1f%%\n",
                     label, ves.volume() * 1000, clay_grade(body), grit_diameter(body) * 1e6,
-                    pan.sharpness, imperfection(pan));
+                    pan.sharpness, imperfection(pan), 100.0 * shelter(body));
         ves = throw_pot(body);
     }
 
     // -- 4a. Where the whole ratchet actually lives --------------------------
     // Not between generations. Between "raw dirt" and "one minute of standing
-    // water", because sand is the only thing coarse enough to blur a pan and
-    // sand is the first thing to fall.
+    // water" -- and not because the stones blur the pan. Because they swallow it.
+    // A sand grain wedged between stones coarser than itself sits below the height
+    // at which the log law gives it any flow, and it does not move at any cut. The
+    // sigma column barely notices what the shelter column does.
+    //
+    // *(2026-07-10, #10. This table had no shelter column, and so it charged the
+    // stones to sigma: raw dirt read 1.83, worse than cupped hands, and a test
+    // asserted it. A separator has two misplacements. `separate.h` learned that
+    // about screens on 2026-07-09; this file was making the same mistake about
+    // floors the whole time, one function away.)*
     std::printf("\nwhat the pot is made of, and what the pan it becomes is worth:\n");
     const double vr = free_velocity(MAGNETITE, SAND) / free_velocity(QUARTZ, SAND);
     auto rate = [&](const char* n, const Substance& b) {
         const SeparatorParams p = fire_pan(b);
-        std::printf("  %-38s grit %8.1f um  sigma %.4f  enrich %.2fx\n",
-                    n, grit_diameter(b) * 1e6, p.sharpness, std::pow(vr, 1.0 / p.sharpness));
+        std::printf("  %-38s grit %8.1f um  sigma %.4f  shelter %5.1f%%  enrich %.2fx\n",
+                    n, grit_diameter(b) * 1e6, p.sharpness, 100.0 * shelter(b),
+                    std::pow(vr, 1.0 / p.sharpness));
     };
-    std::printf("  %-38s %17s  sigma %.4f  enrich %.2fx\n", "cupped hands (no pot at all)", "",
-                HANDS.sharpness, std::pow(vr, 1.0 / HANDS.sharpness));
+    std::printf("  %-38s %17s  sigma %.4f  shelter %5.1f%%  enrich %.2fx\n",
+                "cupped hands (no pot at all)", "",
+                HANDS.sharpness, 0.0, std::pow(vr, 1.0 / HANDS.sharpness));
     rate("pot from raw dirt, stones and all", dirt);
     rate("pot from stone-picked dirt", screen(dirt, HAND_COB).undersize);
     rate("pot from a 1-minute decant", decant(screen(dirt, HAND_COB).undersize, HOLLOW, 60.0).liquor);
     rate("pot from a 1-hour decant", decant(dirt, HOLLOW, 3600.0).liquor);
     rate("pot from a 4-hour decant", decant(dirt, HOLLOW, 14400.0).liquor);
+    std::printf("  (the enrichment of a sheltered pot is a fiction: it is what the sand that\n"
+                "   still moves would do, and half of it is not moving.)\n");
 
     // -- 4b. Where the grade ceiling came from, until it stopped being one ---
     // This instrument was written to show that the clay grade was arithmetic on
@@ -167,11 +186,30 @@ int main() {
         std::printf("  sigma %.2f   imperfection %6.2f   enrichment %6.2fx\n",
                     sig, std::pow(9.0, sig), std::pow(vr, 1.0 / sig));
 
-    std::printf("\ngrit needed to blur a pan by 10%% (sigma 0.55 -> 0.605):\n");
-    const double s_need = std::sqrt(0.605 * 0.605 - 0.55 * 0.55);
-    std::printf("  d_grit = %.0f um, against a skin %.0f um deep.\n",
-                s_need * skin_depth() * 1e6, skin_depth() * 1e6);
-    std::printf("  the coarsest thing levigation can carry over is clay-sized: %.2f um.\n",
-                bin_diameter(CLAY) * 1e6);
+    // -- 5a. Not a cleaner floor -------------------------------------------
+    // The old version of this block priced a 10% blur at 267 um of grit against a
+    // 1061 um skin, and concluded the ratchet was dead by three orders of
+    // magnitude. It was dead by more than that, and the skin had nothing to do
+    // with it. Roughness broadens the cut by displacing the grain the pan is
+    // deciding about -- the one falling at exactly v50 -- and that spread
+    // saturates before it can matter. *(2026-07-10, #10.)*
+    std::printf("\nwhat roughness can and cannot do to a pan (the grain at the cut is %.0f um):\n",
+                d_cut * 1e6);
+    std::printf("  %-28s %10s %10s %10s\n", "floor", "d_grit um", "sigma", "shelter");
+    const double grits[5] = {bin_diameter(CLAY), bin_diameter(SILT), 1.0e-4, d_cut, 5.0 * d_cut};
+    const char* gnames[5] = {"levigated clay (clay grit)", "silt grit", "100 um grit",
+                             "grit as coarse as the cut", "cobbles"};
+    for (int i = 0; i < 5; ++i)
+        std::printf("  %-28s %10.3f %10.4f %9.1f%%\n", gnames[i], grits[i] * 1e6,
+                    std::hypot(WRIST_SHARPNESS, QUADRATURE * roughness_spread(grits[i], d_cut)),
+                    100.0 * sheltered_fraction(grits[i], d_cut));
+    std::printf("\n  a 10%% blur would need sigma 0.605. Roughness tops out at %.4f, and past\n"
+                "  that the sand hides between the grit instead of resting on it -- which is a\n"
+                "  shelter, not a blur. The coarsest thing levigation can carry over is\n"
+                "  clay-sized (%.2f um), and it moves sigma by %.1e.\n",
+                std::hypot(WRIST_SHARPNESS, QUADRATURE * roughness_spread(d_cut, d_cut)),
+                bin_diameter(CLAY) * 1e6,
+                std::hypot(WRIST_SHARPNESS, QUADRATURE * roughness_spread(bin_diameter(CLAY), d_cut))
+                    - WRIST_SHARPNESS);
     return 0;
 }

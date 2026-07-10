@@ -128,8 +128,16 @@ inline constexpr double PAN_RADIUS   = 0.15;   // m
 inline constexpr double SKIN_GRAINS  = 3.0;    // skin depth, in sand-grain diameters
 inline constexpr double BULK_DENSITY = 1600.0; // kg/m^3, packed wet sand. UNVERIFIED.
 
+// How deep the moving water reaches. This used to live in `fire.h`, because the
+// grit->sharpness bridge was written in units of it. That bridge no longer knows
+// what a skin is -- roughness broadens a partition by displacing the grain the
+// separator is deciding about, and the depth of the moving water has nothing to
+// say about it (#10, 2026-07-10). The skin is a property of the flow, and this is
+// where the flow lives.
+inline double skin_depth() { return SKIN_GRAINS * bin_diameter(SAND); }
+
 inline double skin_mass() {
-    return M_PI * PAN_RADIUS * PAN_RADIUS * SKIN_GRAINS * bin_diameter(SAND) * BULK_DENSITY;
+    return M_PI * PAN_RADIUS * PAN_RADIUS * skin_depth() * BULK_DENSITY;
 }
 
 // The part of the pan the water can actually reach, this instant, at this cut.

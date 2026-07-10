@@ -763,12 +763,24 @@ int main() {
         std::printf("        (3 more decants: grade %.6f -> %.6f, recovery %.4f -> %.4f)\n",
                     g0, g3, r0, r3);
 
-        // The ratchet. It has exactly one rung.
-        const SeparatorParams raw = fire_pan(dirt);
-        check(raw.sharpness > HANDS.sharpness,
-              "a pot pinched from unlevigated dirt is a WORSE separator than cupped hands");
-        std::printf("        (unlevigated pot sigma %.3f, imperfection %.1f; hands %.2f, %.1f)\n",
-                    raw.sharpness, imperfection(raw), HANDS.sharpness, imperfection(HANDS));
+        // The ratchet. It has exactly one rung, and the rung is not made of sigma.
+        //
+        // *(This read "a pot pinched from unlevigated dirt is a WORSE separator
+        // than cupped hands" -- sigma 1.83 against 1.20 -- and it was the whole of
+        // what a stony floor was thought to cost. It is false, and it was false
+        // because the bridge in `fire.h` had no way to say "this grain never
+        // moved". It charged the cost of sheltering to the blur. The exposed sand
+        // on a cobbled floor is sorted about as well as on a smooth one; the 42%
+        // of it wedged between the stones is not sorted at all. A separator has
+        // two misplacements, which `separate.h` learned about screens on
+        // 2026-07-09 and this file relearned about floors a day later. The old
+        // claim and its number stay. -- 2026-07-10, #10.)*
+        const double d_cut = cut_diameter(PAN.cut_velocity);
+        const double raw_shelter = sheltered_fraction(grit_diameter(dirt), d_cut);
+        check(raw_shelter > 0.40 && fire_pan(dirt).sharpness > WRIST_SHARPNESS,
+              "a pot pinched from unlevigated dirt is not a bad pan: it is not a pan");
+        std::printf("        (unlevigated pot: grit %.0f um, and %.1f%% of the sand at the cut never moves)\n",
+                    grit_diameter(dirt) * 1e6, 100.0 * raw_shelter);
 
         Vessel ves = HOLLOW; double sig[3] = {0, 0, 0};
         for (int gen = 0; gen < 3; ++gen) {
@@ -776,22 +788,26 @@ int main() {
             sig[gen] = fire_pan(body).sharpness;
             ves = throw_pot(body);
         }
-        check(sig[0] < 0.51 * raw.sharpness && std::fabs(sig[1] - sig[0]) < 1e-6
-                                            && std::fabs(sig[2] - sig[1]) < 1e-6,
-              "and then it stops: generation 1's pan is generation 0's pan, to six places");
-        std::printf("        (sigma: raw %.4f -> gen0 %.4f -> gen1 %.4f -> gen2 %.4f)\n",
-                    raw.sharpness, sig[0], sig[1], sig[2]);
+        check(std::fabs(sig[0] - WRIST_SHARPNESS) < 1e-6
+              && std::fabs(sig[1] - sig[0]) < 1e-9 && std::fabs(sig[2] - sig[1]) < 1e-9,
+              "and then it stops: every generation's pan is the operator's wrist, to nine places");
+        std::printf("        (sigma: gen0 %.9f -> gen1 %.9f -> gen2 %.9f; wrist %.9f)\n",
+                    sig[0], sig[1], sig[2], WRIST_SHARPNESS);
 
         // And the one rung is one minute tall. Sand is the only thing coarse
-        // enough to blur a pan, and sand is the first thing to fall out of
-        // standing water. Everything after that is a rounding error.
+        // enough to matter, and sand is the first thing to fall out of standing
+        // water. What one minute buys is not a sharper pan. It is a pan whose
+        // floor has stopped swallowing the feed.
         const Substance cobbed = screen(dirt, HAND_COB).undersize;
-        const double s_minute = fire_pan(decant(cobbed, HOLLOW, 60.0).liquor).sharpness;
-        const double s_day    = fire_pan(decant(dirt, HOLLOW, 14400.0).liquor).sharpness;
-        check(s_minute - s_day < 1e-3 && fire_pan(cobbed).sharpness > 1.5 * s_minute,
-              "one minute of standing water is worth as much to a pan as four hours");
-        std::printf("        (stone-picked dirt %.4f -> 60 s %.4f -> 4 h %.4f)\n",
-                    fire_pan(cobbed).sharpness, s_minute, s_day);
+        const Substance minute = decant(cobbed, HOLLOW, 60.0).liquor;
+        check(sheltered_fraction(grit_diameter(cobbed), d_cut) > 0.30
+              && sheltered_fraction(grit_diameter(minute), d_cut) == 0.0
+              && fire_pan(minute).sharpness < WRIST_SHARPNESS + 1e-4,
+              "one minute of standing water takes the shelter to zero and the blur to nothing");
+        std::printf("        (stone-picked dirt shelters %.1f%%; after 60 s, %.1f%% and sigma %.6f)\n",
+                    100.0 * sheltered_fraction(grit_diameter(cobbed), d_cut),
+                    100.0 * sheltered_fraction(grit_diameter(minute), d_cut),
+                    fire_pan(minute).sharpness);
 
         // And the grade ceiling is not a ceiling, because levigation separates.
         //
@@ -870,6 +886,112 @@ int main() {
               "and a bigger shovel moves nothing outward: that is what throughput is");
         std::printf("        (at 4 h: pot recovers %.4f, pot with a double charge %.4f)\n",
                     rec_p, recovery(big, decant(big, pot, 14400.0).liquor, KAOLINITE));
+    }
+
+    // ---- 10. The bridge under the ratchet, and it is derived now ------------
+    //
+    // Issue #10 asked whether `sigma^2 = sigma_wrist^2 + (d_grit/h_skin)^2` had
+    // the right functional form, and warned that a `sqrt(d/h)` would move every
+    // number by 35x and might restore the spiral the staircase replaced. It is
+    // the wrong form. The right one is the log law over a rough bed; it is
+    // super-linear rather than sub-linear; and the spiral stays dead. Nothing
+    // below is asserted. Every line of it is checked against the thing it claims
+    // to be -- a numeric mixture, a numeric integral, a numeric derivative.
+    {
+        std::printf("\n  -- 10. the grit -> sharpness bridge, checked rather than believed --\n");
+        const double d_cut = cut_diameter(PAN.cut_velocity);
+
+        check(std::fabs(settling_velocity(PHASES[QUARTZ].density, d_cut) - PAN.cut_velocity)
+                  < 1e-9 * PAN.cut_velocity
+              && d_cut > SIZE_BOUNDS[SAND][0] && d_cut < SIZE_BOUNDS[SAND][1],
+              "the grain the pan decides about is derived from the cut, and it lands in sand");
+        std::printf("        (quartz falls at the %.3f m/s cut when it is %.1f um across; Re %.1f)\n",
+                    PAN.cut_velocity, d_cut * 1e6, reynolds(PAN.cut_velocity, d_cut));
+
+        // The quadrature coefficient. Mix a logistic over Gaussian jitter in its
+        // centre, then read the result's quartiles -- which is exactly how this
+        // project defines sigma. The answer is not 1, which is what fire.h used.
+        auto mixed = [](double x, double sigma, double j) {
+            const int N = 2001; const double lo = -8 * j, dx = 16 * j / N;
+            double num = 0.0, den = 0.0;
+            for (int i = 0; i < N; ++i) {
+                const double u = lo + (i + 0.5) * dx;
+                const double w = std::exp(-0.5 * (u / j) * (u / j));
+                num += w / (1.0 + std::exp(-(x - u) / sigma)); den += w;
+            }
+            return num / den;
+        };
+        auto reported = [&](double sigma, double j) {
+            auto quantile = [&](double target) {
+                double lo = -40.0, hi = 40.0;
+                for (int i = 0; i < 100; ++i) {
+                    const double m = 0.5 * (lo + hi);
+                    if (mixed(m, sigma, j) < target) lo = m; else hi = m;
+                }
+                return 0.5 * (lo + hi);
+            };
+            return (quantile(0.75) - quantile(0.25)) / (2.0 * std::log(3.0));
+        };
+        const double jj = 0.05, rep = reported(WRIST_SHARPNESS, jj);
+        const double c_measured = std::sqrt(rep * rep - WRIST_SHARPNESS * WRIST_SHARPNESS) / jj;
+        check(std::fabs(c_measured - QUADRATURE) < 5e-3,
+              "what adds in quadrature is j/sqrt(2 ln 3), not j: 0.6746, measured to three places");
+        std::printf("        (measured %.6f, derived %.6f; the old bridge used %.6f)\n",
+                    c_measured, QUADRATURE, 1.0);
+
+        // The closed form is the leading term of an integral. Check it against
+        // the integral, everywhere a pot's floor is allowed to be rough.
+        auto exact_spread = [](double dg, double dp) {
+            const int N = 200001; const double z0 = dg / NIKURADSE;
+            double s = 0.0, s2 = 0.0; int n = 0;
+            for (int i = 0; i < N; ++i) {
+                const double zc = 0.5 * dp + (-0.5 + (i + 0.5) / N) * dg;
+                if (zc <= z0) continue;
+                const double y = std::log(std::log(zc / z0));
+                s += y; s2 += y * y; ++n;
+            }
+            return std::sqrt(s2 / n - (s / n) * (s / n));
+        };
+        bool agrees = true;
+        for (double dg : {1e-7, 1e-6, 1e-5, 1e-4, d_cut / 3.0})
+            agrees = agrees && std::fabs(roughness_spread(dg, d_cut) / exact_spread(dg, d_cut) - 1.0) < 0.05;
+        check(agrees, "the closed-form spread is the integral it claims to be, to 5% out to d_cut/3");
+
+        // #10 feared an exponent of 0.5. The log law gives 1 + 1/ln(15 d_cut/d_grit).
+        bool superlinear = true;
+        for (double dg : {1e-7, 1e-6, 1e-5}) {
+            const double e = (std::log(roughness_spread(dg * 1.01, d_cut))
+                            - std::log(roughness_spread(dg / 1.01, d_cut))) / (2.0 * std::log(1.01));
+            superlinear = superlinear && e > 1.0
+                && std::fabs(e - (1.0 + 1.0 / std::log(15.0 * d_cut / dg))) < 2e-3;
+        }
+        check(superlinear, "the exponent is 1 + 1/ln(15 d_cut/d_grit): above 1, and never 0.5");
+
+        // The claim that replaced "267 um of grit blurs the pan by 10%".
+        double worst = 0.0;
+        for (double dg = 1e-9; dg < 1.0; dg *= 1.2)
+            worst = std::fmax(worst, std::hypot(WRIST_SHARPNESS,
+                                                QUADRATURE * roughness_spread(dg, d_cut)));
+        check(worst < 0.5686 && worst > 0.5684,
+              "roughness cannot blur the pan past 3.4%: a 10% blur is not purchasable at any grit");
+        std::printf("        (sigma tops out at %.6f as the grit approaches the cut grain; 10%% needs 0.605)\n",
+                    worst);
+
+        // Sheltering is the other misplacement, and it is where a stony pot's
+        // cost actually lives.
+        check(sheltered_fraction(bin_diameter(CLAY), d_cut) == 0.0
+              && sheltered_fraction(0.5 * d_cut, d_cut) == 0.0
+              && sheltered_fraction(d_cut, d_cut) > 0.03
+              && sheltered_fraction(5.0 * d_cut, d_cut) > 0.40,
+              "shelter is zero under any pot levigation can throw, and 43% under a stony one");
+
+        // What the old bridge got wrong, at the coarsest grit a decant can carry.
+        const double authored = bin_diameter(CLAY) / skin_depth();
+        const double derived  = QUADRATURE * roughness_spread(bin_diameter(CLAY), d_cut);
+        check(authored / derived > 8.0 && authored / derived < 10.0 && derived < 1e-4,
+              "the old bridge overstated the blur 8.85x, and the blur was already nothing");
+        std::printf("        (authored %.3e, derived %.3e, against a wrist of %.2f)\n",
+                    authored, derived, WRIST_SHARPNESS);
     }
 
     // ---- The picture -------------------------------------------------------

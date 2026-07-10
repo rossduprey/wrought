@@ -418,6 +418,70 @@ grain reports to the concentrate with probability 0.0002. That is not a penalty 
 applied. It is what the force balance says, and it is why fine gold is lost in the
 real world.
 
+### Roughness — a floor blurs a cut, and a floor swallows a feed
+
+*(Added 2026-07-10, issue #10.)* A pan's sharpness has two parts: the operator's
+wrist, which is authored (#5), and the roughness of the pot's floor, which was
+authored and is now derived. It was the last invented number holding up a claim on
+this document's front page, which is why it was worth doing before anything new.
+
+Over a rough bed the velocity profile is the log law, `u(z) = (u*/κ)·ln(z/z₀)` with
+`z₀ = k_s/30` (Nikuradse 1933) and `k_s` the grit diameter. A grain resting on that
+bed sits at whatever height the local surface happens to be — on a crest, or in a
+hollow — so it samples a *distribution* of velocities, and the partition the pan
+reports is a mixture of logistics with jittered centres. Three results fall out, and
+none of them is the number we came for:
+
+- **κ and u\* cancel.** The spread of `ln u` does not depend on how hard you wash,
+  only on where the grain sits. The bridge inherits no constant from the flow.
+- **The denominator is the grain at the cut, not the depth of the water.** What
+  roughness jitters is the elevation of the grain the separator is *deciding about* —
+  the one at v50, whose partition value σ actually controls. Grains far from the cut
+  report 0 or 1 whatever σ is. `settling.h` inverts the force balance to find it:
+  **quartz falls at the pan's 0.060 m/s cut when it is 413 µm across**, at Re 21.7.
+- **The exponent is `1 + 1/ln(15·d_cut/d_grit)` ≈ 1.11.** Issue #10 feared a `√(d/h)`,
+  which would have moved every number by 35× and might have restored the spiral it
+  was written to bury. The truth is *super*-linear: the blur dies off faster than
+  linearly as the grit gets fine, not slower.
+
+And a fourth, from the other half of the bridge. A logistic is a probit in disguise
+and variances add — but this project reports σ through **quartiles** (`9^σ`), not
+through variance, and the two do not agree. Expanding the mixed logistic gives
+`σ' = σ + j²/(4σ·ln3)`, so what adds in quadrature is `j/√(2·ln3) = 0.6746·j`. The
+old code added `j` itself. The suite now checks that coefficient against a numeric
+mixture rather than trusting the algebra: measured 0.674421, derived 0.674626.
+
+**One authored number survives**, and it is bounded: the standard deviation of the
+bed's surface elevation, in grit diameters. It is `1/√12` for a uniform monolayer
+and no plausible packing puts it outside 0.25–0.35. The Nikuradse 30 is cited, the
+quadrature is derived, `d_cut` is derived. Where there was an invented functional
+form there is now one invented shape factor with a known range.
+
+**What it cost the front page.** At the coarsest grit a decant can carry (0.883 µm),
+the old bridge said the blur was 8.33×10⁻⁴ and the derivation says 9.40×10⁻⁵ — the
+old form was 8.85× too large, from three errors that partly cancelled. The staircase
+did not merely survive; it gained 8.85× of margin. And the claim that replaced the
+old one is stronger: **roughness cannot blur the pan past 3.4%, at any grit, ever.**
+σ tops out at 0.5685 when the grit is as coarse as the cut grain, and a 10% blur —
+which the old bridge priced at 267 µm of grit — is not purchasable at any price.
+
+**What it cost was a joke.** Past that saturation the model stops describing a rough
+floor and starts describing a cobbled one: the sand no longer rests *on* the grit,
+it hides *between* it, its centre falls below `z₀`, and the flow never reaches it. It
+does not move at any cut. That is not a blur — it is a grain that left before the
+separation began, and its name is **shelter**. The old bridge had nowhere to put such
+a grain, so it charged the entire cost of a stony floor to σ, which is how this
+document came to claim that a pot pinched from raw dirt was a *worse separator than
+cupped hands*. It is not. It is not a separator at all: 42% of the sand at the cut
+never moves, and the rest is sorted about as well as on a smooth floor.
+
+`separate.h` learned on 2026-07-09 that **a separator has two misplacements, not
+one**, when a single `efficiency` made hand-picking pebbles cost 15% of the sand.
+`fire.h` was making the identical mistake about floors, one function away, and
+nobody connected them for a day. Modelling what becomes of the sheltered grains (a
+hiding–exposure function; Egiazaroff 1965) is issue #19 and is not done — they are
+counted, and then ignored. What survives authored in the bridge itself is issue #18.
+
 ### The law: grade trades against recovery, always
 
 This is the central fact of mineral processing, it has been measured ten thousand
@@ -678,40 +742,69 @@ has taken, and it is at the centre of it.)*
 
 The claim requires that a pan fired from finer clay be a sharper separator. A
 pan's sharpness is the blur in its cut, and the physical route from clay to blur
-is grit: a grain standing proud of the floor makes the water move faster over it
-than beside it, so the pan has not one cut but a spread of them, and the spread
-adds to the wrist's own in quadrature. Run the numbers and the route is not
-merely weak, it is three orders of magnitude short. **To blur a pan by ten
-percent you need 267 µm of grit, against a skin 1061 µm deep. The coarsest thing
-a decant can carry over is clay-sized: 0.88 µm.**
+is grit: a grain of grit displaces the grain the pan is *deciding about* — the one
+falling at exactly the cut — so the pan has not one cut but a spread of them, and
+the spread adds to the wrist's own in quadrature. Run the numbers and the route is
+not merely weak, it does not exist. **Roughness cannot blur a pan by more than
+3.4%, at any grit size, ever.** Before the blur can grow past that, the sand stops
+resting *on* the grit and starts hiding *between* it, which is a different failure
+with a different name.
+
+*(The sentence above used to read: "it is three orders of magnitude short — to blur
+a pan by ten percent you need 267 µm of grit, against a skin 1061 µm deep, and the
+coarsest thing a decant can carry over is clay-sized: 0.88 µm." Every number in it
+was wrong and the conclusion it supported was right. The bridge behind it was
+authored, issue #10 said so, and on 2026-07-10 it was derived instead: the log law
+over a rough bed, `z₀ = k_s/30`. Three separate errors partly cancelled — the skin
+depth had no business being in the denominator, a logarithm was missing, and the
+quadrature was missing its coefficient — leaving the old blur 8.85× too large and
+the conclusion 8.85× safer than advertised. The correction is below and the wrong
+sentence stays above it.)*
 
 So iterating does nothing. Levigate in the hollow, fire a pot, levigate in the
-pot, fire another — the sharpness is 0.5500 at every generation, to four decimal
-places, forever. There is no purity spiral. There is one step:
+pot, fire another — the sharpness is 0.5500 at every generation, now to **nine**
+decimal places rather than four. There is no purity spiral. There is one step:
 
-| the pot you fired from | grit | σ | enrichment |
-|---|---|---|---|
-| raw dirt, stones and all | 1852 µm | 1.83 | 1.44× |
-| *cupped hands, for comparison* | — | *1.20* | *1.75×* |
-| stone-picked dirt | 944 µm | 1.05 | 1.89× |
-| **a one-minute decant** | 11.6 µm | **0.5501** | **3.37×** |
-| a one-hour decant | 0.9 µm | 0.5500 | 3.37× |
-| a four-hour decant | 0.9 µm | 0.5500 | 3.37× |
+| the pot you fired from | grit | σ | sheltered | enrichment |
+|---|---|---|---|---|
+| raw dirt, stones and all | 1852 µm | 0.5685 | **42.2%** | *3.24× (fiction)* |
+| *cupped hands, for comparison* | — | *1.20* | *0%* | *1.75×* |
+| stone-picked dirt | 944 µm | 0.5685 | **31.5%** | *3.24× (fiction)* |
+| **a one-minute decant** | 11.6 µm | **0.5500** | **0%** | **3.37×** |
+| a one-hour decant | 0.9 µm | 0.5500 | 0% | 3.37× |
+| a four-hour decant | 0.9 µm | 0.5500 | 0% | 3.37× |
 
-Two things in that table are worth the whole of step 2.
+Two things in that table are worth the whole of step 2, and the first of them is
+not what this document said it was for a day.
 
-**A pot pinched from dirt you did not levigate is a worse separator than your
-bare hands.** Not marginally — 1.44× against 1.75×. The first pot is a
-*downgrade*, and the only thing that makes pottery worth inventing is the
-levigation, not the firing. That is a real and slightly funny fact and nobody
-designed it.
+**A pot pinched from dirt you did not levigate is not a bad pan. It is not a pan.**
+Forty-two percent of the sand at the cut is wedged between stones coarser than
+itself, sitting below the height at which the flow reaches it, and it does not move
+at any wash strength whatever. The sand that *is* exposed gets sorted about as well
+as it would on a smooth floor — which is why the σ column barely twitches, and why
+the enrichment column reads a healthy 3.24× while describing a pot that has
+swallowed nearly half its feed. A separator has **two misplacements**, not one. The
+first pot is still a downgrade and levigation is still what makes pottery worth
+inventing; but the mechanism is shelter, not blur.
+
+> *(2026-07-10, #10.)* This table used to read `1.83` and `1.44×` for raw dirt, and
+> the paragraph above used to say **"a pot pinched from dirt you did not levigate is
+> a worse separator than your bare hands — not marginally, 1.44× against 1.75×."**
+> A test asserted it. Both were artifacts of a bridge with nowhere to put a grain
+> that never moved, so it charged the whole cost of the stones to σ. The joke was
+> real and the reason for it was invented. What makes this worth preserving rather
+> than quietly fixing is that `separate.h` had already learned this exact lesson,
+> about screens, on 2026-07-09 — *"a separator has two misplacements, not one"* — and
+> `fire.h` was making the identical mistake about floors, one function away, and
+> nobody connected them for a day.
 
 **And the ratchet is one minute long.** Sand is the only thing coarse enough to
-blur a pan. Sand settles two hundred and sixty times faster than silt. So sixty
-seconds of standing water takes the pan from 1.89× to 3.37×, and the next
-forty-five hours of patience change it by one part in ten thousand. Every gram of
-narrative weight this document placed on *"how finely you levigate"* is carried by
-the first minute, and there is nothing left over to spend on a spiral.
+matter. Sand settles two hundred and sixty times faster than silt. So sixty seconds
+of standing water takes the pot's shelter from 31.5% to zero and its σ to the
+wrist, and the next forty-five hours of patience change the pan by eight parts in a
+billion. Every gram of narrative weight this document placed on *"how finely you
+levigate"* is carried by the first minute, and there is nothing left over to spend
+on a spiral.
 
 **Where the loop actually runs.** It runs through recovery. The pourable fraction
 of a vessel is set by how much of it the sediment fills, so a bigger pot returns

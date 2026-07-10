@@ -12,7 +12,7 @@ Debian 13. `g++ 14.2.0`, `GNU Make 4.4.1`. No dependencies, no build system beyo
 
 ```
 cd core
-make test          # 62 assertions. Must print "ok (0 failures)".
+make test          # 69 assertions. Must print "ok (0 failures)".
 make ratchet-run   # a measurement, not a test. Allowed to come out badly.
 make pan           # play it
 make clean
@@ -33,9 +33,9 @@ Read them in this order. Each one only knows about the ones above it.
 | `phase_table.h` | Ten minerals, four Wentworth size bins. Densities, susceptibilities, aspect ratios. Every number `UNVERIFIED` or `AUTHORED`. |
 | `substance.h` | `Substance`: a `[phase][size]` mass matrix, twice — free grains and composites. `grade()`. No position, no vertical dimension, no volume. |
 | `settling.h` | Terminal velocity from a force balance, solved as a damped fixed point. Water properties from temperature; grain shape from the aspect ratio. `free_velocity(p, s, T)` is the number the whole project turns on, and the long comment on what a bin diameter *means* is the most load-bearing paragraph in `core/`. |
-| `separate.h` | The Tromp partition, `9^σ` imperfection, screening, crushing, closed circuit, the bed (`exposed()`), `recovery()`. |
+| `separate.h` | The Tromp partition, `9^σ` imperfection, screening, crushing, closed circuit, the bed (`exposed()`), `skin_depth()`, `recovery()`. |
 | `levigate.h` | The batch decant. Its partition is a ramp and it is exact — there is no authored sharpness in this file. |
-| `fire.h` | The two bridges from a body of clay to a tool: grit → sharpness, clay → vessel. Both authored. Both are issues. |
+| `fire.h` | The two bridges from a body of clay to a tool: grit → sharpness, clay → vessel. The first is **derived** now — the log law over a rough bed — and keeps one bounded shape factor where it used to keep an invented functional form. The second is still invented end to end. Both are issues. Read the "two misplacements" note at the foot of its header before you touch `fire_pan`. |
 
 `test_separation.cpp` is the suite. `pan.cpp` is the playable slice. `ratchet.cpp` is neither — it is an instrument, it prints tables, and it exists because `DESIGN.md` asserted something without ever having run it.
 
@@ -49,7 +49,7 @@ Read them in this order. Each one only knows about the ones above it.
 
 **A measurement is allowed to come out badly.** `make ratchet-run` was written to confirm the design document's central mechanism and it refuted it instead. That is the best day this project has had. Do not fix an instrument that is telling you something you did not want to hear.
 
-**When a claim turns out to be wrong, the wrong claim stays.** Written next to the right one, dated, with what caused the error. There are two of these preserved in `levigate.h` and one in `README.md`'s claim #2. They are not self-flagellation; they are the only record of *why* the current sentence is worded the way it is, and without them somebody will helpfully revert it.
+**When a claim turns out to be wrong, the wrong claim stays.** Written next to the right one, dated, with what caused the error. There are two preserved in `levigate.h`, one in `README.md`'s claim #2, one on `README.md`'s front page, and one each in `fire.h`, `ratchet.cpp`, `test_separation.cpp` and `DESIGN.md`. They are not self-flagellation; they are the only record of *why* the current sentence is worded the way it is, and without them somebody will helpfully revert it. Two of them are wrong claims about wrong claims.
 
 **Grade and recovery are always reported together.** One of them alone is a lie by omission. Reporting either as a single score invites optimising it, and the composition vector — not a score — is the state.
 
@@ -73,16 +73,22 @@ Commit messages are lowercase, `area: what changed`, and they are allowed to be 
 
 Era 0 (hands, pan, sluice, lodestone) and the first half of Era 1 (levigation, fired pot) are implemented and measured. Nothing else exists.
 
-**This section said, on 2026-07-09, that #13 was "the single most dangerous uncited number in the project — it can reverse a finding rather than refine one." On 2026-07-10 it was done, and it did.** One of the four settled results below is now struck through. Read that as encouragement: the paragraph was right, the work was worth prioritising, and the way to find out was to go and do the arithmetic. Two of the remaining three have a way they could be un-settled, and it is written down because a fresh reader will otherwise treat them as load-bearing when they are provisional:
+**This section said, on 2026-07-09, that #13 was "the single most dangerous uncited number in the project — it can reverse a finding rather than refine one." On 2026-07-10 it was done, and it did.** One of the four settled results below is now struck through. Read that as encouragement: the paragraph was right, the work was worth prioritising, and the way to find out was to go and do the arithmetic. **#10 was done the same day, for the same reason, and it reversed a different thing than anyone expected.** Of the three results that remain, one is now derived rather than provisional:
 
-- **Progression is a staircase, not a ratchet.** You do not refine a tool into a better tool; you invent a different mechanism with its own irreducible sharpness. *Overturned if* the grit → sharpness bridge in `fire.h` has the wrong functional form — see **#10**. Its magnitude is safe by three orders of magnitude; its exponent is not. *(Survived #13 untouched: σ is 0.5500 at every generation, before and after. This was the obvious thing to fear and it did not happen — sand is what blurs a pan, and a clay platelet has no opinion about sand.)*
+- **Progression is a staircase, not a ratchet.** You do not refine a tool into a better tool; you invent a different mechanism with its own irreducible sharpness. *This used to say "overturned if the grit → sharpness bridge in `fire.h` has the wrong functional form — its magnitude is safe by three orders of magnitude, its exponent is not."* **The bridge did have the wrong functional form, and the staircase gained margin rather than losing it.** #10 replaced it with the log law over a rough bed: the exponent is `1 + 1/ln(15·d_cut/d_grit)` ≈ 1.11, *super*-linear rather than the feared `√(d/h)`, and roughness cannot blur the pan past 3.4% at any grit size whatever. σ is 0.5500 at every generation to nine places. **Within this model nothing is left that could overturn it:** a pan's sharpness has exactly two inputs — the operator's wrist (#5, which sets a step's height, not whether there are steps) and the floor's roughness (derived). Restoring the spiral now requires a *new mechanism* by which finer clay makes a sharper pan, and none is proposed. *(It also survived #13 untouched, which was the obvious thing to fear and did not happen — a clay platelet has no opinion about sand.)*
 - **Levigation authors nothing.** Its imperfection is exactly 3.0 for every vessel, charge and wait, and even the pour fraction is derived. Nothing to overturn — it is algebra. *(Survived #13: the algebra never moved. Every number it stood on did.)*
 - ~~**Era 1 has a lodestone-shaped hole.** Levigation cannot separate clay from clay-sized quartz; the velocity ratio is 1.031×, the same 1.03× that hides magnetite in hematite.~~ **Overturned 2026-07-10 by #13.** The 1.031× was the ratio between two *spheres* of equal diameter and unequal density; kaolinite is a platelet and the real ratio is **6.977×**. Levigation divides the clay bin, reaches grade 1.000 given patience, and has a grade/recovery curve like every other separator here. Deflocculation (**#15**) survives as an *improvement*, not a *requirement*.
 - **Throughput is a bigger shovel.** More mass per hour is not progression. A bigger pot is, because it moves the curve outward at matched grade. This distinction was got wrong once already, in the direction of thinking the pot's loop was illegal. *(Survived #13, but its old proof did not: "same grade, more recovery" was only sayable while grade was pinned. The pot now wins at every matched grade, which is the real test and the one §2a specifies.)*
 
-Two habits earned their keep on 2026-07-10 and are worth stating as rules rather than as anecdotes. **An uncited number can be load-bearing for a conclusion in a different file, and nothing in the code will tell you which one** — the velocity ratio that Era 1 rested on was a property of the word "sphere", which nobody had ever written down as an assumption. And **a correction can be wrong.** `levigate.h` carried a dated, self-flagellating note admitting its algebra had been too clever about vessel depth; the algebra was right, and the note was covering for a defect one file over. Both stay, both dated. Do not assume the most recent sentence is the true one.
+Three habits earned their keep on 2026-07-10 and are worth stating as rules rather than as anecdotes.
 
-The next piece of work is **Phase A step 3 (smelt)** — slag falls out of a bloomery and the ledger balances. It is downstream of nothing and cannot invalidate anything already written, which is now the whole of what is left to choose from: **#13 is closed.** Before starting it, glance at **#10**, the grit → sharpness bridge, which is the last authored number a finding on the front page rests on.
+**An uncited number can be load-bearing for a conclusion in a different file, and nothing in the code will tell you which one** — the velocity ratio that Era 1 rested on was a property of the word "sphere", which nobody had ever written down as an assumption.
+
+**A correction can be wrong.** `levigate.h` carried a dated, self-flagellating note admitting its algebra had been too clever about vessel depth; the algebra was right, and the note was covering for a defect one file over. Both stay, both dated. Do not assume the most recent sentence is the true one.
+
+**A lesson learned in one file does not propagate to the next one by itself.** `separate.h` worked out on 2026-07-09 that *a separator has two misplacements, not one*, and rewrote `screen()` around it. `fire.h` was making the identical mistake about pot floors — one authored line, one function away, charging the cost of a grain that never moved to the blur of the grains that did — and it survived a full day and a passing test suite. When you fix a modelling error, grep for the shape of it, not for the symbol.
+
+The next piece of work is **Phase A step 3 (smelt)** — slag falls out of a bloomery and the ledger balances. It is downstream of nothing and cannot invalidate anything already written, which is now the whole of what is left to choose from: **#13 and #10 are both closed**, and with them the last authored number under a front-page finding. What remains open is either a set piece (**#15**, deflocculation), an unbuilt model (**#19**, hiding–exposure, which #10 opened and did not close), or a citation chore (**#1, #2, #5, #12, #16, #17, #18**) — none of which can reverse anything.
 
 ---
 

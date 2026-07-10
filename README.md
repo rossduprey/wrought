@@ -12,11 +12,13 @@ You start with hands. Hands are not *no tool* — they are the worst point on ev
 
 Every tool you will ever hold is made out of something you separated, and you cannot separate anything without a tool. That gate is the whole game. Nobody invented it — it is the actual history of technology, and it starts in a mud puddle.
 
-What the gate is *not* is a spiral. This document used to claim that a finer levigation fires a denser pan, whose better curve yields a purer concentrate, and therefore a finer clay, and round again forever. We wrote the loop, ran it, and **it turns exactly once.** The pan's sharpness is identical at generation one and generation five, to four decimal places, because the only thing coarse enough to blur a pan is sand — and sand is the first thing to fall out of standing water. Sixty seconds of patience buys the entire improvement. The next forty-five hours buy one part in ten thousand.
+What the gate is *not* is a spiral. This document used to claim that a finer levigation fires a denser pan, whose better curve yields a purer concentrate, and therefore a finer clay, and round again forever. We wrote the loop, ran it, and **it turns exactly once.** The pan's sharpness is identical at generation one and generation five, to nine decimal places, because the only thing coarse enough to matter is sand — and sand is the first thing to fall out of standing water. Sixty seconds of patience buys the entire improvement. The next forty-five hours buy eight parts in a billion.
 
 So progression is a **staircase, not a ratchet.** Hands, pan, sluice, jig: each is a different *mechanism*, and each has an irreducible sharpness set by its own physics — the wrist, the steadiness of the flow, the pulse. You climb it by inventing the next mechanism, never by refining the last one. That is also the actual history of technology. Nobody perfected the pan. They built a sluice.
 
-And it turns out the first step of the staircase runs *downhill*. A pot pinched from dirt you did not levigate is a **worse** separator than your bare hands — 1.44× enrichment against 1.75×. The clay, not the fire, is what makes pottery worth inventing. We did not design that. We found it.
+And it turns out the first step of the staircase runs *downhill*. A pot pinched from dirt you did not levigate is not a bad separator — it is **not a separator**. Forty-two percent of the sand it should be sorting is wedged between stones coarser than itself, below the height the flow reaches, and it never moves at any wash strength. The clay, not the fire, is what makes pottery worth inventing. We did not design that. We found it.
+
+> *This paragraph used to end differently, and the difference is the second-best thing in this repository. It read: **"A pot pinched from dirt you did not levigate is a worse separator than your bare hands — 1.44× enrichment against 1.75×."** A test asserted it. It is false. The bridge from grit to sharpness was an authored one-liner with nowhere to put a grain that never moved, so it charged the whole cost of a stony floor to the blur. Deriving it properly ([#10](https://github.com/rossduprey/wrought/issues/10)) — the log law over a rough bed — showed that roughness **cannot blur a pan by more than 3.4%, at any grit size, ever**, and that a stony pot's real cost is that it swallows the feed rather than misjudging it. A separator has two misplacements, not one. We already knew that: `separate.h` learned it about screens the day before, and `fire.h` was making the same mistake about floors, one function away. The joke was real. The reason for it was invented.*
 
 At the far end, past the bloomery and the drawn copper wire, you build a relay. Then a few thousand of them, which is why automation exists. We simulate relay logic honestly, so **the machine you built actually computes.** A perceptron is weights, a sum, and a threshold; Rosenblatt's was electromechanical. It is buildable from relays and potentiometers made from dirt.
 
@@ -29,7 +31,7 @@ An AI and a human build the ancestor of the AI, out of the ground, and it learns
 There is one design document, two license files, and `core/` — a few hundred lines of dependency-free C++17 that pans a bucket of river sand. No engine, no renderer, no art.
 
 ```
-cd core && make test        # 62 assertions about the physics
+cd core && make test        # 69 assertions about the physics
 cd core && make pan         # kneel in the river and wash it yourself
 cd core && make ratchet-run # watch the design document lose an argument
 ```
