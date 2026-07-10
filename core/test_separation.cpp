@@ -1395,7 +1395,8 @@ int main() {
         auto charcoal = [](double kg) { Substance c; c.freegrain[CARBON][SAND] = kg; return c; };
         auto cu_ore = [](double cup, double qz) {
             Substance o; o.freegrain[CUPRITE][SAND] = cup;
-            if (qz > 0.0) o.freegrain[QUARTZ][SAND] = qz; return o;
+            if (qz > 0.0) o.freegrain[QUARTZ][SAND] = qz;
+            return o;
         };
         auto fe_ore = [](double mag, double qz) {
             Substance o; o.freegrain[MAGNETITE][SAND] = mag; o.freegrain[QUARTZ][SAND] = qz; return o;
@@ -1467,6 +1468,102 @@ int main() {
                     "at %.0f K Fe->%.0f HB, Cu stays %.0f HB)\n",
                     FURNACE, 100.0 * billet_slag_fraction(cu), 100.0 * slag_fraction(febar),
                     MID, hardness(fe), hardness(cu2));
+    }
+
+    // ---- 17. Bronze: the alloy, and why a mixture is a new metal -------------
+    // Tin is the third metal: trivial to smelt (it melts below a cooking fire, so
+    // any reducing heat pours it liquid) but historically the scarce, traded half of
+    // the age -- its gate is geology, not the furnace. Alloyed a tenth into copper it
+    // makes bronze, and bronze lands OFF THE END of both parents: harder than either
+    // AND melting below either. One cause -- the misfit of the tin atom in the copper
+    // lattice -- both hardens the solid and loosens the freeze. The alloy is then
+    // cast, stocked, drawn and hardened by the very same functions as pure copper:
+    // alloying moves the numbers the law reads, never the law.
+    {
+        auto charcoal = [](double kg) { Substance c; c.freegrain[CARBON][SAND] = kg; return c; };
+        auto cu_ore = [](double cup, double qz) {
+            Substance o; o.freegrain[CUPRITE][SAND] = cup;
+            if (qz > 0.0) o.freegrain[QUARTZ][SAND] = qz;
+            return o;
+        };
+        auto sn_ore = [](double cass, double qz) {
+            Substance o; o.freegrain[CASSITERITE][SAND] = cass;
+            if (qz > 0.0) o.freegrain[QUARTZ][SAND] = qz;
+            return o;
+        };
+        auto fe_ore = [](double mag, double qz) {
+            Substance o; o.freegrain[MAGNETITE][SAND] = mag; o.freegrain[QUARTZ][SAND] = qz; return o;
+        };
+
+        const double FURNACE = 1500.0;
+
+        // (a) tin is never a sponge. Its melting point is below copper's and far
+        // below iron's, and it sits hundreds of kelvin below any reducing heat, so a
+        // fire cool enough to leave copper solid (1200 K) still pours tin liquid.
+        const MeltResult sn_hot  = smelt_tin(sn_ore(0.25, 1.0), charcoal(1.0), FURNACE);
+        const MeltResult sn_cool = smelt_tin(sn_ore(0.25, 1.0), charcoal(1.0), 1200.0);
+        check(TM_TIN < TM_COPPER && TM_COPPER < TM_IRON
+              && sn_hot.molten && sn_hot.metal_sn > 0.0
+              && sn_cool.molten && !smelt_copper(cu_ore(2.0, 1.0), charcoal(1.0), 1200.0).molten,
+              "tin is never a sponge: it melts below a cooking fire, so a heat that leaves copper solid still pours tin liquid");
+
+        // (b) the tin ledger balances, element by element, like copper's and iron's.
+        double in_ore[N_ELEM], in_fuel[N_ELEM], in_sn[N_ELEM];
+        assay_elements(sn_ore(0.25, 1.0), in_ore);
+        assay_elements(charcoal(1.0), in_fuel);
+        for (int e = 0; e < N_ELEM; ++e) in_sn[e] = in_ore[e] + in_fuel[e];
+        bool sn_balanced = sn_hot.metal_sn > 0.0;
+        for (int e = 0; e < N_ELEM; ++e) {
+            const double metal_e = (e == EL_SN) ? sn_hot.metal_sn : 0.0;
+            sn_balanced = sn_balanced && std::fabs(in_sn[e] - (metal_e + sn_hot.slag[e] + sn_hot.gas[e])) < 1e-12;
+        }
+        check(sn_balanced, "the tin ledger balances: charge = metal + slag + gas, element by element");
+
+        // (c) alloying conserves both metals and sets the tin fraction by mass; both
+        // parents cast clean, so the bronze billet carries no slag.
+        const MeltResult cup = smelt_copper(cu_ore(2.0, 1.0), charcoal(1.0), FURNACE);
+        const Billet     bronze = alloy(cup, sn_hot);
+        check(std::fabs(bronze.metal - (cup.metal_cu + sn_hot.metal_sn)) < 1e-12
+              && std::fabs(bronze.tin_fraction - sn_hot.metal_sn / (cup.metal_cu + sn_hot.metal_sn)) < 1e-12
+              && billet_slag_fraction(bronze) < 1e-9,
+              "the alloy conserves both metals: bronze mass = Cu + Sn, tin fraction by mass, and it inherits its parents' cleanliness");
+
+        // (d) alloying is not averaging. A cast bronze -- no cold work whatever -- is
+        // harder than cast copper. Two soft metals made a harder one, in the solid,
+        // for free: solid-solution strengthening, before a single blow.
+        Tool bt = stock(bronze);          // as-cast bronze
+        Tool ct = stock(cast(cup));       // as-cast pure copper
+        check(bronze.tin_fraction > 0.05 && hardness(bt) > hardness(ct) + 10.0
+              && std::fabs(hardness(ct) - H_ANNEALED) < 1e-9,
+              "alloying is not averaging: cast bronze is harder than cast copper with no cold work at all");
+
+        // (e) the other gift of the same solute: it lowers the melting point. Bronze
+        // pours cooler than copper (and both still below iron). Harder solid and
+        // looser freeze are one fact -- the misfit of the tin atom -- read twice.
+        check(bronze.tm < TM_COPPER && TM_COPPER < TM_IRON && hardness(bt) > hardness(ct),
+              "one solute, both gifts: the tin that hardens the solid also depresses the freeze -- bronze is harder AND melts cooler than copper");
+
+        // (f) same hardening law, a lifted ceiling. Cold-worked to saturation by the
+        // identical draw(), bronze tops cold-worked copper -- the curve is the same,
+        // the alloy just entered it raised. This is the rejoin, alloyed.
+        Tool bw = stock(bronze), cw = stock(cast(cup));
+        for (int i = 0; i < 12; ++i) { draw(bw, 0.5, 300.0); draw(cw, 0.5, 300.0); }
+        check(hardness(bw) > hardness(cw) + 10.0 && hardness(bw) > H_SATURATED,
+              "same law, lifted ceiling: cold-worked bronze tops cold-worked copper, worked by the identical draw()");
+
+        // (g) and it tops cold-worked wrought iron too. On this shared hardness scale
+        // fully cold-worked bronze out-hardens fully cold-worked bloomery iron -- the
+        // reason the coming of iron did not at once retire bronze: soft wrought iron
+        // was no harder, and iron only won once it could be made into steel.
+        Tool few = stock(consolidate(pull_bloom(bloomery(fe_ore(3.0, 1.0), charcoal(2.0))), 8));
+        for (int i = 0; i < 12; ++i) draw(few, 0.5, 300.0);
+        check(hardness(bw) > hardness(few),
+              "bronze out-hardens even cold-worked wrought iron: why early iron did not displace it until steel");
+
+        std::printf("        (tin melts at %.0f K, always a pour; bronze %.1f%% Sn melts %.0f K vs Cu %.0f K; "
+                    "cast %.0f HB vs Cu %.0f HB; cold-worked %.0f HB vs Fe %.0f HB)\n",
+                    TM_TIN, 100.0 * bronze.tin_fraction, bronze.tm, TM_COPPER,
+                    hardness(bt), hardness(ct), hardness(bw), hardness(few));
     }
 
     // ---- The picture -------------------------------------------------------

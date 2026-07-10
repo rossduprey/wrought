@@ -19,6 +19,14 @@
 // hardened by the same hardness() law as an iron bar. Iron and copper diverge at
 // the furnace and meet again at the hammer.
 //
+// And it holds the alloy fork, BRONZE (see ALLOY below). Bronze is not a fourth
+// metal reduced from a fourth ore -- it is copper and tin, each cast, then mixed
+// liquid. It rejoins at the anvil exactly as copper does, worked by the same draw()
+// and hardness(). What alloying changes is not the PATH but the two numbers the path
+// reads: the tin dissolved in the copper lattice raises the hardness curve (the
+// billet is harder before a single blow) and lowers the melting point (it pours
+// cooler than copper). One foreign atom, both gifts -- the same solute doing both.
+//
 // This is the first process in the project that is DEFORMATION, not separation.
 // Everything before it -- pan, sluice, lodestone, even the bloomery's chemistry --
 // sorts a population of grains by a property. Consolidation does something new: it
@@ -213,7 +221,8 @@ struct Billet {
     double metal = 0.0;          // kg cast copper
     double slag[N_ELEM] {};      // kg entrained slag -- ~0 for a clean liquid pour
     double drained[N_ELEM] {};   // kg slag that floated off and was skimmed
-    double tm = TM_COPPER;       // the metal's melting point
+    double tm = TM_COPPER;       // the metal's melting point (depressed if alloyed)
+    double tin_fraction = 0.0;   // Sn / (Cu+Sn) by mass; 0 = pure copper, >0 = bronze
     double temperature = 288.0;  // K
     bool cast_clean = false;     // did it pour liquid (slag floated off) or freeze a sponge
 };
@@ -312,6 +321,93 @@ inline constexpr double H_SATURATED = 220.0;
 inline constexpr double STRAIN_SCALE = 0.6;
 
 // ------------------------------------------------------------------------
+// BRONZE: the alloy, and why a mixture is a new metal instead of a blend.
+//
+// Copper is soft: annealed, it sits at the hardness floor, and no smith ever put a
+// working edge on pure copper. Tin is softer still -- it dents under a thumbnail. By
+// every naive expectation a mix of the two should land BETWEEN them, softer than
+// copper. It does the opposite. A tenth of tin dissolved into copper makes bronze,
+// and bronze is harder than either parent AND melts below either -- it lands off the
+// end of both scales, not in the middle. That is the finding, and it has one cause:
+//
+//   ALLOYING IS NOT AVERAGING. A tin atom is the wrong size for a copper lattice
+//   site, and that single fact of foreignness does two things at once. In the SOLID
+//   it strains the lattice around every solute atom, and those strain fields snag
+//   the dislocations whose glide is what "soft" means -- so the alloy is harder, at
+//   zero cold work, than the pure metal (solid-solution strengthening). In the
+//   FREEZE it disorders the crystal the liquid is trying to build, lowering the
+//   temperature at which order wins -- so the alloy melts cooler than the pure metal
+//   (freezing-point depression). Harder solid and looser freeze are not two lucky
+//   properties; they are ONE property -- the misfit of the solute -- read on two
+//   axes. And both are gifts: the harder metal takes a real edge, and the cooler,
+//   wider freeze pours into a mold far better than stiff pure copper ever did. That
+//   pairing -- castable AND edge-holding -- is why an AGE is named after this alloy
+//   and not after the copper that preceded it by millennia.
+//
+// Mechanically, alloying does not add a process. It moves the two numbers the
+// existing hardness() and cast() already read: it raises the hardness curve (floor
+// and ceiling together) and lowers the melting point. The alloy is then cast,
+// stocked, drawn and hardened by the very same functions as pure copper -- the code
+// demonstrates "one law" by changing only inputs, never the law.
+//
+// Per DESIGN.md's fidelity ceiling: the parent melting points are VERIFIED, but the
+// DEPRESSION rate and the SOLID-SOLUTION hardening rate are AUTHORED envelopes
+// (issue #26). Both are linear-in-tin stand-ins for curves that really bend (peak
+// strength near the peritectic, a liquidus that is not a straight line). The finding
+// rides their SIGNS -- tin lowers the melt and raises the hardness, monotonically --
+// never their magnitudes.
+
+// Melting-point depression per unit tin fraction. bronze_tm slides from copper's Tm
+// toward tin's as tin rises; at x=0.10 this puts the (nominal) melt near 1273 K
+// (~1000 C), below copper's 1085 C, matching bronze's easier casting. AUTHORED,
+// cited envelope (issue #26). Sign, not size, carries the finding.
+inline constexpr double MELT_DEPRESSION = 850.0; // K per unit Sn fraction
+
+// Solid-solution hardening per unit tin fraction, in Brinell, applied to BOTH the
+// annealed floor and the saturated ceiling (the whole curve lifts). At x=0.10 it
+// adds ~40 HB: a cast bronze already reads above pure copper's annealed floor, and
+// cold-worked bronze tops even cold-worked iron -- which is the historical reason
+// early wrought iron did not displace bronze until it could be made into steel.
+// AUTHORED, cited envelope (issue #26).
+inline constexpr double SOLUTE_HARDENING = 400.0; // HB per unit Sn fraction
+
+inline double clamp_tin(double x) { return x < 0.0 ? 0.0 : (x > 1.0 ? 1.0 : x); }
+
+// Bronze's melting point at tin fraction x: depressed below copper's. x=0 returns
+// TM_COPPER exactly, so a pure-copper billet is unchanged.
+inline double bronze_tm(double x) { return TM_COPPER - MELT_DEPRESSION * clamp_tin(x); }
+
+// Bronze's annealed and saturated hardness at tin fraction x: the pure-copper
+// values (H_ANNEALED, H_SATURATED) plus the solute lift. x=0 returns the pure values
+// exactly, so pure copper and iron keep the unshifted curve and their tests do not move.
+inline double bronze_h_annealed(double x)  { return H_ANNEALED  + SOLUTE_HARDENING * clamp_tin(x); }
+inline double bronze_h_saturated(double x) { return H_SATURATED + SOLUTE_HARDENING * clamp_tin(x); }
+
+// Mix a copper pour and a tin pour into a bronze billet. This is the alloying step:
+// two liquids become one, the tin fraction is set by mass, and from it the billet's
+// melting point and hardness curve are fixed. Both metals were cast clean (each
+// poured liquid and shed its slag), so bronze inherits copper's cleanliness -- the
+// alloy is clean for the same reason its parents were. The ledger is trivial: metal
+// out = Cu in + Sn in, no element created or lost.
+inline Billet alloy(const MeltResult& copper, const MeltResult& tin) {
+    Billet b;
+    const double cu = copper.metal_cu, sn = tin.metal_sn;
+    const double total = cu + sn;
+    b.metal = total;
+    b.tin_fraction = (total > 0.0) ? sn / total : 0.0;
+    b.tm = bronze_tm(b.tin_fraction);
+    b.cast_clean = copper.molten && tin.molten;   // both poured liquid -> clean alloy
+    b.temperature = std::fmax(copper.temperature, tin.temperature);
+    // Both parents cast clean, so the billet carries no entrained slag; any slag the
+    // two pours skimmed is recorded as drained, conserved but out of the metal.
+    for (int e = 0; e < N_ELEM; ++e) {
+        b.slag[e]    = 0.0;
+        b.drained[e] = copper.slag[e] + tin.slag[e];
+    }
+    return b;
+}
+
+// ------------------------------------------------------------------------
 // RED-SHORT: the poison that only the hammer can find.
 //
 // Shaping said the heat is a smith's friend: form is free hot, so you work hot
@@ -369,6 +465,8 @@ struct Tool {
     double cold_strain = 0.0;   // accumulated plastic strain worked in below recryst
     double cracking = 0.0;      // grain-boundary damage from hot-working a sulfurous bar
     double tm = TM_IRON;        // the metal's melting point; the recryst floor is a fraction of it
+    double h_annealed = H_ANNEALED;   // this metal's soft floor (raised by alloying)
+    double h_saturated = H_SATURATED; // this metal's hard ceiling (raised by alloying)
     double temperature = 288.0; // K, the piece's current heat
 };
 
@@ -391,8 +489,14 @@ inline Tool stock(const Bar& bar) {
 inline Tool stock(const Billet& billet) {
     Tool t;
     t.metal = billet.metal;
-    t.sulfur = 0.0;             // oxide-ore copper carries no sulfur: no red-short
-    t.tm = billet.tm;
+    t.sulfur = 0.0;             // oxide-ore copper/bronze carries no sulfur: no red-short
+    t.tm = billet.tm;           // depressed if this is bronze (alloy())
+    // The hardness curve the piece carries onto the anvil is set here, from the
+    // billet's tin fraction: pure copper (x=0) keeps the unshifted floor and ceiling,
+    // bronze enters already lifted. This is where "the alloy is harder before a blow"
+    // becomes a fact the same hardness() law will read.
+    t.h_annealed  = bronze_h_annealed(billet.tin_fraction);
+    t.h_saturated = bronze_h_saturated(billet.tin_fraction);
     t.temperature = billet.temperature;
     for (int e = 0; e < N_ELEM; ++e) t.slag[e] = billet.slag[e];
     return t;
@@ -430,7 +534,7 @@ inline void draw(Tool& t, double reduction, double T) {
 // ceiling, exponential in the retained cold strain. Worked hot only, it stays
 // soft; worked cold, it climbs and levels off. DERIVED form, AUTHORED scale.
 inline double hardness(const Tool& t) {
-    return H_ANNEALED + (H_SATURATED - H_ANNEALED) *
+    return t.h_annealed + (t.h_saturated - t.h_annealed) *
            (1.0 - std::exp(-t.cold_strain / STRAIN_SCALE));
 }
 

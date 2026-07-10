@@ -22,6 +22,7 @@ enum PhaseId {
     GOETHITE, ILMENITE, PYRITE, CALCITE, CARBON,
     IRON,
     CUPRITE, COPPER,
+    CASSITERITE, TIN,
     N_PHASE
 };
 
@@ -123,6 +124,21 @@ inline constexpr Phase PHASES[N_PHASE] = {
     // textbook diamagnet, and unlike an iron bloom a copper billet is invisible to
     // the lodestone. AUTHORED. Inert to every separator here, magnet included.
     {"copper",    8.96, -1.0e-5, 1.00, 0.0, "UNVERIFIED Cu", "AUTHORED lump"},
+    // Cassiterite, SnO2 ("tinstone"): the one workable tin ore, and nearly the only
+    // one -- tin has no rich family of oxides and carbonates the way iron and copper
+    // do. What matters about it here is DENSITY: ~6.99, far heavier than the 2.6-2.7
+    // silicates it weathers out with, so cassiterite concentrates in placers under
+    // running water and was won by panning gravel, not by mining rock. That density,
+    // not a furnace, is what made tin findable. Diamagnetic-to-weakly-para, NOT
+    // ferromagnetic: the lodestone is as blind to it as to copper ore.
+    {"cassiterite", 6.99, -1.0e-5, 1.00, 0.0, "UNVERIFIED SnO2", "AUTHORED isometric"},
+    // Metallic tin: the cast product of cassiterite, and the softer of bronze's two
+    // parents. It exists here so a tin pour has somewhere to live and the alloy
+    // something to draw from. Density ~7.29 (white beta-tin, the room-temperature
+    // form). Diamagnetic; inert to every separator here, magnet included. Its
+    // melting point (505 K, smelt.h) is so low that no fire that reduces it fails to
+    // melt it -- tin is never a sponge, always a pour.
+    {"tin",       7.29, -1.0e-5, 1.00, 0.0, "UNVERIFIED beta-Sn", "AUTHORED lump"},
 };
 
 } // namespace wrought
