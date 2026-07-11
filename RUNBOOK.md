@@ -52,7 +52,7 @@ Read in order; each file knows only the ones above it.
 2. Decide: invariant → a test in `test_separation.cpp`; number to watch → its own program.
 3. Let the result contradict `DESIGN.md`. Then change `DESIGN.md`, log the reversal in `CORRECTIONS.md`, and say in the commit that it lost.
 4. New authored numbers get an issue before the commit that introduces them lands.
-5. Commit lowercase `area: what changed`, push to `origin`.
+5. Commit lowercase `area: what changed`, push to `origin`. Settled and not to be re-verified before every push: identity is `ross <rossduprey@gmail.com>`, `origin` is SSH `git@github.com:rossduprey/wrought.git`, branch is `main`. Just `git add`/`commit`/`push` — it has never failed; let it error if it ever does instead of pre-checking.
 
 ## Open questions — Ross's to answer
 
