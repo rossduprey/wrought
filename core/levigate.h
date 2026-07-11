@@ -169,4 +169,82 @@ inline DecantResult decant(const Substance& mud, const Vessel& ves, double secon
     return out;
 }
 
+// ---------------------------------------------------------------------------
+// Deflocculation -- Era 1's real tool, and the second variable orthogonal to
+// settling velocity (the lodestone was the first).
+//
+// Everything above this line models the DEFLOCCULATED state without ever naming
+// it: a clay is bare platelets, each falling at its own velocity. That is what a
+// suspension looks like once an electrolyte -- wood ash, or urine -- has charged
+// its platelets so they repel and refuse to stack. Its opposite is FLOCCULATION:
+// add a salt or an acid, the charge is killed, the platelets aggregate, and the
+// clay falls as one big floc. Surface charge, not size, decides which -- a variable
+// a velocity separator cannot read, the same shape of answer the lodestone is for
+// magnetite and hematite, and the one issue #15 asked for.
+//
+// A probe on 2026-07-10 decided which half of this is honest to model. The romantic
+// half -- "deflocculated clay stays up forever" -- is NOT single-particle Brownian
+// suspension: at a clay platelet's size the Peclet number over a pottery vessel is
+// ~1e4, so gravity beats diffusion by four orders of magnitude, and what really
+// holds a deflocculated sol up is a many-body colloidal osmotic pressure (Hamaker
+// constant, Debye length, zeta potential, volume fraction) -- the "six invented
+// numbers" #15 itself warns is the wrong model. So we do NOT model indefinite
+// suspension. We model the FLOCCULATION half, where the physics is clean: a floc is
+// a grain of an AUTHORED effective size (#29) and falls by the same force balance as
+// any other. Two wins fall straight out of it, and neither needs a curve:
+//
+//   1. RECOVERY ON DEMAND. A single platelet takes ~158 h to cross a hollow; a floc
+//      crosses it in ~73 s. Deflocculate to pour a clean clay liquor, then flocculate
+//      that liquor to get the clay BACK in minutes instead of days. Levigation gave
+//      you grade for the price of patience; flocculation gives you the clay itself.
+//
+//   2. A SEPARATION VELOCITY CANNOT MAKE. Only clay minerals floc; quartz and
+//      feldspar have no charge to kill and stay up. So flocculating a clay liquor
+//      drops the kaolinite and leaves clay-sized quartz behind -- it divides a single
+//      velocity class by surface charge. #13 taught velocity to split that class by
+//      SHAPE (6.98x plate drag); this splits it by a truly orthogonal variable, and
+//      the recovered solid comes out purer than the feed.
+
+// The effective size a kaolinite floc falls at once its charge is killed. AUTHORED,
+// UNVERIFIED (#29): a real floc is an open aggregate of tens of microns; both
+// findings ride on this being MUCH coarser than a platelet, not on its value. Only
+// clay minerals floc -- that selectivity is the whole point.
+inline constexpr double FLOC_DIAMETER = 30.0e-6;  // m. AUTHORED, UNVERIFIED (#29).
+
+// The velocity a grain falls at in a flocculated suspension. A clay-mineral fine
+// becomes a floc of FLOC_DIAMETER (equant, so aspect 1.0); anything already coarser
+// than a floc, and anything that does not floc, falls at its own velocity unchanged.
+inline double flocculated_velocity(int p, int s, double T) {
+    if (p == KAOLINITE && bin_diameter(s) < FLOC_DIAMETER)
+        return settling_velocity(PHASES[KAOLINITE].density, FLOC_DIAMETER, 1.0, T);
+    return free_velocity(p, s, T);
+}
+
+struct FloccResult {
+    Substance recovered;    // reached the floor: your clay, dropped on demand
+    Substance supernatant;  // still up: the water, and the fines that do not floc
+};
+
+// Flocculate a (deflocculated) clay suspension and let it stand `seconds`. The clay
+// aggregates and drops as flocs; clay-sized quartz keeps its charge and stays up. So
+// this recovers the clay FAST and divides it from quartz by surface charge -- the
+// recovery half of the set piece, and the half whose physics needs no invented curve.
+inline FloccResult flocculate(const Substance& susp, const Vessel& ves, double seconds) {
+    FloccResult out;
+    const double T = susp.temperature;
+    out.recovered.temperature = out.supernatant.temperature = T;
+    for (int p = 0; p < N_PHASE; ++p)
+        for (int s = 0; s < N_SIZE; ++s) {
+            const double ff = settled_fraction(flocculated_velocity(p, s, T), ves.depth, seconds);
+            out.recovered.freegrain[p][s]   = susp.freegrain[p][s] * ff;
+            out.supernatant.freegrain[p][s] = susp.freegrain[p][s] * (1.0 - ff);
+            // A composite is a locked grain, not a dispersed platelet: it does not
+            // floc, it settles at its own velocity.
+            const double fc = settled_fraction(composite_velocity(p, s, T), ves.depth, seconds);
+            out.recovered.composite[p][s]   = susp.composite[p][s] * fc;
+            out.supernatant.composite[p][s] = susp.composite[p][s] * (1.0 - fc);
+        }
+    return out;
+}
+
 } // namespace wrought

@@ -914,6 +914,35 @@ int main() {
               "and a bigger shovel moves nothing outward: that is what throughput is");
         std::printf("        (at 4 h: pot recovers %.4f, pot with a double charge %.4f)\n",
                     rec_p, recovery(big, decant(big, pot, 14400.0).liquor, KAOLINITE));
+
+        // Flocculation: the recovery half of levigation, and a separation a settling
+        // cut cannot make. Deflocculated levigation (everything above) buys grade for
+        // patience and leaves the clay dispersed. Flocculate the poured liquor and the
+        // clay drops in minutes -- and because quartz keeps its charge and will not
+        // floc, the solid it hands back is purer than the liquor it settled from,
+        // dividing a single velocity class by surface charge. #13 split that class by
+        // shape; this splits it by a variable velocity cannot read.
+        // *(2026-07-10, #15. The floc size is authored, #29.)*
+        const Substance liquor = decant(dirt, HOLLOW, 3600.0).liquor;   // a clay liquor
+        const FloccResult fl = flocculate(liquor, HOLLOW, 300.0);       // stand five minutes
+        double defloc_kaol = 0.0;   // what plain deflocculated standing drops in 5 min
+        for (int s = 0; s < N_SIZE; ++s)
+            defloc_kaol += liquor.freegrain[KAOLINITE][s]
+                * settled_fraction(free_velocity(KAOLINITE, s, liquor.temperature), HOLLOW.depth, 300.0);
+        const double floc_rec   = recovery(liquor, fl.recovered, KAOLINITE);
+        const double defloc_rec = liquor.phase_mass(KAOLINITE) > 0.0
+            ? defloc_kaol / liquor.phase_mass(KAOLINITE) : 0.0;
+        const double floc_conserved = std::fabs(fl.recovered.total_mass()
+            + fl.supernatant.total_mass() - liquor.total_mass());
+        check(floc_conserved < 1e-9
+              && floc_rec > 0.90                              // the clay is down in minutes
+              && floc_rec > 100.0 * defloc_rec               // where dispersed it barely moves
+              && fl.recovered.grade(KAOLINITE) > liquor.grade(KAOLINITE) + 1e-3,  // purer than feed
+              "flocculation is levigation's recovery half: it drops the clay in minutes, and "
+              "because quartz will not floc it hands back a solid purer than the liquor");
+        std::printf("        (5 min: flocculated recovers %.3f of the clay vs %.5f dispersed; "
+                    "solid grade %.4f from a %.4f liquor)\n",
+                    floc_rec, defloc_rec, fl.recovered.grade(KAOLINITE), liquor.grade(KAOLINITE));
     }
 
     // ---- 10. The bridge under the ratchet, and it is derived now ------------

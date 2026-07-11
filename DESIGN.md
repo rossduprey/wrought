@@ -1006,6 +1006,35 @@ loud, and it is now the most valuable unbuilt thing in Era 1.
 > settled result. It was a property of an assumption nobody had written down as an
 > assumption, because "sphere" is what you get when nobody says otherwise.
 
+#### Deflocculation, now built — the recovery half, and a variable velocity cannot read
+
+*(2026-07-10, #15.)* Deflocculation went in as the improvement the reversal above
+predicted, not the requirement it was first filed as — and a probe decided how much
+of it is honest to model. The romantic claim, that deflocculated clay stays up
+indefinitely, is **not** single-particle physics: at a platelet's size the Péclet
+number over a pottery vessel is ~10⁴, so gravity beats Brownian diffusion by four
+orders of magnitude, and what actually holds a charged sol up is a many-body osmotic
+pressure that would cost the six invented numbers (Hamaker constant, Debye length,
+zeta potential, volume fraction) issue #15 itself named as the wrong model. So we
+model the other half, where the physics is clean: **flocculation.** Kill the charge
+with a pinch of salt and the platelets aggregate into a floc that falls by the same
+force balance as any grain. Two wins fall out, neither needing a curve:
+
+- **Recovery on demand.** A single platelet takes ~158 h to cross a hollow; a floc
+  crosses it in ~73 s. Levigation bought grade for patience and left the clay
+  dispersed in the poured water; flocculating that liquor hands the clay back in
+  minutes, not days.
+- **A separation velocity cannot make.** Only clay minerals floc; clay-sized quartz
+  keeps its charge and stays up. So the recovered solid is *purer than the liquor* —
+  0.999 kaolinite from a 0.862 feed in the test — dividing a single velocity class by
+  surface charge. #13 had just taught velocity to split that class by *shape*; this
+  splits it by a truly orthogonal variable, which is the lodestone's Era-0 role
+  carried into Era 1.
+
+The one authored number is the floc's effective size (#29); both findings ride on it
+being far coarser than a platelet, not on its value. This is the last unbuilt
+*mechanism* in the core — what remains open is citation debt, not missing physics.
+
 So the paragraph above survives only as its last sentence — *every tool is made
 from something you separated* — which is true, and load-bearing, and is a **gate**
 rather than an engine. What replaces the engine is not a loop but a staircase:
