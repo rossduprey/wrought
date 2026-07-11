@@ -677,6 +677,18 @@ built to pay off:
    dug. The dig bar fills over several strokes and crosses these tiers; the assay
    panel shifts live as you descend.
 
+   **The gesture, decided and now built** (`core/dig.cpp`, the second playable
+   slice after the pan): the player sees a **vertical bar of the layers he is
+   cutting**, and strikes the ground with the **hand or the shovel** — one strike,
+   one bite, the pit edge descending in real time down the bar — exactly as a
+   left-click eats into the dirt. It is the honest terminal translation of that
+   click (an impulse key, because a terminal cannot see a held mouse button, the
+   same limit the pan hit with its swirl). The shovel is the Era-0→1 rung: it takes
+   ~10× the bite and drives the pit down faster, which is why a shovel with no cart
+   just buries you. Nothing is stated; the choice — a small clean oxide pile up top
+   versus a big mixed oxide+sulfide pile deep — is only dug, and the panel changes
+   *character* (not just magnitude) as the mineral changes with depth.
+
 2. **A full-depth dig MIXES the column — and it all comes up as *locked rock*.**
    Oxide, barren middle, and sulfide heap into one spoil pile — the richer haul and
    the harder problem at once, because it carries two minerals that want opposite
@@ -726,9 +738,13 @@ The dig fills the **composite** bins, not the free ones, so a fresh scoop reads 
 grade but liberates nothing until the rock-breaking station crushes it — the honest
 chain is *dig locked rock → haul (hand → cart) → crush → cob → furnace*. The peak
 grade is now capped at `COMPOSITE_TARGET_FRACTION` (0.5): a locked grain is half
-mineral, so no scoop can read richer than a solid ore grain. **Still unbuilt (game
-layer):** the cart, the carry-capacity rungs, and the panel/dig-bar UI — the sim
-core now produces exactly what they consume.
+mineral, so no scoop can read richer than a solid ore grain. **The dig-bar UI is now
+built** (`core/dig.cpp`, 2026-07-11): strike down through the layers, watch the
+mineral change with depth on a live assay, walk the valley for the twitch, shoulder
+the locked rock and leave for the breaker. **Still unbuilt (game layer):** the
+carry loop itself — the cart and the carry-capacity rungs (hands → back-load → cart)
+that make hauling heavy waste to the breaker a real cost — and the breaker and cob
+stations the dig now feeds. The sim core produces exactly what they consume.
 
 ---
 
@@ -2142,8 +2158,9 @@ whether any of this feels the way Ross hopes it will.
 
 1. **How to build the Linux server binary** (blocks Phase D, not Phase C):
    - *(a)* Build natively in CI on a Linux runner — needs UE source + toolchain in
-     a runner image; that image is large (tens of GB) and the Gitea runner disk
-     is not sized for it today.
+     a runner image; that image is large (tens of GB). *(Moot since 2026-07-11:
+     the LAN Gitea/CI was dropped, so there is no self-hosted runner to size —
+     this would now mean GitHub Actions.)*
    - *(b)* Build on a Linux node by hand once, iterate rarely. Violates the
      no-snowflakes rule, but honestly: it's a build host, not a service.
    - *(c)* Skip Phase D. Run the dedicated server on the Mac, on the LAN. The
@@ -2217,6 +2234,10 @@ open decision that cannot be deferred without defeating its own purpose.
    canonical**, and `Cluster/knowledge` keeps the planning docs. Gitea can carry a
    native **push mirror** so the LAN stays a full replica and CI keeps running on
    the LAN runner. Ross confirms.
+   **Reversed 2026-07-11:** the Gitea mirror was dropped. GitHub is now the only
+   host; the sole other copy is a working clone on the LAN. There is no LAN replica,
+   no second remote, and no LAN CI. (The wrong claim stays, per the RUNBOOK — the
+   mirror's twin-issue-tracker rationale was real, it just was not worth the drift.)
 
 ## Why this project — the thesis
 
