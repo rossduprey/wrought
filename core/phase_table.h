@@ -21,7 +21,7 @@ enum PhaseId {
     QUARTZ, FELDSPAR, KAOLINITE, MAGNETITE, HEMATITE,
     GOETHITE, ILMENITE, PYRITE, CALCITE, CARBON,
     IRON,
-    CUPRITE, COPPER,
+    CUPRITE, CHALCOCITE, COPPER,
     CASSITERITE, TIN,
     N_PHASE
 };
@@ -118,6 +118,15 @@ inline constexpr Phase PHASES[N_PHASE] = {
     // in any case NOT ferromagnetic -- the lodestone cannot concentrate copper ore,
     // which is why copper dressing was gravity and hand-sorting, never the magnet.
     {"cuprite",   6.00, -1.0e-5, 1.00, 0.0, "UNVERIFIED Cu2O", "AUTHORED isometric"},
+    // Chalcocite, Cu2S ("copper glance"): the high-grade copper SULFIDE, and the
+    // ore that outlasted the oxides once the surface gossan was mined out. It cannot
+    // be smelted the way cuprite can -- a reducing fire strips oxygen, and chalcocite
+    // has none to give; it must first be ROASTED in air to a reducible oxide, driving
+    // its sulfur off as SO2 (smelt.h). What matters here is only that it is a distinct
+    // phase carrying copper AND sulfur, so the ledger can watch the sulfur leave.
+    // Density ~5.6 (chalcocite is lighter than cuprite); diamagnetic-to-weakly-para,
+    // NOT ferromagnetic -- the lodestone is as blind to it as to every copper ore.
+    {"chalcocite", 5.60, -1.0e-5, 1.00, 0.0, "UNVERIFIED Cu2S", "AUTHORED isometric"},
     // Metallic copper: the cast product, copper's answer to the iron bloom. It
     // exists here so a pour has somewhere to live and shaping something to pick up.
     // Density is standard copper. Susceptibility is diamagnetic -- copper is the

@@ -1566,6 +1566,97 @@ int main() {
                     hardness(bt), hardness(ct), hardness(bw), hardness(few));
     }
 
+    // ---- 18. Sulfide copper: the roast, and the fire that runs backwards -----
+    // The oxide ores are the weathered surface; below them copper is a SULFIDE, and
+    // a reducing fire cannot smelt it -- it strips oxygen, and a sulfide has none to
+    // give. You must first ROAST it in air (an oxidizing fire, the opposite of the
+    // furnace) to burn the sulfur off as SO2 and leave a copper oxide, which then
+    // smelts as if it were cuprite. Two fires, opposite atmospheres, fixed order.
+    // And it is sulfur's second verdict: invisible-and-incurable in iron (red-short,
+    // caught at the anvil), loud-and-curable in copper (caught at the furnace).
+    {
+        auto charcoal = [](double kg) { Substance c; c.freegrain[CARBON][SAND] = kg; return c; };
+        auto cu_ore = [](double cup, double qz) {
+            Substance o; o.freegrain[CUPRITE][SAND] = cup;
+            if (qz > 0.0) o.freegrain[QUARTZ][SAND] = qz;
+            return o;
+        };
+        auto sulfide_ore = [](double cc, double qz) {
+            Substance o; o.freegrain[CHALCOCITE][SAND] = cc;
+            if (qz > 0.0) o.freegrain[QUARTZ][SAND] = qz;
+            return o;
+        };
+        auto pyritic_fe = [](double mag, double py, double qz) {
+            Substance o; o.freegrain[MAGNETITE][SAND] = mag;
+            o.freegrain[PYRITE][SAND] = py; o.freegrain[QUARTZ][SAND] = qz; return o;
+        };
+
+        const double FURNACE = 1500.0; // above Cu's mp; a reducing charcoal hearth
+
+        // (a) the reducing furnace has no move on a sulfide. Fed straight to
+        // smelt_copper, chalcocite yields NO metal -- there is no oxide to reduce --
+        // and its sulfur and copper both report to the slag, untouched.
+        const MeltResult direct = smelt_copper(sulfide_ore(2.0, 1.0), charcoal(1.0), FURNACE);
+        double in_s[N_ELEM];
+        assay_elements(sulfide_ore(2.0, 1.0), in_s);
+        check(direct.metal_cu < 1e-12
+              && std::fabs(direct.slag[EL_CU] - in_s[EL_CU]) < 1e-12
+              && std::fabs(direct.slag[EL_S]  - in_s[EL_S])  < 1e-12,
+              "a reducing fire cannot smelt a sulfide: chalcocite gives no copper -- there is no oxygen to strip");
+
+        // (b) the roast conserves copper and drives ALL the sulfur off, element by
+        // element. Copper crosses into the calcine as oxide; sulfur leaves as gas;
+        // the silica and everything else pass through. (The calcine's new oxygen is
+        // atmospheric, so oxygen alone is not conserved -- that is the roast working.)
+        const RoastResult rr = roast(sulfide_ore(2.0, 1.0), FURNACE);
+        double in_ore[N_ELEM], cal[N_ELEM];
+        assay_elements(sulfide_ore(2.0, 1.0), in_ore);
+        assay_elements(rr.calcine, cal);
+        check(rr.lit
+              && std::fabs(cal[EL_CU] - in_ore[EL_CU]) < 1e-12       // copper conserved
+              && cal[EL_S] < 1e-12                                   // sulfur gone from the solid
+              && std::fabs(rr.gas[EL_S] - in_ore[EL_S]) < 1e-12      // ...and up the stack
+              && std::fabs(cal[EL_SI] - in_ore[EL_SI]) < 1e-12       // gangue passed through
+              && cal[EL_O] > in_ore[EL_O] + 1e-9,                    // oxygen ADDED from air
+              "the roast desulfurizes: copper conserved, all sulfur off as gas, oxygen taken from the air");
+
+        // (c) roast, THEN reduce: the calcine smelts to clean copper, the same metal
+        // an equal-copper oxide ore would give. The sulfide is won -- but only by the
+        // two fires in sequence.
+        const MeltResult from_sulfide = smelt_copper(rr.calcine, charcoal(1.0), FURNACE);
+        const double cu_equiv = in_ore[EL_CU];
+        const MeltResult from_oxide = smelt_copper(cu_ore(cu_equiv / element_fraction(CUPRITE, EL_CU), 1.0),
+                                                   charcoal(1.0), FURNACE);
+        const Billet cast_sulfide = cast(from_sulfide);
+        check(from_sulfide.metal_cu > 0.0
+              && std::fabs(from_sulfide.metal_cu - from_oxide.metal_cu) < 1e-9
+              && cast_sulfide.cast_clean && billet_slag_fraction(cast_sulfide) < 1e-9,
+              "roast then reduce wins the metal: the calcine pours the same clean copper an oxide ore would");
+
+        // (d) it takes BOTH fires, in order. The reducing fire alone gives nothing
+        // (a); and a fire too cool to roast (below ROAST_T) converts no sulfide, so
+        // the reducing fire that follows still finds no oxide and pours no metal.
+        const RoastResult cold = roast(sulfide_ore(2.0, 1.0), 900.0); // < ROAST_T
+        const MeltResult after_cold = smelt_copper(cold.calcine, charcoal(1.0), FURNACE);
+        check(!cold.lit && direct.metal_cu < 1e-12 && after_cold.metal_cu < 1e-12,
+              "two fires, fixed order: neither the reduce alone nor a failed roast gives copper -- only oxidize-then-reduce");
+
+        // (e) sulfur's two verdicts, side by side. The copper's sulfur left at the
+        // FURNACE (the roast), so no sulfur reaches the cast metal at all. The iron's
+        // sulfur is invisible at the furnace and rides into the bloom, seeding the
+        // red-short the anvil will find. Same element; cured in one metal, hidden in
+        // the other -- because copper's sulfide roasts and iron's contaminant does not.
+        const BloomResult pybloom = bloomery(pyritic_fe(3.0, 0.5, 1.0), charcoal(2.0));
+        check(cal[EL_S] < 1e-12 && from_sulfide.slag[EL_S] < 1e-12   // copper: no sulfur, furnace-cured
+              && pybloom.bloom_sulfur > 0.0,                          // iron: sulfur into the metal, anvil-bound
+              "one element, two verdicts: copper's sulfur is roasted off at the furnace; iron's rides silently to the anvil");
+
+        std::printf("        (chalcocite %.0f%% Cu, %.0f%% S: reduce-only yields 0 kg Cu; roast drives off %.3f kg S, "
+                    "then reduce pours %.3f kg clean Cu; pyritic bloom keeps %.3f kg S for the anvil)\n",
+                    100.0 * element_fraction(CHALCOCITE, EL_CU), 100.0 * element_fraction(CHALCOCITE, EL_S),
+                    rr.gas[EL_S], from_sulfide.metal_cu, pybloom.bloom_sulfur);
+    }
+
     // ---- The picture -------------------------------------------------------
     std::printf("\n  settling velocity, m/s (free grains)\n  %-10s %10s %10s %10s %10s\n",
                 "phase", sz(0), sz(1), sz(2), sz(3));

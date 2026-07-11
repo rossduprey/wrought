@@ -69,8 +69,10 @@ namespace detail {
     // which is correct for a bloom of metallic iron carrying only Fe. Pyrite is the
     // only sulfur-bearer: FeS2 is now fully resolved (Fe + 2 S ~= its whole mass),
     // so its OTHER falls to ~0 and its sulfur is on the ledger where it can do harm.
-    // Cuprite (Cu2O) and metallic copper carry the copper column; cassiterite (SnO2)
-    // and metallic tin carry the tin column; every other row is copper- and tin-free.
+    // Cuprite (Cu2O) and metallic copper carry the copper column; chalcocite (Cu2S)
+    // carries copper AND sulfur at once (it is the ore that must be roasted before it
+    // will smelt); cassiterite (SnO2) and metallic tin carry the tin column; every
+    // other row is copper- and tin-free.
     inline constexpr Formula FORMULA[N_PHASE] = {
         /*QUARTZ    SiO2         */ {60.083,  0, 1, 2, 0, 0, 0, 0},
         /*FELDSPAR  KAlSi3O8     */ {278.33,  0, 3, 8, 0, 0, 0, 0},
@@ -84,6 +86,7 @@ namespace detail {
         /*CARBON    C            */ {12.011,  0, 0, 0, 1, 0, 0, 0},
         /*IRON      Fe (metal)   */ {55.845,  1, 0, 0, 0, 0, 0, 0},
         /*CUPRITE   Cu2O         */ {143.09,  0, 0, 1, 0, 0, 2, 0},
+        /*CHALCOCITE Cu2S        */ {159.152, 0, 0, 0, 0, 1, 2, 0},
         /*COPPER    Cu (metal)   */ {63.546,  0, 0, 0, 0, 0, 1, 0},
         /*CASSITER. SnO2         */ {150.708, 0, 0, 2, 0, 0, 0, 1},
         /*TIN       Sn (metal)   */ {118.71,  0, 0, 0, 0, 0, 0, 1},
@@ -477,6 +480,99 @@ inline MeltResult smelt_tin(const Substance& ore, const Substance& charcoal,
     r.slag[EL_SN]    = in[EL_SN] - metal_sn;
     r.slag[EL_OTHER] = in[EL_OTHER];
 
+    return r;
+}
+
+// ------------------------------------------------------------------------
+// THE SULFIDE ORE: roasting, and the fire that runs the other way.
+//
+// Everything above reduces an OXIDE. Dig a copper oxide (cuprite, malachite) or a
+// tin oxide (cassiterite), and one charcoal fire strips its oxygen and pours a
+// metal. But the oxide ores are the surface -- the weathered gossan a deposit wears
+// where air and water have gotten at it. Mine down past it and the copper turns to
+// SULFIDE: chalcocite, Cu2S. And the sulfide cannot be smelted the way the oxide
+// can, because of what a reducing fire actually is:
+//
+//   THE REDUCING FURNACE HAS ONE MOVE: IT STRIPS OXYGEN. Feed it a sulfide and it
+//   has nothing to take -- chalcocite has no oxygen to give, and charcoal cannot
+//   pull the sulfur off copper. The charge just sits there as a sulfide, sulfur and
+//   all. To win the metal you must first put the oxygen ON, in a second fire that
+//   runs the other way: an OXIDIZING roast, air not charcoal, that burns the sulfur
+//   off as SO2 and leaves a copper OXIDE behind -- which the reducing fire can then
+//   smelt as if it had been cuprite all along. So a sulfide ore needs TWO fires of
+//   OPPOSITE ATMOSPHERE, in a fixed order: oxidize to desulfurize, then reduce to
+//   pour. The oxide ore was one fire; the sulfide is two, and the second one is a
+//   whole idea -- that you add oxygen in order to be able to remove it. That gap is
+//   why the easy oxide gossans were worked for an age before the deep sulfides, and
+//   why the roast heap, not the furnace, was the real advance of mature copper.
+//
+// This is the SECOND time sulfur is the villain, and the two times are a matched
+// pair that only make sense together. In IRON (bloomery, above) sulfur is INVISIBLE
+// at the furnace -- it rides silently into the bloom and reveals itself only at the
+// anvil, as red-short (forge.h), where no Era-1 tool can undo it. In COPPER it is
+// the opposite: sulfur announces itself AT THE FURNACE -- the sulfide flatly refuses
+// to smelt -- and there, at the furnace, it can be cured, by the roast. Same poison,
+// two verdicts: a hidden, incurable anvil failure in one metal; a loud, curable
+// furnace step in the other. The difference is not the sulfur. It is that copper's
+// sulfide roasts cleanly to a reducible oxide and iron's contaminant does not.
+//
+// Per DESIGN.md's fidelity ceiling: the reaction (2 Cu2S + 3 O2 -> 2 Cu2O + 2 SO2)
+// and the fact that its oxygen is atmospheric are tabulated; what is AUTHORED is the
+// roast-onset temperature and the idealization that ONE roast drives off ALL the
+// sulfur (real roasts stall at a copper sulfate below heat and leave a residual
+// matte -- issue #27). The finding rides the sulfide having no oxygen for a reducing
+// fire to take, not on any rate.
+
+// Chalcocite is the sulfide the roast converts; it is the whole roastable set here.
+inline bool roastable(int p) { return p == CHALCOCITE; }
+
+// Roast onset: below ~800 C an oxidizing fire stalls -- it makes copper SULFATE, not
+// oxide, and evolves little SO2, so the sulfur never leaves. Above it the sulfide
+// oxidizes to cuprite and the sulfur goes off as gas. AUTHORED, cited envelope (the
+// measured window is ~650-850 C; issue #27). Note it is not the TEMPERATURE that
+// tells a roast from a smelt -- both run near this heat -- it is the ATMOSPHERE:
+// air oxidizes, charcoal reduces. Two fires at one heat, opposite in what they do.
+inline constexpr double ROAST_T = 1073.0; // ~800 C
+
+struct RoastResult {
+    Substance calcine;         // the roasted charge: chalcocite -> cuprite, ready to smelt
+    double gas[N_ELEM] {};     // sulfur leaving as SO2 (the S is the charge's; the O2 is air's)
+    double roasted_cu = 0.0;   // kg copper freed from the sulfide, now held as oxide
+    bool lit = false;          // did the roast reach oxidizing heat
+};
+
+// Roast a sulfide charge at `furnace_T` in air. The calcine is the charge with its
+// chalcocite converted to an equal mass of copper carried as cuprite, its sulfur
+// gone up the stack as SO2, and every other phase passed through untouched. Feed the
+// calcine to smelt_copper and it reduces exactly as an oxide ore would.
+//
+// Copper is conserved (chalcocite copper -> cuprite copper) and sulfur is conserved
+// (charge sulfur -> gas). The cuprite's new oxygen is ATMOSPHERIC -- it comes from
+// the roast's air, outside this closed charge ledger, exactly as the bloomery's
+// blast oxygen does. So the calcine weighs more than the sulfide it came from, and
+// that added mass is air, not a bookkeeping leak.
+inline RoastResult roast(const Substance& ore, double furnace_T) {
+    RoastResult r;
+    r.lit = furnace_T >= ROAST_T;
+    r.calcine = ore;                 // every phase passes through...
+    if (!r.lit) return r;            // ...a fire too cool to roast changes nothing
+
+    // Pull the chalcocite out of the calcine, tallying the copper it held and the
+    // sulfur bound to it. (Only free chalcocite roasts here; a grain locked inside
+    // gangue as a composite would roast incompletely, and is left as-is -- honest.)
+    double cu = 0.0, sulf = 0.0;
+    for (int s = 0; s < N_SIZE; ++s) {
+        const double m = r.calcine.freegrain[CHALCOCITE][s];
+        cu   += m * element_fraction(CHALCOCITE, EL_CU);
+        sulf += m * element_fraction(CHALCOCITE, EL_S);
+        r.calcine.freegrain[CHALCOCITE][s] = 0.0;
+    }
+
+    // Put the copper back as cuprite (oxygen from air), and send the sulfur off as
+    // SO2. The calcine now carries a reducible oxide where the sulfide was.
+    r.calcine.freegrain[CUPRITE][SAND] += cu / element_fraction(CUPRITE, EL_CU);
+    r.roasted_cu = cu;
+    r.gas[EL_S] = sulf;
     return r;
 }
 
