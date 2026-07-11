@@ -30,6 +30,7 @@
 #include "magnetic.h"
 #include "smelt.h"
 #include "forge.h"
+#include "geology.h"
 
 using namespace wrought;
 
@@ -1655,6 +1656,84 @@ int main() {
                     "then reduce pours %.3f kg clean Cu; pyritic bloom keeps %.3f kg S for the anvil)\n",
                     100.0 * element_fraction(CHALCOCITE, EL_CU), 100.0 * element_fraction(CHALCOCITE, EL_S),
                     rr.gas[EL_S], from_sulfide.metal_cu, pybloom.bloom_sulfur);
+    }
+
+    // ---- 19. Geography: the ground as a field, and the co-location gate -----
+    // The first spatial model. Composition = f(x, y, tier): point at the ground,
+    // scoop, read the panel; move, and the makeup changes. Most of the valley is
+    // barren. An ore body is graded (rises toward a center), not a node. Depth
+    // changes the MINERAL -- oxide cap over sulfide root -- so a full-depth dig
+    // heaps a mixed column that must be cobbed. And copper and tin sit far apart,
+    // so no spot yields both: bronze forces travel. None of these assert a layout
+    // number; they assert the SHAPE of the field (issue #28).
+    {
+        const Place cu_center{0.0, 0.0};
+        const Place tin_center{300.0, 120.0};
+        const Place nowhere{150.0, -200.0}; // far from every body
+
+        // (a) most ground is barren: a scoop far from any body is gangue, and the
+        // panel reads nothing. This is why sampling is an activity at all.
+        const Substance waste = sample(nowhere, SURFACE, 1.0);
+        check(waste.grade(QUARTZ) > 0.999
+              && waste.grade(CUPRITE) < 1e-9 && waste.grade(CASSITERITE) < 1e-9,
+              "most ground is barren: a scoop far from any body is all gangue, the panel reads nothing");
+
+        // (b) an ore body is graded, not a node: copper richness climbs smoothly
+        // toward the center, with no step and no plug-in spot. Walk in from the rim.
+        double last = -1.0;
+        bool monotone = true;
+        for (double r : {40.0, 30.0, 20.0, 10.0, 0.0}) {
+            const double g = sample(Place{r, 0.0}, SURFACE, 1.0).grade(CUPRITE);
+            if (g < last - 1e-12) monotone = false;
+            last = g;
+        }
+        const double g_center = sample(cu_center, SURFACE, 1.0).grade(CUPRITE);
+        const double g_edge = sample(Place{38.0, 0.0}, SURFACE, 1.0).grade(CUPRITE);
+        check(monotone && g_edge > 0.0 && g_center > g_edge,
+              "an ore body is graded, not a node: copper richness climbs smoothly toward the center");
+
+        // (c) depth changes the MINERAL, not just the amount: an oxide cap the fire
+        // smelts straight, a sulfide root the fire refuses until roasted. The roast
+        // (Section 18) lives underground.
+        const Substance cap = sample(cu_center, SURFACE, 1.0);
+        const Substance deep = sample(cu_center, DEEP, 1.0);
+        check(cap.grade(CUPRITE) > 0.0 && cap.grade(CHALCOCITE) < 1e-12
+              && deep.grade(CHALCOCITE) > 0.0 && deep.grade(CUPRITE) < 1e-12,
+              "depth changes the mineral: oxide cap on top, sulfide root below -- the gossan worked before the deep ore");
+
+        // (d) the mixed column: a full-depth dig heaps oxide AND sulfide AND waste
+        // into one pile -- richer haul, harder problem -- and mass is conserved
+        // across the tiers. No single tier holds both minerals; the pile does,
+        // which is the whole reason it must be cobbed.
+        const Substance pile = dig_column(cu_center, 1.0);
+        check(pile.grade(CUPRITE) > 0.0 && pile.grade(CHALCOCITE) > 0.0
+              && pile.grade(QUARTZ) > 0.0
+              && std::fabs(pile.total_mass() - N_TIER * 1.0) < 1e-12,
+              "the mixed column: a full-depth dig heaps oxide, sulfide and waste in one pile that must be sorted");
+
+        // (e) co-location is the gate: the copper body carries no tin and the tin
+        // body no copper, and they are hundreds of meters apart. Bronze cannot be
+        // dug from one hole -- it forces you to travel.
+        const Substance at_sn = dig_column(tin_center, 1.0);
+        check(pile.grade(CASSITERITE) < 1e-12                              // copper body: no tin
+              && at_sn.grade(CASSITERITE) > 0.0
+              && at_sn.grade(CUPRITE) < 1e-12 && at_sn.grade(CHALCOCITE) < 1e-12, // tin body: no copper
+              "co-location is the gate: copper carries no tin and tin no copper -- bronze forces travel");
+
+        // (f) hands sample, the shovel hauls: the tool sets the mass, never the
+        // makeup. Same grade on the panel, ten times the load.
+        const Substance hand = sample(cu_center, SURFACE, 0.1);
+        const Substance shovel = sample(cu_center, SURFACE, 1.0);
+        check(std::fabs(shovel.total_mass() - 10.0 * hand.total_mass()) < 1e-12
+              && std::fabs(shovel.grade(CUPRITE) - hand.grade(CUPRITE)) < 1e-12,
+              "hands sample, the shovel hauls: the tool sets the load, not the makeup");
+
+        const double sep = std::sqrt(300.0 * 300.0 + 120.0 * 120.0);
+        std::printf("        (copper body: surface %.0f%% cuprite, deep %.0f%% chalcocite; full column "
+                    "%.0f%% oxide + %.0f%% sulfide + %.0f%% waste, one pile to cob; tin body %.0f m away, 0%% copper)\n",
+                    100.0 * cap.grade(CUPRITE), 100.0 * deep.grade(CHALCOCITE),
+                    100.0 * pile.grade(CUPRITE), 100.0 * pile.grade(CHALCOCITE),
+                    100.0 * pile.grade(QUARTZ), sep);
     }
 
     // ---- The picture -------------------------------------------------------

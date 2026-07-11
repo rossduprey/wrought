@@ -641,6 +641,65 @@ generation required** — which independently confirms the recommendation in ope
 decision #2. The river is the first machine, and it was running before you got
 there.
 
+#### The ground as a field, not a grid of nodes
+
+*(Designed with Ross 2026-07-10, built the same day: `core/geology.h`. The first
+**spatial** model in the project — until it, no charge had a location.)*
+
+The scoop needed a source. This is it: **composition = f(x, y, tier)**. You point
+the crosshair at the ground, left-click, and take a bag of whatever the field says
+is there; move, and the makeup changes, because *if the ground looks different its
+makeup is different*. There is no "ore node" you plug a machine into — an ore body
+is a region where a mineral's fraction rises smoothly toward a center and fades to
+barren country rock at the rim. Most of the valley is that country rock, which is
+what makes sampling an activity: you walk it, watching the panel for the spot where
+the numbers twitch.
+
+Three decisions made this real, each of which the rest of the chain was already
+built to pay off:
+
+1. **Depth is a tier, not a carved z-axis — and it changes the *mineral*, not just
+   the amount.** A copper body wears a weathered oxide cap (cuprite, smelts
+   straight) over a leached middle over a primary **sulfide** root (chalcocite,
+   which the furnace refuses until it is roasted — Era 2b). "The easy gossans were
+   worked for an age before the deep sulfides" becomes a fact about how far down you
+   dug. The dig bar fills over several strokes and crosses these tiers; the assay
+   panel shifts live as you descend.
+
+2. **A full-depth dig MIXES the column.** Oxide, barren middle, and sulfide heap
+   into one spoil pile — the richer haul and the harder problem at once, because it
+   carries two minerals that want opposite fires. That mixed pile is finally the
+   reason **cobbing** exists: hand-sorting the coarse grains by eye into oxide,
+   sulfide, and waste before any fuel is spent. Dig shallow for a small clean oxide
+   pile; dig deep for a big mixed one you must sort. The Era-0 verb that waited
+   three eras now has a job.
+
+3. **Co-location is the gate — as geometry.** Copper ground and tin ground are
+   placed hundreds of meters apart, so no single hole yields both. Tin's historic
+   scarcity, the thing that forced Bronze-Age trade, stops being prose (the half
+   the tin build could not say) and becomes distance you have to walk. Tin also
+   breaks copper's symmetry honestly: cassiterite is *already* an oxide, won from
+   veins and placer gravel, so it has no oxide-over-sulfide column — its makeup is
+   the same at every tier.
+
+**The engine choice that shaped it, and cost nothing:** deforming terrain at
+runtime (voxels, carved pits) is the expensive, hardware-heavy, not-free path
+(Voxel Plugin is a $349 paid plugin; UE's native runtime landscape deformation is
+a render-target hack). It is also unnecessary — the hole is pure cosmetics. The
+mechanic needs only a coordinate, the field, and a panel, so the ground stays a
+**cheap static plane** that can still be a beautiful valley (hills, grass, trees
+are static mesh, free at runtime), and a volumetric dig, if ever wanted, is a
+purely visual upgrade that changes zero lines of sim — the simulation only ever
+sees the `Substance` that comes up, never the hole.
+
+Everything authored here (the valley layout, the tier count, the linear falloff)
+is a placeholder; the tests assert only the field's *shape* — barren-by-default,
+monotone grading, depth-changes-mineral, copper-and-tin-never-together. Correcting
+a layout number changes no test. Issue #28. **Still unbuilt:** dug ore arrives
+pre-liberated as free coarse grains; real ore is locked in rock and must be crushed
+before cobbing can sort it — wiring the dig into the existing composite/liberation
+model is the follow-on (#28).
+
 ---
 
 ## Eras — the in-world progression
@@ -1405,7 +1464,8 @@ needs more than one actor.
 Earth-like: terrain with **deposit compositions** (not "ore nodes") placed by
 hand, a day cycle driving work/light, weather only insofar as it gates activity.
 Resist the urge to build a planet. **One valley, fully simulated, beats a
-continent of empty.**
+continent of empty.** *(Built 2026-07-10 as a deterministic field `f(x, y, tier)`,
+`core/geology.h` — see "The ground as a field, not a grid of nodes" above.)*
 
 ### 5. Persistence
 
