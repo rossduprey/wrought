@@ -29,8 +29,11 @@
 //      furnace flatly refuses until it is roasted (smelt.h). "The easy gossans
 //      were worked for an age before the deep sulfides" stops being prose and
 //      becomes a fact about how far down you dug. A full-depth dig MIXES the
-//      column -- oxide, barren middle, and sulfide in one spoil pile -- which is
-//      exactly why the pile must be COBBED (sorted by eye) before the furnace.
+//      column -- oxide, barren middle, and sulfide in one spoil pile -- and since
+//      it all comes up as LOCKED rock, that pile must first be hauled to the
+//      rock-breaking station and crushed (separate.h `crush`) to free the grains,
+//      then cobbed (sorted by eye, oxide from sulfide from waste) before the
+//      furnace. The ore stays rock until it reaches the breaker.
 //
 //   2. CO-LOCATION IS THE GATE. Copper ground and tin ground are placed far
 //      apart, so no single spot ever hands you both. Bronze therefore forces you
@@ -51,11 +54,21 @@
 // because the simulation only ever sees the Substance that comes up, never the
 // hole it came from.
 //
+// THE ORE COMES UP LOCKED. A scoop is not a bag of clean grains -- it is rock, with
+// the mineral disseminated in gangue and glued to it until broken. The dig fills
+// the COMPOSITE bins, not the free ones, so a fresh pile has a readable grade but
+// nothing a separator can win. It stays rock in the hand and in the cart; only the
+// rock-breaking station (separate.h `crush`) liberates it. This is the whole carry
+// loop: dig locked rock -> haul it (by hand, then by cart) to the breaker -> crush
+// to free the grains -> cob -> furnace. Nothing is pre-liberated (the earlier #28
+// shortcut, now closed).
+//
 // AUTHORED, tracked in issue #28: the whole valley layout (deposit centers, radii,
-// peak grades), N_TIER, the per-tier mineral assignment, and the linear falloff
-// are game-world placeholders -- a human chose them, no correct value exists. The
-// tests assert only structure (barren-by-default, monotone grading, depth-changes-
-// mineral, copper/tin never co-located), so correcting any number changes no test.
+// peak grades -- now capped at COMPOSITE_TARGET_FRACTION), N_TIER, the per-tier
+// mineral assignment, and the linear falloff are game-world placeholders -- a human
+// chose them, no correct value exists. The tests assert only structure (barren-by-
+// default, monotone grading, depth-changes-mineral, copper/tin never co-located,
+// and dug ore locked until crushed), so correcting any number changes no test.
 
 namespace wrought {
 
@@ -82,7 +95,10 @@ struct Deposit {
     const char* id;
     double cx, cy;             // center on the valley floor, m
     double radius;             // m; ore grade fades to background at the rim
-    double peak_grade;         // ore mass fraction at the dead center
+    double peak_grade;         // mineral mass fraction at the dead center. Capped
+                               // at COMPOSITE_TARGET_FRACTION (0.5): the ore comes
+                               // up LOCKED as half-mineral composite rock, so a
+                               // scoop cannot read richer than a solid ore grain.
     int tier_mineral[N_TIER];  // the ore phase at each depth, or BARREN
 };
 
@@ -92,21 +108,33 @@ struct Deposit {
 // This is the concrete form of DESIGN.md's "six hand-authored deposit
 // compositions"; more can be added the same way, no procedural generation.
 inline constexpr Deposit DEPOSITS[] = {
-    {"copper-hill", 0.0,   0.0,  40.0, 0.55, {CUPRITE, BARREN, CHALCOCITE}},
+    {"copper-hill", 0.0,   0.0,  40.0, 0.45, {CUPRITE, BARREN, CHALCOCITE}},
     {"tin-creek",   300.0, 120.0, 25.0, 0.45, {CASSITERITE, CASSITERITE, CASSITERITE}},
 };
 
 // A scoop of ground: the makeup at (`at`, `tier`), rendered as `mass` kg of coarse
-// grains. `mass` is the tool's bite -- bare hands take a little to read the panel,
+// rock. `mass` is the tool's bite -- bare hands take a little to read the panel,
 // a shovel hauls perhaps ten times as much of the very same makeup.
 //
-// The grains land FREE in the GRAVEL bin: coarse, because cobbing (the eye-and-
-// fingers sort that the pile is destined for) works only on coarse liberated
-// material; free, because real dug ore is locked in composite rock and would need
-// crushing to liberate first -- a simplification skipped here and tracked in #28.
+// What comes up is ROCK, and the ore in it is LOCKED. Grains land in the GRAVEL
+// bin (coarse, as dug) but as COMPOSITE, not free: the mineral is disseminated in
+// country rock, glued to gangue it cannot be told apart from until the rock is
+// broken. So a fresh scoop reads its GRADE on the panel -- how much copper is in
+// this ground -- but yields nothing you can separate. The rock stays rock in your
+// hands and stays rock in the cart; it does not become free grains until you carry
+// it to the rock-breaking station and crush it (separate.h `crush`). That is the
+// #28 fix: nothing is pre-liberated, and the breaking station is a place you must
+// walk to, not a formality.
+//
+// A composite grain is half mineral, half gangue (COMPOSITE_TARGET_FRACTION), so a
+// scoop whose mineral fraction is `richness` needs richness/f of composite rock to
+// carry it; the rest of the bite is barren free gangue. Total mass is exactly
+// `mass`, and grade(mineral) still equals `richness` -- the panel is honest, the
+// liberation is not free.
 inline Substance sample(Place at, int tier, double mass) {
+    constexpr double f = COMPOSITE_TARGET_FRACTION;
     Substance s;
-    double ore = 0.0;
+    double ore = 0.0; // mineral mass fraction of the scoop, summed over bodies
     for (const Deposit& d : DEPOSITS) {
         const int mineral = d.tier_mineral[tier];
         if (mineral == BARREN) continue;
@@ -115,15 +143,18 @@ inline Substance sample(Place at, int tier, double mass) {
         const double falloff = dist < d.radius ? 1.0 - dist / d.radius : 0.0;
         const double richness = d.peak_grade * falloff;
         if (richness <= 0.0) continue;
-        s.freegrain[mineral][GRAVEL] += mass * richness;
+        // Locked, not free: it takes richness/f of composite rock to carry
+        // `richness` of mineral, and half of that rock is gangue riding along.
+        s.composite[mineral][GRAVEL] += mass * richness / f;
         ore += richness;
     }
-    if (ore > 1.0) ore = 1.0; // deposits are placed apart, so this never bites --
-                              // it only guarantees the gangue term stays non-negative.
-    // Everything that is not ore is barren country rock -- quartz gangue. This is
-    // why most of the valley reads as nothing on the panel, and why even a rich
-    // scoop is mostly waste you must cob away before it is worth any fuel.
-    s.freegrain[QUARTZ][GRAVEL] += mass * (1.0 - ore);
+    if (ore > f) ore = f; // deposits are placed apart, so this never bites -- it
+                          // only keeps the free-gangue term below non-negative.
+    // Everything not bound up in ore-bearing rock is barren country rock -- free
+    // quartz gravel. This is why most of the valley reads as nothing on the panel,
+    // and why even a rich scoop is mostly waste, some free and some locked, that
+    // you must break and cob away before it is worth any fuel.
+    s.freegrain[QUARTZ][GRAVEL] += mass * (1.0 - ore / f);
     return s;
 }
 

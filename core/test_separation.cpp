@@ -1728,6 +1728,22 @@ int main() {
               && std::fabs(shovel.grade(CUPRITE) - hand.grade(CUPRITE)) < 1e-12,
               "hands sample, the shovel hauls: the tool sets the load, not the makeup");
 
+        // (g) the ore comes up LOCKED: a fresh scoop reads a grade on the panel
+        // but is all composite rock -- nothing a separator can win -- until it is
+        // carried to the rock-breaking station and crushed. The rock stays rock in
+        // the hand and the cart; only the breaker frees the grains. This is why a
+        // deposit must be hauled, not read-and-run, and why the cart earns its keep.
+        const Substance dug = sample(cu_center, SURFACE, 1.0);
+        const Substance broken = crush(dug, 1.0);
+        double dug_free = 0.0, broken_free = 0.0;
+        for (int s = 0; s < N_SIZE; ++s) {
+            dug_free    += dug.freegrain[CUPRITE][s];
+            broken_free += broken.freegrain[CUPRITE][s];
+        }
+        check(dug.grade(CUPRITE) > 0.0 && dug_free < 1e-12   // grade on the panel, nothing free yet
+              && broken_free > 0.0,                          // the breaker liberates it
+              "the ore comes up locked: a scoop reads a grade but frees no mineral until the breaker crushes the rock");
+
         const double sep = std::sqrt(300.0 * 300.0 + 120.0 * 120.0);
         std::printf("        (copper body: surface %.0f%% cuprite, deep %.0f%% chalcocite; full column "
                     "%.0f%% oxide + %.0f%% sulfide + %.0f%% waste, one pile to cob; tin body %.0f m away, 0%% copper)\n",

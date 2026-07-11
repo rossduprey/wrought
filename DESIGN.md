@@ -666,13 +666,27 @@ built to pay off:
    dug. The dig bar fills over several strokes and crosses these tiers; the assay
    panel shifts live as you descend.
 
-2. **A full-depth dig MIXES the column.** Oxide, barren middle, and sulfide heap
-   into one spoil pile — the richer haul and the harder problem at once, because it
-   carries two minerals that want opposite fires. That mixed pile is finally the
-   reason **cobbing** exists: hand-sorting the coarse grains by eye into oxide,
-   sulfide, and waste before any fuel is spent. Dig shallow for a small clean oxide
-   pile; dig deep for a big mixed one you must sort. The Era-0 verb that waited
-   three eras now has a job.
+2. **A full-depth dig MIXES the column — and it all comes up as *locked rock*.**
+   Oxide, barren middle, and sulfide heap into one spoil pile — the richer haul and
+   the harder problem at once, because it carries two minerals that want opposite
+   fires. But nothing in that pile is a clean grain: the ore is disseminated in
+   country rock, so the scoop reads a *grade* on the panel yet yields nothing a
+   separator can win. **The rock stays rock until you carry it to the rock-breaking
+   station and crush it** (`separate.h crush` — the verb already existed); only the
+   breaker frees the grains. Then the mixed pile is finally the reason **cobbing**
+   exists: hand-sorting the freed coarse material by eye into oxide, sulfide, and
+   waste before any fuel is spent. Dig shallow for a small clean oxide pile; dig
+   deep for a big mixed one you must break and sort. The Era-0 verb that waited
+   three eras now has a job — after the breaker does its.
+
+   The carry is its own layer, because the rock is heavy and mostly waste and you
+   cannot cob it down at the hole (nothing is liberated there). So hauling the whole
+   pile to the breaker is the cost, and it has rungs like the dig does: **hands →
+   back-load → a cart the player builds.** The shovel multiplies what you pull *out*
+   of the ground (10× a hand-scoop); the cart multiplies what you can move *to* the
+   station in one trip, so a shovel without a cart just buries you in rock you can't
+   carry. The cart is also what makes a distant deposit worth working — which is how
+   co-location (decision 3) turns from an annoyance into a logistics decision.
 
 3. **Co-location is the gate — as geometry.** Copper ground and tin ground are
    placed hundreds of meters apart, so no single hole yields both. Tin's historic
@@ -694,11 +708,16 @@ sees the `Substance` that comes up, never the hole.
 
 Everything authored here (the valley layout, the tier count, the linear falloff)
 is a placeholder; the tests assert only the field's *shape* — barren-by-default,
-monotone grading, depth-changes-mineral, copper-and-tin-never-together. Correcting
-a layout number changes no test. Issue #28. **Still unbuilt:** dug ore arrives
-pre-liberated as free coarse grains; real ore is locked in rock and must be crushed
-before cobbing can sort it — wiring the dig into the existing composite/liberation
-model is the follow-on (#28).
+monotone grading, depth-changes-mineral, copper-and-tin-never-together, and dug ore
+locked until crushed. Correcting a layout number changes no test. Issue #28. **Now
+closed:** the earlier shortcut where the dig handed back pre-liberated free grains.
+The dig fills the **composite** bins, not the free ones, so a fresh scoop reads a
+grade but liberates nothing until the rock-breaking station crushes it — the honest
+chain is *dig locked rock → haul (hand → cart) → crush → cob → furnace*. The peak
+grade is now capped at `COMPOSITE_TARGET_FRACTION` (0.5): a locked grain is half
+mineral, so no scoop can read richer than a solid ore grain. **Still unbuilt (game
+layer):** the cart, the carry-capacity rungs, and the panel/dig-bar UI — the sim
+core now produces exactly what they consume.
 
 ---
 
