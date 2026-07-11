@@ -32,6 +32,7 @@
 #include "forge.h"
 #include "geology.h"
 #include "fuel.h"
+#include "char.h"
 
 using namespace wrought;
 
@@ -1884,6 +1885,32 @@ int main() {
         std::printf("  %-26s %8.0f\n", "charcoal, forced air", peak_temperature(CHARCOAL, FORCED));
         std::printf("  char yield %.0f%%: %.2f kg wood -> %.2f kg charcoal -> %.2f kg iron (silica-free charge)\n",
                     100.0 * CHAR_YIELD, wood, charcoal.phase_mass(CARBON), with_char.bloom_iron);
+    }
+
+    // ---- The charcoal pit: the seal is the gate ---------------------------
+    // The station that makes the reductant, and its one failure mode -- char.h.
+    // A sealed pit reproduces the ideal pyrolysis yield; air eats the char before
+    // it can be drawn, to nearly nothing wide open. The finding is the ordering,
+    // not the retained fractions.
+    {
+        const double wood = 3.0;
+        const Substance sealed = char_pit(wood, 0.0, PIT_SEALED);
+        const Substance vented = char_pit(wood, 0.0, PIT_VENTED);
+        const Substance open   = char_pit(wood, 0.0, PIT_OPEN);
+
+        // A fully sealed pit loses nothing to the fire: it IS pyrolyze().
+        check(std::fabs(sealed.phase_mass(CARBON) - pyrolyze(wood, 0.0).phase_mass(CARBON)) < 1e-12,
+              "char pit: a sealed pit yields the full pyrolysis char -- the ideal transform");
+        // Air is the gate: more of it, less char, monotonically.
+        check(sealed.phase_mass(CARBON) > vented.phase_mass(CARBON)
+              && vented.phase_mass(CARBON) > open.phase_mass(CARBON),
+              "char pit: the looser the seal, the less char survives -- air burns the product");
+        // Wide open it is a bonfire: char is nearly all consumed to ash.
+        check(open.phase_mass(CARBON) < 0.2 * sealed.phase_mass(CARBON),
+              "char pit: an open pit leaves almost no charcoal -- it is a fire, not a kiln");
+        // What survives is still the reductant a smelt reads: free CARBON.
+        check(sealed.freegrain[CARBON][GRAVEL] > 0.0,
+              "char pit: the drawn char is free CARBON -- exactly what smelt.h reduces with");
     }
 
     // ---- The picture -------------------------------------------------------
