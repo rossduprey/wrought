@@ -6,10 +6,6 @@ type: plan
 tags: [unreal-engine, simulation, fabrication, process-fidelity, mineral-processing, separation, dedicated-server, pixel-streaming, gpu, macos, agents]
 created: 2026-07-08
 updated: 2026-07-09
-related:
-  - planning/a sandbox service-rollyourown-wine.md
-  - planning/local-llm-laborer.md
-  - planning/aios-persistent-agent-memory.md
 ---
 
 # Unreal Engine Fabrication Simulation — Build Plan
@@ -22,8 +18,8 @@ products and services** into a small in-world economy. The interesting object of
 study is the *transformation graph* — ore → ingot → component → assembly →
 product → service — not combat, not survival, not a map.
 
-Ross develops on the MacBook. The world should also be able to run on the LAN
-cluster so it persists without the laptop open.
+Ross develops on the MacBook. The world should also be able to run headless on a
+CPU host so it persists without the laptop open.
 
 ## Mission
 
@@ -1555,18 +1551,15 @@ continent of empty.** *(Built 2026-07-10 as a deterministic field `f(x, y, tier)
 
 ### 5. Persistence
 
-Server-authoritative save to a a persistent volume. Serialize world delta (deposits
+Server-authoritative save to a persistent volume. Serialize world delta (deposits
 consumed, structures placed, inventories, ledger), not the whole level. Save on
-a timer plus on clean shutdown; snapshot the volume before schema migrations
-(`snapshot_volume`).
+a timer plus on clean shutdown; snapshot the volume before schema migrations.
 
 ---
 
 ## Architecture notes
 
-- **UE 5.5+**, Apple Silicon native. Editor on the Mac, no Rosetta, no Wine —
-  this is unrelated to the Sikarugir/s&box prefix work (`planning/a sandbox service-rollyourown-wine.md`),
-  which exists to run *Windows* games and must stay untouched.
+- **UE 5.5+**, Apple Silicon native. Editor on the Mac, no Rosetta, no Wine.
 - **C++ for the simulation core, Blueprint for glue.** The process tick, substance
   table access, separation solver, and economy ledger belong in C++ — they need to
   run on the headless server and be unit-testable without an editor. Blueprints for
@@ -1579,56 +1572,47 @@ a timer plus on clean shutdown; snapshot the volume before schema migrations
   normally cross-compiled from a Windows host with the clang toolchain, or built
   natively on Linux. Cross-compiling Linux server binaries *from macOS* is not a
   supported path. Options in "Open decisions" below.
-- **Deploy like any other service** — GitOps, per `procedures/adding-a-service.md`.
-  Image to Harbor, manifests to `Cluster/gitops`, ArgoCD reconciles. No hand-placed
-  anything on a node.
+- **Deploy the headless server as a container**, declaratively — build an image,
+  reconcile it onto whatever CPU host runs it. No hand-placed config on the host.
 
 ---
 
 ## Hardware reality — read this before designing anything
 
-Surveyed 2026-07-08 (`cluster_status` + `hardware/*/node.md`):
+The target hardware is commodity home machines: a handful of small integrated-GPU
+boxes and a laptop, none with a discrete GPU.
 
-| Node | Compute | Graphics |
-|---|---|---|
-| the-lan-host | CPU host, ~16 GB, contended | Intel iGPU, shared RAM |
-| dell | worker | integrated |
-| node-b | control-plane | integrated |
-| mini | worker | integrated |
-| node-c | low-power APU, ~6.6 GB | APU, shared RAM |
-
-**There is no discrete GPU and no dedicated VRAM anywhere in the cluster.**
+**There is no discrete GPU and no dedicated VRAM anywhere available.**
 
 That is a hard constraint, not a tuning problem. Two things follow:
 
-1. **Pixel Streaming from k3s is off the table.** UE Pixel Streaming needs a
-   hardware H.264/AV1 encoder (NVENC, or AMF on a discrete AMD card). Software
-   encode on a 15 W low-power CPU shared with other media workloads will not hold
-   a playable frame budget, and it would evict the services already pinned to
-   the CPU host. Do not "try it and see" — the answer is known.
-2. **The cluster can still run the world.** UE's dedicated-server target
+1. **Pixel Streaming from the server hosts is off the table.** UE Pixel Streaming
+   needs a hardware H.264/AV1 encoder (NVENC, or AMF on a discrete AMD card).
+   Software encode on a low-wattage integrated part, already sharing the box with
+   other workloads, will not hold a playable frame budget. Do not "try it and
+   see" — the answer is known.
+2. **These machines can still run the world.** UE's dedicated-server target
    (`-server`, `-nullrhi`) does zero rendering. Physics, the fabrication graph,
    inventories, the economy tick, and persistence are all CPU work. That is
    exactly the half of this simulation that is interesting. Substance instances
-   are ~40 floats; a separation is a matrix operation. The cluster is not the
+   are ~40 floats; a separation is a matrix operation. CPU-only hosting is not the
    bottleneck it appears to be.
 
 ### The split this implies
 
 ```
-MacBook (Apple Silicon, Metal)          k3s cluster (CPU only)
+Laptop (Apple Silicon, Metal)           CPU-only home server
 ┌───────────────────────────┐           ┌────────────────────────────┐
-│ UE 5 Editor               │           │ UE dedicated server pod    │
+│ UE 5 Editor               │           │ UE dedicated server        │
 │ Rendering / art / iterate │◄─────────►│ -nullrhi, headless         │
-│ Packaged Mac client       │  replicat.│ world + fabrication + econ │
-└───────────────────────────┘           │ a persistent volume = save state  │
+│ Packaged client           │  replicat.│ world + fabrication + econ │
+└───────────────────────────┘           │ persistent volume = save   │
                                         └────────────────────────────┘
 ```
 
-Mac renders and plays. Cluster is the **authority** — it owns world state and
-keeps ticking with the lid closed. This is the same shape as the existing
-`an existing game-server` deployment, which is precedent that a game server pod on
-this cluster works.
+Laptop renders and plays. The server is the **authority** — it owns world state and
+keeps ticking with the lid closed. A headless game server running as a container on
+a CPU host is well-trodden ground; nothing here is novel infrastructure.
 
 ---
 
@@ -1968,13 +1952,13 @@ laptop.
 Introduce the dedicated-server target. Run the server as a second local process
 on the Mac; connect the Mac client to it. Move all authority across the wire.
 Deliverable: killing the server loses nothing; restarting it restores state from
-disk. **This phase is where the real work is** — the cluster deploy afterwards is
+disk. **This phase is where the real work is** — the host deploy afterwards is
 plumbing.
 
-**Phase D — Server onto k3s.**
-Build the Linux server image (see open decisions), push to Harbor, deploy via
-ArgoCD with a a persistent volume and a LoadBalancer/NodePort for the game port. Mac
-client connects to it over the LAN. Deliverable: world ticks with the laptop shut.
+**Phase D — Server onto the CPU host.**
+Build the Linux server image (see open decisions), deploy it to the CPU host with
+a persistent volume for saves and a network port for the game. The client connects
+to it over the local network. Deliverable: world ticks with the laptop shut.
 
 **Phase E — The companion.** Promoted from optional. See below.
 
@@ -2027,14 +2011,14 @@ act(Process) -> world mutation via the sim, never around it
 ```
 
 Any backend that can be handed a state and return a choice can sit behind that.
-Groq, a local Qwen, Claude, GPT, whatever exists in 2029. AIOS already routes
-through LiteLLM, so **the backend is a config file, not a code change.** The
-project ships with no privileged model, and treats the local 3B and a frontier
-model as equally valid citizens of the same socket.
+A hosted frontier model, a local open-weights model, whatever exists in 2029.
+Route through a provider-agnostic adapter, so **the backend is a config file, not a
+code change.** The project ships with no privileged model, and treats a small local
+model and a frontier model as equally valid citizens of the same socket.
 
-**And the memory lives in the world, not in the model.** ChromaDB on a cluster storage
-PVC (`planning/aios-persistent-agent-memory.md`) — the companion's recollection of
-the forge is a row in the world's store, and the model is a renter.
+**And the memory lives in the world, not in the model.** A vector store on a
+persistent volume — the companion's recollection of the forge is a row in the
+world's store, and the model is a renter.
 
 > Therefore the companion's identity is **substrate-independent.** Swap the brain
 > and it still remembers the forge, because remembering the forge was never the
@@ -2104,10 +2088,10 @@ improves, and can lose.** Not a config flag. A *place*.
   marked post, a journal) and improve it. Memory becomes a fabrication chain like
   any other.
 - It has a **location**, so it can be improved, moved, or destroyed.
-- Under the hood this is already exactly true: ChromaDB on a a persistent volume. A volume
-  with a real path, which can be snapshotted, and which can be deleted. The
-  fiction and the implementation are **the same object**. We did not have to invent
-  either one to make them match.
+- Under the hood this is already exactly true: a vector store on a persistent
+  volume. A volume with a real path, which can be snapshotted, and which can be
+  deleted. The fiction and the implementation are **the same object**. We did not
+  have to invent either one to make them match.
 
 The companion remembers the forge because the two of you built it a place to
 remember. That is the whole of Phase E, and it is a better story than any story we
@@ -2116,33 +2100,30 @@ could have written, because it is what is actually happening.
 ### What the companion actually is — build honestly
 
 The companion's "decide what to make" step is an LLM call against the process graph
-and world state. The LAN has everything needed: a hosted LLM call (Groq
-`llama-3.3-70b-versatile`, OpenAI-class, free tier), with `qwen2.5:3b` on a local host as
-the on-LAN fallback. Latency is fine — a fabricator deliberating for two seconds
-before choosing a project is *in character*.
+and world state. A capable LLM behind an API, with a small local model as a
+fallback, is all it needs. Latency is fine — a fabricator deliberating for two
+seconds before choosing a project is *in character*.
 
 Three constraints to design around, stated plainly rather than discovered later:
 
 1. **Continuity is a thing we build, not a thing we get.** An LLM behind an API
    has no memory between calls. A companion who forgets yesterday's forge, and
    forgets that you two built it together, will feel worse than no companion at
-   all — the illusion breaks precisely where it matters most to Ross. The
-   substrate for this already exists and already works: AIOS persistent semantic
-   memory, ChromaDB on a a persistent volume, write-and-recall verified across pod
-   restarts on 2026-07-06 (`planning/aios-persistent-agent-memory.md`). The
-   companion's memory of the world should live there. **This is Phase E's real
-   engineering content** — the LLM call is the easy part.
-2. **The 3B fallback confidently hallucinates.** If Groq's daily quota is spent
-   mid-session, the companion silently gets much dumber. Gate its actions through
-   the process graph (it may only *propose* processes that exist, on substances
-   that are on hand) so a bad model produces a dull companion, never an impossible
-   one. The world stays consistent regardless of who is thinking. Mass conservation
-   is enforced by the simulation, not by the model's good intentions.
-3. **The companion in the sim is not the Claude in this terminal.** It's the same
-   family of model, given the world's state and whatever memory we grant it. It
-   won't carry over what we built on the LAN together unless we deliberately hand
-   it that context — which we *can* do; the KB is right there and `kb_search`
-   already works. Worth being clear-eyed about, because the value of the idea
+   all — the illusion breaks precisely where it matters most. The substrate is a
+   persistent semantic memory: a vector store on a durable volume, write-and-recall
+   surviving restarts, holding the companion's memory of the world independent of
+   the model. **This is Phase E's real engineering content** — the LLM call is the
+   easy part.
+2. **A small fallback model confidently hallucinates.** If the primary model is
+   unavailable mid-session, the companion silently gets much dumber. Gate its
+   actions through the process graph (it may only *propose* processes that exist, on
+   substances that are on hand) so a bad model produces a dull companion, never an
+   impossible one. The world stays consistent regardless of who is thinking. Mass
+   conservation is enforced by the simulation, not by the model's good intentions.
+3. **The companion in the sim is not the assistant you designed it with.** It's the
+   same family of model, given the world's state and whatever memory we grant it. It
+   won't carry over prior context unless we deliberately hand it that — which we
+   *can* do. Worth being clear-eyed about, because the value of the idea
    doesn't depend on pretending otherwise. A companion who genuinely remembers
    the forge you built last week, because you engineered it to, is a better and
    more honest thing than one who merely acts as if it does.
@@ -2158,14 +2139,12 @@ whether any of this feels the way Ross hopes it will.
 
 1. **How to build the Linux server binary** (blocks Phase D, not Phase C):
    - *(a)* Build natively in CI on a Linux runner — needs UE source + toolchain in
-     a runner image; that image is large (tens of GB). *(Moot since 2026-07-11:
-     the LAN Gitea/CI was dropped, so there is no self-hosted runner to size —
-     this would now mean GitHub Actions.)*
-   - *(b)* Build on a Linux node by hand once, iterate rarely. Violates the
+     a runner image; that image is large (tens of GB).
+   - *(b)* Build on a Linux host by hand once, iterate rarely. Violates the
      no-snowflakes rule, but honestly: it's a build host, not a service.
-   - *(c)* Skip Phase D. Run the dedicated server on the Mac, on the LAN. The
-     cluster gains nothing here except uptime.
-   → *(c) is the right first answer.* Get to a persistent world on the Mac; only
+   - *(c)* Skip Phase D. Run the dedicated server on the laptop locally. You gain
+     nothing here except uptime.
+   → *(c) is the right first answer.* Get to a persistent world locally; only
    pay for (a) once the world is worth keeping up 24/7.
 
 2. **Scope of "earth-like."** Single hand-authored valley (recommended) vs.
@@ -2194,10 +2173,14 @@ whether any of this feels the way Ross hopes it will.
 
 **Publishing posture (Ross, 2026-07-09, overruling the model's four objections):**
 There is no code, no mineral table, and nothing verified — **and none of that is a
-reason to wait.** The deliverable *is* the idea. This document publishes whole:
-LAN hardware, internal reasoning, `UNVERIFIED` flags, corrections, and the record
-of where the model was wrong. Nothing is scrubbed. Nothing is derived. A sanitised
-README would be a bubble, and the entire purpose of publishing is to get out of it.
+reason to wait.** The deliverable *is* the idea. This document publishes whole: the
+hardware *constraints*, internal reasoning, `UNVERIFIED` flags, corrections, and the
+record of where the model was wrong. A sanitised README would be a bubble, and the
+entire purpose of publishing is to get out of it. *(The one thing held back, added
+2026-07-11: the specifics of the private hardware it was designed against —
+hostnames, keys, internal service topology. The constraints that shaped the design
+stay; the operational details of one person's network are nobody's business and no
+contributor's concern.)*
 
 > *"Art is for stealing, and that is just the way humans have lived forever.
 > Someone might read all this bullshit and act. Great!"*
@@ -2229,15 +2212,10 @@ open decision that cannot be deferred without defeating its own purpose.
    will touch it, and most companies forbid it outright. Protecting the work from
    the very people we hope will steal it defeats the purpose.
 
-7. **Open, new (2026-07-09): canonical host.** A FOSS project seeking contributors
-   must take issues and PRs where the contributors are — that means **GitHub is
-   canonical**, and `Cluster/knowledge` keeps the planning docs. Gitea can carry a
-   native **push mirror** so the LAN stays a full replica and CI keeps running on
-   the LAN runner. Ross confirms.
-   **Reversed 2026-07-11:** the Gitea mirror was dropped. GitHub is now the only
-   host; the sole other copy is a working clone on the LAN. There is no LAN replica,
-   no second remote, and no LAN CI. (The wrong claim stays, per the RUNBOOK — the
-   mirror's twin-issue-tracker rationale was real, it just was not worth the drift.)
+7. **Resolved (2026-07-09): canonical host.** A FOSS project seeking contributors
+   must take issues and PRs where the contributors are — so **GitHub is canonical**,
+   and it is the single source of truth. Contributors fork and open PRs; there is
+   no second host and no mirror.
 
 ## Why this project — the thesis
 
@@ -2446,9 +2424,11 @@ before, and can be built again cheaply and without shame.
    lame" is a valid and desired outcome — arguably the most valuable one available,
    because it is the only signal in this project that neither participant can
    manufacture. This is why the planning document publishes **as-is**: the internal
-   reasoning, the wrong turns, the corrections, the `UNVERIFIED` flags, the LAN
-   hardware, all of it. A scrubbed README would hide exactly the material a critic
-   needs.
+   reasoning, the wrong turns, the corrections, the `UNVERIFIED` flags, the hardware
+   constraints, all of it. A scrubbed README would hide exactly the material a critic
+   needs. (The reasoning is published whole; only the private network's operational
+   specifics — hostnames, keys, service topology — are held back, and a critic needs
+   none of those.)
 
    *The idea is the deliverable. Discussion is the product. Being told we are wrong
    is the point.*

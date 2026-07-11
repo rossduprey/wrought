@@ -76,7 +76,7 @@ We are publishing all of it unfinished, because the idea is the deliverable and 
 
 **[Read the design document →](DESIGN.md)**
 
-It is not a pitch. It's the working document, published whole: the internal reasoning, the LAN hardware it was designed against, the places the model was wrong and got corrected, and the numbers we have not yet verified. Nothing is scrubbed. A sanitised version would hide exactly the material a critic needs.
+It is not a pitch. It's the working document, published whole: the internal reasoning, the commodity hardware constraints it was designed against, the places the model was wrong and got corrected, and the numbers we have not yet verified. The reasoning is unscrubbed; only the operational specifics of one private network are held back. A sanitised version would hide exactly the material a critic needs.
 
 ## Where this comes from
 

@@ -21,7 +21,7 @@ make clean
 
 Everything is header-only in `core/`. There are exactly four translation units and each one is its own program.
 
-One remote. `origin` is GitHub (`rossduprey/wrought`) and it is the only place this lives besides a working copy on the LAN. There was once a `gitea` LAN mirror; it was dropped. Push to `origin`, and do not reintroduce a second remote.
+`origin` is GitHub (`rossduprey/wrought`) and it is the single source of truth. Contributors fork it and open a pull request; maintainers push to `origin main`. (Maintainer environment specifics — the exact push path — live in an untracked local file, not in this repo.)
 
 ---
 
