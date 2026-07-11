@@ -771,9 +771,23 @@ finding the docs lacked: **`roast()` only cures the sulfide the crushing freed**
 grain still sealed in gangue the hammer left whole is beyond any fire, so the recovery
 ceiling (63%, not 100%) is *set upstream at the breaker*, and the slice reports that
 loss split from the sulfide you simply never roasted (a blow you did not strike vs. a
-fire you did not run). **Still unbuilt (game layer):** only the carry loop itself — the
-cart and the carry-capacity rungs (hands → back-load → cart) that make hauling heavy
-waste from dig to breaker a real cost. The sim core produces exactly what it consumes.
+fire you did not run). **And the carry loop is now built** (`core/carry.cpp`,
+2026-07-11): the fifth slice, and the last unbuilt piece of the front half of the
+chain — the walk between the hole and the breaking stone. It stands on no sim header;
+the one thing it must not invent is the distance, and it does not (the walk is measured
+off `geology.h`'s real `DEPOSITS` coordinates — the breaker at an authored 80 m offset,
+the tin ground at the true 323 m). The gesture is the **trip**: load what you can, walk
+it over, haul back, again — with rungs (hands → a shouldered sack → a cart you stop and
+build) that change how much moves per trip. The face is the two piles and the road
+between, never a projected trip count. It teaches, without stating, the finding the
+probe confirmed: because *nothing is liberated at the hole*, the heap is **one uniform
+grade** (30%), so you cannot high-grade it — every kilogram of "waste" left behind is
+exactly its grade in ore left behind. The whole heavy pile is the haul, and a shovel
+fills it faster than hands empty it, so **a shovel without a cart buries you** (12 kg is
+6 hand-trips / ~15 min, or one cart trip); the report names the cart's worth and, from
+the real geometry, why the *far* deposit is only worth working once the cart exists.
+**Nothing of the front half is unbuilt now** — dig → carry → break → pan → furnace all
+run as playable slices, and the sim core produces exactly what each consumes.
 
 ---
 

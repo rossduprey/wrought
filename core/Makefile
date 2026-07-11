@@ -18,10 +18,13 @@ breaker_game: breaker.cpp $(HEADERS)
 furnace_game: furnace.cpp $(HEADERS)
 	$(CXX) $(CXXFLAGS) -o $@ furnace.cpp
 
+carry_game: carry.cpp $(HEADERS)
+	$(CXX) $(CXXFLAGS) -o $@ carry.cpp
+
 ratchet: ratchet.cpp $(HEADERS)
 	$(CXX) $(CXXFLAGS) -o $@ ratchet.cpp
 
-.PHONY: test pan dig breaker furnace ratchet-run clean
+.PHONY: test pan dig breaker furnace carry ratchet-run clean
 test: test_separation
 	./test_separation
 
@@ -47,10 +50,16 @@ breaker: breaker_game
 furnace: furnace_game
 	./furnace_game
 
+# Haul the heap. The dig fills faster than hands empty, and the rock is one grade
+# because nothing is freed at the hole -- so every kilogram left is ore left. The
+# cart is the rung that unburies you, and distance is what makes it worth building.
+carry: carry_game
+	./carry_game
+
 # Walk Era 0 into Era 1 and watch the ratchet fail to turn. Not a test: a
 # measurement, and it is allowed to come out badly. It did.
 ratchet-run: ratchet
 	./ratchet
 
 clean:
-	rm -f test_separation pan_game dig_game breaker_game furnace_game ratchet
+	rm -f test_separation pan_game dig_game breaker_game furnace_game carry_game ratchet

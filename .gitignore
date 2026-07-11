@@ -5,6 +5,7 @@ core/pan_game
 core/dig_game
 core/breaker_game
 core/furnace_game
+core/carry_game
 core/ratchet
 Binaries/
 Intermediate/
