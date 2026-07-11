@@ -1782,13 +1782,14 @@ int main() {
               && std::fabs(pick.grade(CUPRITE) - hand.grade(CUPRITE)) < 1e-12,
               "hands sample, the pick wins: the tool sets the load, not the makeup");
 
-        // (g) liberation is a SIZE, not a toll. What a blow frees depends on how the
-        // mineral occurs. Placer tin is coarse and weathered free, so it comes up
-        // essentially all FREE at the face -- pannable on the spot, the crusher
-        // never needed. The disseminated sulfide root comes up essentially all
-        // LOCKED, freeing almost nothing until the breaker crushes it toward grain
-        // size. This is why placers were panned by one hand and hard rock built
-        // stamp mills; it is also the fact the carry loop's cost turns on.
+        // (g) liberation is a SIZE, not a toll, and ORIGIN sets it. The tin creek is
+        // a placer: the river weathered the cassiterite free and sorted it, so it
+        // comes up essentially all FREE at the face -- pannable on the spot, the
+        // crusher never needed. The disseminated sulfide root is hard rock ground to
+        // microns, so it comes up essentially all LOCKED, freeing almost nothing
+        // until the breaker crushes it toward grain size. This is why placers were
+        // panned by one hand and hard rock built stamp mills; it is also the fact the
+        // carry loop's cost turns on.
         auto free_fraction = [](const Substance& sub, int mineral) {
             double free_m = 0.0, tot_m = 0.0;
             for (int s = 0; s < N_SIZE; ++s) {
@@ -1807,6 +1808,27 @@ int main() {
               && root_crushed > root_free, // and the breaker is what frees it
               "liberation is a size, not a toll: placer tin comes up free at the face, the sulfide root stays locked until the breaker");
 
+        // (h) free is not won: origin decides whether a WASH concentrates the ore.
+        // The wash the carry slice does -- screen the coarse off (cut at GRAVEL),
+        // pan the sand -- must LIFT the grade at the placer and barely move it at the
+        // hard-rock hill. This is the whole reason the tin creek is workable with a
+        // pan and the copper hill is not, and it is what an earlier "all tin free in
+        // the gravel" model got wrong: free coarse tin a low pan cut cannot sort from
+        // coarse quartz is free but not won.
+        auto washed_grade = [](const Substance& heap, int mineral) {
+            const ScreenResult sc = screen(heap, 0.95, GRAVEL);   // cobble off, sand under
+            const Substance conc = separate(sc.undersize, PAN).concentrate;
+            const double m = conc.total_mass();
+            return m > 0.0 ? conc.freegrain[mineral][SAND] / m : 0.0; // free ore grade of the pan product
+        };
+        const double tin_wash  = washed_grade(dig_column(tin_center, 1.0), CASSITERITE);
+        const double tin_feed  = dig_column(tin_center, 1.0).grade(CASSITERITE);
+        const Substance cu_pile = dig_column(cu_center, 1.0);
+        const double cu_wash   = washed_grade(cu_pile, CUPRITE) + washed_grade(cu_pile, CHALCOCITE);
+        check(tin_wash > tin_feed + 0.2      // placer: the wash concentrates the tin
+              && cu_wash < 0.10,             // hard rock: the wash wins almost nothing
+              "free is not won: a wash concentrates the placer tin (grade climbs, no stone) but barely touches the locked copper");
+
         const double sep = std::sqrt(300.0 * 300.0 + 120.0 * 120.0);
         const double cap_face = free_fraction(sample(cu_center, SURFACE, 1.0), CUPRITE);
         std::printf("        (copper body: surface %.0f%% cuprite, deep %.0f%% chalcocite; full column "
@@ -1816,6 +1838,10 @@ int main() {
                     100.0 * pile.grade(CUPRITE), 100.0 * pile.grade(CHALCOCITE),
                     100.0 * pile.grade(QUARTZ),
                     100.0 * tin_free, 100.0 * cap_face, 100.0 * root_free, sep);
+        std::printf("        (a wash -- screen off the cobble, pan the sand -- lifts the placer "
+                    "tin %.0f%% -> %.0f%% grade with no stone; the same wash at the copper hill "
+                    "reaches %.0f%%)\n",
+                    100.0 * tin_feed, 100.0 * tin_wash, 100.0 * cu_wash);
     }
 
     // ---- The picture -------------------------------------------------------

@@ -16,29 +16,32 @@
 //
 // -- The finding this slice is built on. -----------------------------------
 //
-// CORRECTED 2026-07-11, from monitored play: an earlier version of this slice
-// stood on a falsehood -- that the dig hands you ONE uniform grade of locked rock,
-// so the whole heap must go to the breaker and every kilogram left is ore left. It
-// does not. geology.h now breaks the pick's spoil across a size DISTRIBUTION, and
-// liberation rides on it: the FINE end of the heap is already-free grains a pan can
-// take at the hole with no breaker at all, and the coarse end is locked rock the
-// breaker is the only way into. How much frees at the face is the mineralogy's to
-// decide, not ours (sourced in geology.h) -- and at THIS hole, the copper hill, it
-// decides against you. A probe on the corrected model:
+// CORRECTED 2026-07-11, from monitored play, in two passes. First: an earlier
+// version stood on a falsehood -- that the dig hands you ONE uniform grade of locked
+// rock, so the whole heap must go to the breaker. It does not; geology.h breaks the
+// pick's spoil across a size DISTRIBUTION and liberation rides on it. Second, deeper:
+// the fix at first modelled BOTH grounds as fresh-broken rock, which is right for the
+// copper hill and wrong for the tin creek. A placer is not fresh rock -- it is
+// alluvium a river already broke AND sorted, dropping the free heavy mineral into a
+// narrow band of pannable SAND. geology.h now carries that as a Deposit's Origin, and
+// this slice lets you WORK either ground and feel the difference the origin makes.
 //
-//   heap from a pick column (copper hill):  12 kg, 30% ore (3.6 kg copper mineral)
-//   of that, FREE at the face (washable):   ~0.1 kg copper -- the oxide's fine tail
-//   LOCKED in the coarse (breaker only):    ~3.5 kg copper -- nearly all of it
+// Probes on the corrected model, a full-depth pick column of each (12 kg, 45% ore):
 //
-// So the wash at the hole is real but nearly worthless HERE: this is hard rock, the
-// copper is ground into the gangue, and the stone is the only way to it. That is
-// the lesson, and it is the true reason hard-rock ore built stamp mills. The knife
-// turns at the tin ground: there the ore is placer cassiterite, coarse and weathered
-// free, and the same wash would take almost ALL of it at the hole with no stone
-// touched -- which is why placer tin was panned by a single hand. The slice teaches
-// the tool (a wash, a haul) and lets the ground teach which one this ground rewards.
+//   COPPER HILL (hard rock):  free at the face, washable  ~0.08 kg -- 2% of the copper
+//                             locked in the coarse, breaker-only  ~nearly all of it
+//   TIN CREEK   (placer):     wash (screen off cobble, pan the sand) wins ~3.2 kg tin
+//                             -- 59% of it, and it LIFTS the grade 45% -> 76%, no stone
 //
-// And the locked coarse is bigger than your hands. The numbers this slice authors:
+// So the same wash is nearly worthless at the copper hill (hard rock, the ore ground
+// into the gangue, the stone the only way in -- the true reason hard-rock ore built
+// stamp mills) and is the whole game at the tin creek (a placer, the tin free in the
+// sand, panned where it lies -- which is why placer tin was won by a single hand).
+// The slice teaches the tools (a wash, a haul) and lets the ground -- your choice of
+// it -- teach which tool that ground rewards. Nobody says which; the pan's yield does.
+//
+// At the copper hill the locked coarse is bigger than your hands. The numbers this
+// slice authors:
 //
 //   HAND-haul the coarse 80 m to the breaker:  6 trips,  ~14 min of walking
 //   BACK-load (a shouldered sack):             3 trips,  ~7 min
@@ -47,24 +50,27 @@
 // The pick multiplies what you win from the ground tenfold; your hands do not grow
 // to match. So a pick with no cart just buries you in rock you cannot carry, and the
 // cart is the rung that unburies you. It is also what makes DISTANCE affordable: the
-// breaker is 80 m off, but the tin ground is 323 m off (real -- sqrt(300^2+120^2)
+// breaker is 80 m off, and the two grounds are 323 m apart (real -- sqrt(300^2+120^2)
 // straight out of geology.h's DEPOSITS), and by hand that is an hour a heap. None of
 // this is stated to the player -- it is felt, one trip at a time, and named only at
 // the end as the cost it already was.
 //
 // -- The gestures. ----------------------------------------------------------
 //
-// Two, where the other slices had one. The WASH is the tin-or-toll question asked
-// at the hole: screen the fines off the heap and pan them where you stand, winning
-// whatever came up free -- everything, at a placer; a sliver, at this hard hill.
-// The TRIP is the haul of what the wash could not free: you load the locked coarse
-// and you WALK it, and again, watching the heap shrink and the pile at the breaker
-// grow. A terminal cannot see you hold a walk key, so a trip is an impulse -- one
-// key, one round trip, the walk played out so you feel the road. The rungs (a
-// shouldered sack, then a cart you stop and build) change how much moves per trip.
-// Nobody tells you the wash is futile here, or that the cart would pay for itself;
-// you find out by doing. The display is the two piles and the road between them --
-// the material, never a projected count -- and the cost lands only at the end.
+// First you CHOOSE the ground -- the copper hill or the tin creek -- and that choice
+// is the fork the whole slice turns on. Then two gestures, where the other slices had
+// one. The WASH is the ore-or-toll question asked at the hole: screen the coarse off
+// the heap and pan the sand where you stand, winning whatever came up free -- most of
+// it, at the placer; a sliver, at the hard hill. The TRIP is the haul of the coarse:
+// you load it and you WALK it, and again, watching the heap shrink and the pile at the
+// breaker grow -- ore worth crushing at the copper hill, barren cobble at the creek.
+// A terminal cannot see you hold a walk key, so a trip is an impulse -- one key, one
+// round trip, the walk played out so you feel the road. The rungs (a shouldered sack,
+// then a cart you stop and build) change how much moves per trip. Nobody tells you
+// the wash is futile at the hill, or the haul is futile at the creek, or the cart
+// would pay for itself; you find out by doing. The display is the two piles and the
+// road between them -- the material, never a projected count -- and the cost lands
+// only at the end.
 //
 // Build: make carry   (needs a terminal; it reads single keypresses)
 
@@ -106,13 +112,23 @@ static constexpr int    LEG_FRAMES = 28;      // ticks to animate one leg of a t
 // A grain has to weigh something before the panel admits it exists.
 static constexpr double SPECK = 1e-6;
 
-static bool is_copper_ore(int p) { return p == CUPRITE || p == CHALCOCITE; }
+// The ore phases a dig can hand you here -- copper's two, and tin's one. A given
+// ground only ever carries one family (co-location is the gate, geology.h), so
+// summing all three counts exactly the ore that is actually in the heap.
+static bool is_ore(int p) { return p == CUPRITE || p == CHALCOCITE || p == CASSITERITE; }
 
 static double ore_mass(const Substance& s) {
     double m = 0.0;
-    for (int p = 0; p < N_PHASE; ++p) if (is_copper_ore(p)) m += s.phase_mass(p);
+    for (int p = 0; p < N_PHASE; ++p) if (is_ore(p)) m += s.phase_mass(p);
     return m;
 }
+
+// The two grounds you can work, indices into geology.h DEPOSITS. The copper hill is
+// HARD ROCK (the ore locked in coarse composite, the breaker the only way in); the
+// tin creek is a PLACER (the ore free in the sand, won by a wash where it lies).
+enum Ground { COPPER_HILL = 0, TIN_CREEK = 1 };
+static bool is_placer(Ground g) { return g == TIN_CREEK; }
+static const char* metal_of(Ground g) { return g == TIN_CREEK ? "tin" : "copper"; }
 
 // Take a uniform scoop off the heap: hauling a load removes rock in the proportion
 // it sits in the pile (you cannot high-grade a shovel of locked rock -- only a wash
@@ -220,14 +236,15 @@ static const int N_AMBIENT = (int)(sizeof(AMBIENT) / sizeof(AMBIENT[0]));
 
 static void draw(double heap, double delivered, double of, Carrier carrier,
                  double load, int trips, double t, double won_here, bool walking,
-                 double where, bool loaded, const char* ambient, const char* nag) {
+                 double where, bool loaded, const char* ambient, const char* nag,
+                 const char* metal) {
     std::printf("\033[H\033[J");
     std::printf("\n   %-52s  %2d:%02d\n\n", ambient ? ambient : "",
                 (int)t / 60, (int)t % 60);
 
     std::printf("   the spoil heap at the hole, and the road to the breaking stone\n\n");
-    std::printf("   trips to the stone: %-3d   washed free at the hole: %.0f g copper\n\n",
-                trips, won_here * 1000.0);
+    std::printf("   trips to the stone: %-3d   washed free at the hole: %.0f g %s\n\n",
+                trips, won_here * 1000.0, metal);
 
     draw_pile(6, 4, "at the hole", heap, of);
     draw_pile(7, 4, "at the stone", delivered, of);
@@ -253,69 +270,111 @@ static void draw(double heap, double delivered, double of, Carrier carrier,
 
 // ---------------------------------------------------------------------------
 // The reckoning. Only what you could know standing between the two piles: what the
-// wash won you here, how much locked rock you hauled, how much you left, how long.
-// And then the things the work taught without saying: at this hard hill almost none
-// of the copper would come free at the face, so the coarse you left is LOCKED ore
-// the breaker never got to; what the cart was worth; and the tin ground, where the
-// same wash would have taken it all. Named only now, as the cost it already was.
-static void report(double heap_left, double delivered, double won_here, double grade,
-                   Carrier carrier, int trips, double t) {
+// wash won you here, how much rock you hauled, how much you left, how long. And then
+// the things the work taught without saying -- which differ by ground, because that
+// is the whole point. At the hard-rock copper hill almost none of the copper comes
+// free at the face, so the coarse you left is LOCKED ore the breaker never got to,
+// and the haul is the game. At the tin creek the wash already won the tin where you
+// stood, so the coarse you left is BARREN cobble and the haul was for nothing. The
+// slice never says which ground is which; the reckoning names what the work already
+// showed. Distances are real geology, not figures of speech.
+static void report(Ground ground, double heap_left, double delivered, double won_here,
+                   double grade, Carrier carrier, int trips, double t) {
+    const bool placer = is_placer(ground);
+    const char* metal = metal_of(ground);
     std::printf("   You set the load down and straighten your back.\n\n");
 
-    if (won_here > SPECK)
-        std::printf("   Washing the loose fines at the hole won you %.0f g of copper without a\n"
-                    "   single step -- the little of this ore that came up already free.\n\n",
-                    won_here * 1000.0);
+    if (won_here > SPECK) {
+        if (placer)
+            std::printf("   Washing the sand at the hole won you %.0f g of tin without a single step\n"
+                        "   -- you screened off the cobble and panned the heavy sand, and the tin\n"
+                        "   was already free in it. This is placer ground: the river did the\n"
+                        "   breaking, and the pan finished the job. No stone was ever needed.\n\n",
+                        won_here * 1000.0);
+        else
+            std::printf("   Washing the loose fines at the hole won you %.0f g of copper without a\n"
+                        "   single step -- the little of this ore that came up already free.\n\n",
+                        won_here * 1000.0);
+    }
 
     if (delivered * 1.0 < SPECK) {
-        std::printf("   You carried nothing to the stone. The locked rock -- nearly all of the\n"
-                    "   copper -- is still at the hole, and no wash will free it. Only the\n"
-                    "   breaker can, and it is a walk away.\n\n");
+        if (placer)
+            std::printf("   You carried nothing to the stone, and you needed to carry nothing:\n"
+                        "   the tin was won in the pan. The coarse left at the hole is barren\n"
+                        "   cobble, not ore.\n\n");
+        else
+            std::printf("   You carried nothing to the stone. The locked rock -- nearly all of the\n"
+                        "   copper -- is still at the hole, and no wash will free it. Only the\n"
+                        "   breaker can, and it is a walk away.\n\n");
     } else {
-        std::printf("   You carried %.0f kg of locked rock to the breaking stone in %d %s,\n",
+        const bool washed = won_here > SPECK;
+        std::printf("   You carried %.0f kg of rock to the breaking stone in %d %s,\n",
                     delivered, trips, trips == 1 ? "trip" : "trips");
-        std::printf("   across %d minutes and %d seconds of walking.\n\n",
-                    (int)t / 60, (int)t % 60);
+        std::printf("   across %d minutes and %d seconds of walking%s\n\n",
+                    (int)t / 60, (int)t % 60,
+                    placer ? (washed ? " -- cobble the pan had already made barren."
+                                     : " -- a scoop of good sand and cobble alike, unpanned.")
+                           : ".");
     }
 
     if (heap_left * 1.0 > 0.5) {
-        // The finding, as consequence: what you left is coarse LOCKED ore -- not
-        // free, so the wash could not save it, and it never reached the stone.
         const double ore_left = grade * heap_left;
-        std::printf("   %.0f kg is still at the hole -- coarse, locked rock. The wash could not\n"
-                    "   part it (the ore is ground into the gangue) and it never reached the\n"
-                    "   stone, so the roughly %.0f g of copper in it is ore left behind: not\n"
-                    "   waste, un-freed ore, back where no fire will ever find it.\n\n",
-                    heap_left, ore_left * 1000.0);
-    } else if (delivered >= SPECK) {
+        if (placer && won_here > SPECK)
+            std::printf("   %.0f kg is still at the hole -- coarse cobble the current could not lift\n"
+                        "   with the heavies, near-barren. The roughly %.0f g of %s still in it is\n"
+                        "   the coarse tail the pan let go; a stone could chase it, but the sand\n"
+                        "   held the most of it and you already have that.\n\n",
+                        heap_left, ore_left * 1000.0, metal);
+        else if (placer)
+            std::printf("   %.0f kg is still at the hole, and the tin is still in it -- roughly\n"
+                        "   %.0f g, most of it in the heavy sand you never panned. A wash would\n"
+                        "   have taken it where it lay; hauling the coarse to the stone chases the\n"
+                        "   little that isn't there.\n\n",
+                        heap_left, ore_left * 1000.0);
+        else
+            // The finding, as consequence: what you left is coarse LOCKED ore -- not
+            // free, so the wash could not save it, and it never reached the stone.
+            std::printf("   %.0f kg is still at the hole -- coarse, locked rock. The wash could not\n"
+                        "   part it (the ore is ground into the gangue) and it never reached the\n"
+                        "   stone, so the roughly %.0f g of copper in it is ore left behind: not\n"
+                        "   waste, un-freed ore, back where no fire will ever find it.\n\n",
+                        heap_left, ore_left * 1000.0);
+    } else if (delivered >= SPECK && !placer) {
         std::printf("   The hole is bare -- the locked coarse is all at the stone now, waiting\n"
                     "   on the hammer that is the only way into it.\n\n");
     }
 
-    // What the carrier cost or saved, named only now. The distance to the far
-    // deposit is real geology, not a figure of speech.
-    const double gap = std::sqrt(
-        (DEPOSITS[0].cx - DEPOSITS[1].cx) * (DEPOSITS[0].cx - DEPOSITS[1].cx) +
-        (DEPOSITS[0].cy - DEPOSITS[1].cy) * (DEPOSITS[0].cy - DEPOSITS[1].cy));
-
-    if (carrier == BY_HANDS && trips >= 4) {
+    if (carrier == BY_HANDS && trips >= 4 && !placer) {
         std::printf("   You hauled the locked coarse in your two hands, a few kilograms a trip.\n"
                     "   A cart carries ten times that -- what took you %d trips would have\n"
                     "   been one or two. The pick filled the heap faster than your hands could\n"
                     "   empty it; that is the shape of it, and the cart is the fix.\n\n",
                     trips);
-    } else if (carrier == BY_CART) {
+    } else if (carrier == BY_CART && !placer) {
         std::printf("   The cart earned back the time you spent building it and then some --\n"
                     "   it swallowed in a load or two what your hands could not have matched\n"
                     "   in an afternoon of trips.\n\n");
     }
 
-    std::printf("   This is hard rock: the wash at the hole barely helped, and the stone was\n"
-                "   the only way in. It would not be so at the tin ground, %.0f m off (this\n"
-                "   stone is %.0f m) -- placer tin comes up coarse and free, and there the\n"
-                "   wash you just did would have taken nearly all of it, no stone touched.\n"
-                "   Which ground rewards the pan and which the breaker is the ground's to say.\n\n",
-                gap, D_BREAKER);
+    // The distance between the two grounds is real: sqrt(300^2 + 120^2) = 323 m.
+    const double gap = std::sqrt(
+        (DEPOSITS[0].cx - DEPOSITS[1].cx) * (DEPOSITS[0].cx - DEPOSITS[1].cx) +
+        (DEPOSITS[0].cy - DEPOSITS[1].cy) * (DEPOSITS[0].cy - DEPOSITS[1].cy));
+
+    if (placer)
+        std::printf("   This is placer ground, and the pan is the whole of it: the tin came up\n"
+                    "   free in the sand and a wash took it where it lay. It is not so at the\n"
+                    "   copper hill, %.0f m off -- there the ore is locked in hard rock, the wash\n"
+                    "   wins almost nothing, and every kilogram must be hauled to the stone and\n"
+                    "   crushed. One hand panned tin; the other built stamp mills for copper.\n\n",
+                    gap);
+    else
+        std::printf("   This is hard rock: the wash at the hole barely helped, and the stone was\n"
+                    "   the only way in. It would not be so at the tin creek, %.0f m off (this\n"
+                    "   stone is %.0f m) -- placer tin comes up free in the sand, and there the\n"
+                    "   wash you just did would have taken most of it, no stone touched.\n"
+                    "   Which ground rewards the pan and which the breaker is the ground's to say.\n\n",
+                    gap, D_BREAKER);
 }
 
 // ---------------------------------------------------------------------------
@@ -326,33 +385,74 @@ int main() {
         return 1;
     }
 
-    std::printf("\033[H\033[J\n"
-        "   You have picked a full-depth column at the copper hill: a heap of broken\n"
-        "   ground, oxide and sulfide and barren rock heaped together. The pick left\n"
-        "   it in every size, from dust to fist-sized stone. The loose fines you can\n"
-        "   wash right here, and keep whatever came up free. The coarse rock is\n"
-        "   locked -- the ore ground into it -- and only the breaking stone, a walk\n"
-        "   off, can free that.\n\n"
-        "   Wash the fines where you stand, or load the coarse and carry it to the\n"
-        "   stone yourself, a load at a time. Your two hands do not hold much. There\n"
-        "   is a sack you can shoulder, and a cart you can stop and build, if you\n"
-        "   judge the heap worth it -- but nobody will tell you whether the wash is\n"
-        "   worth doing here, or whether the cart pays. Try them, and find out.\n\n"
-        "   [press any key]\n");
-    std::fflush(stdout);
     raw_tty();
+
+    // Choose the ground. This is a real fork, not a skin: the copper hill is hard
+    // rock and the tin creek is a placer, and they reward opposite work. The slice
+    // will not tell you which wants the pan and which wants the stone -- that is the
+    // thing you are here to find out.
+    std::printf("\033[H\033[J\n"
+        "   Two grounds are yours to work, and they are not the same kind of ground.\n\n"
+        "     [c]  the copper hill -- hard rock, an oxide cap over a sulfide root.\n"
+        "     [t]  the tin creek   -- a placer, tin in the gravel of an old streambed.\n\n"
+        "   Pick one and take a full-depth column of it. What comes up, and what it\n"
+        "   takes to win the metal from it, is the ground's to decide -- nobody here\n"
+        "   will tell you whether to reach for the pan or the breaking stone.\n\n"
+        "   [c] copper hill   [t] tin creek   [q] walk away\n");
+    std::fflush(stdout);
+    Ground ground = COPPER_HILL;
+    for (;;) {
+        int c = poll_key();
+        if (c == 'c') { ground = COPPER_HILL; break; }
+        if (c == 't') { ground = TIN_CREEK;  break; }
+        if (c == 'q') { restore_tty(); std::printf("\033[H\033[J\n   You leave both grounds unturned.\n\n"); return 0; }
+        nap(0.02);
+    }
+    const bool placer = is_placer(ground);
+    const char* metal = metal_of(ground);
+
+    // The ground-specific brief. Same two gestures either way -- wash here, or haul
+    // to the stone -- but what each is FOR differs, and the slice does not say so.
+    if (placer)
+        std::printf("\033[H\033[J\n"
+            "   You have picked a full-depth column at the tin creek: broken streambed\n"
+            "   gravel, dark heavy sand and pale cobble heaped together. There is no\n"
+            "   oxide cap and no sulfide root here -- the river weathered the tin free\n"
+            "   an age ago and laid it down loose in the sand. The cobble is barren.\n\n"
+            "   Wash the sand where you stand and keep the heavy tin the pan holds, or\n"
+            "   load the coarse and carry it to the breaking stone, a load at a time.\n"
+            "   Your two hands do not hold much; there is a sack to shoulder and a cart\n"
+            "   to build. Nobody will tell you whether the wash is worth doing here, or\n"
+            "   whether the stone is worth the walk. Try them, and find out.\n\n"
+            "   [press any key]\n");
+    else
+        std::printf("\033[H\033[J\n"
+            "   You have picked a full-depth column at the copper hill: a heap of broken\n"
+            "   ground, oxide and sulfide and barren rock heaped together. The pick left\n"
+            "   it in every size, from dust to fist-sized stone. The loose fines you can\n"
+            "   wash right here, and keep whatever came up free. The coarse rock is\n"
+            "   locked -- the ore ground into it -- and only the breaking stone, a walk\n"
+            "   off, can free that.\n\n"
+            "   Wash the fines where you stand, or load the coarse and carry it to the\n"
+            "   stone yourself, a load at a time. Your two hands do not hold much. There\n"
+            "   is a sack you can shoulder, and a cart you can stop and build, if you\n"
+            "   judge the heap worth it -- but nobody will tell you whether the wash is\n"
+            "   worth doing here, or whether the cart pays. Try them, and find out.\n\n"
+            "   [press any key]\n");
+    std::fflush(stdout);
     while (poll_key() < 0) nap(0.02);
 
-    // The heap: a pick full-depth dig at the copper hill center. Materialized the
+    // The heap: a pick full-depth dig at the chosen ground's center. Materialized the
     // way every slice materializes its feed -- so this one stands alone but is fed
-    // exactly what the dig produces: a size distribution, free fines over locked
-    // coarse, the copper mostly in the locked part (that is the finding).
-    Substance heap = dig_column(Place{0.0, 0.0}, PICK_BITE);
+    // exactly what the dig produces. At the copper hill that is a size distribution,
+    // free fines over locked coarse, the copper mostly locked; at the tin creek it is
+    // free heavy sand over barren cobble, the tin mostly pan-ready (that is the fork).
+    Substance heap = dig_column(Place{DEPOSITS[ground].cx, DEPOSITS[ground].cy}, PICK_BITE);
     const double heap0 = heap.total_mass();
     const double grade = heap0 > SPECK ? ore_mass(heap) / heap0 : 0.0; // for the ore-left estimate
     double heap_mass = heap0;
     double delivered = 0.0;
-    double won_here  = 0.0;   // copper won by washing the free fines at the hole
+    double won_here  = 0.0;   // ore won by washing at the hole (copper fines or tin sand)
 
     Carrier carrier = BY_HANDS;
     int trips = 0;
@@ -365,7 +465,9 @@ int main() {
 
     const char* ambient = AMBIENT[0];
     double ambient_t = 0;
-    std::string nag = "The heap is at your feet. Load up and start walking.";
+    std::string nag = placer
+        ? "The heap is at your feet. Wash the sand, or load the coarse and walk it."
+        : "The heap is at your feet. Load up and start walking.";
     double nag_t = 6;
 
     bool running = true, quit = false;
@@ -374,10 +476,12 @@ int main() {
             if (walking) continue;   // you cannot re-tool or re-load mid-stride
             if (c == 'q') { running = false; quit = true; }
             else if (c == 'w') {
-                // Wash the loose fines where you stand: screen the sand-and-finer off
-                // the coarse (cut at GRAVEL) and pan it. You keep the free ore it
-                // holds; the locked coarse stays to haul. At this hard hill that ore
-                // is a sliver -- but the gesture is real and the ground decides.
+                // Wash where you stand: screen the sand-and-finer off the coarse (cut
+                // at GRAVEL) and pan it. You keep only the FREE ore the pan holds. The
+                // SAME gesture at either ground -- but the ground decides what it wins:
+                // at the copper hill the free ore is a sliver and the coarse is locked
+                // ore to haul; at the tin creek the sand IS the ore and the coarse is
+                // barren cobble. Nobody says which; the pan's yield tells you.
                 if (heap_mass < 0.5) {
                     nag = "The hole is bare -- there is nothing left to wash.";
                     nag_t = t + 4;
@@ -389,7 +493,7 @@ int main() {
                     // it stays in the haul; a pan cannot free what the breaker must.
                     double won = 0.0;
                     for (int p = 0; p < N_PHASE; ++p)
-                        if (is_copper_ore(p))
+                        if (is_ore(p))
                             for (int z = 0; z < N_SIZE; ++z) won += pr.concentrate.freegrain[p][z];
                     won_here += won;
                     // The haul: the coarse oversize, plus every locked grain that
@@ -403,7 +507,10 @@ int main() {
                                                   + pr.tailings.composite[p][z];
                     heap_mass = heap.total_mass();
                     t += WASH_COST;
-                    nag = "You screen the fines off and pan them where you stand. The heavy "
+                    nag = placer
+                        ? "You screen off the cobble and pan the heavy sand. The dark grains "
+                          "that stay in the pan are tin, come up free of the rock."
+                        : "You screen the fines off and pan them where you stand. The heavy "
                           "specks that stay are the ore that came up free.";
                     nag_t = t + 6;
                 }
@@ -477,7 +584,7 @@ int main() {
         if (t > nag_t) nag.clear();
 
         draw(heap_mass, delivered, heap0, carrier, load, trips, t, won_here, walking,
-             where, outbound, ambient, nag.empty() ? nullptr : nag.c_str());
+             where, outbound, ambient, nag.empty() ? nullptr : nag.c_str(), metal);
         nap(0.05);
     }
 
@@ -491,6 +598,6 @@ int main() {
         return 0;
     }
 
-    report(heap_mass, delivered, won_here, grade, carrier, trips, t);
+    report(ground, heap_mass, delivered, won_here, grade, carrier, trips, t);
     return 0;
 }

@@ -693,12 +693,13 @@ built to pay off:
    and whether a grain comes up free or still locked in gangue depends on its size
    against the mineral's own grain size. The **fine** end can be **panned at the hole
    with no breaker**; the **coarse** end is locked rock only the breaker frees. How
-   much frees at the face is the mineralogy's — placer tin comes up coarse and free
-   (a pan takes nearly all of it, no stone), disseminated sulfide is ground to microns
-   and comes up all but locked (the breaker is the only way in), the weathered oxide
-   cap sits between. So you **wash** the fines where you stand for whatever came up
-   free, **carry** the locked coarse to the rock-breaking station and **crush** it
-   (`separate.h crush` — the verb already existed), then **pan** the crushed rock.
+   much frees at the face is the mineralogy's *and* the deposit's **origin** — a
+   placer's tin comes up free in the heavy **sand** (a wash concentrates nearly all of
+   it, no stone), disseminated sulfide in hard rock is ground to microns and comes up
+   all but locked (the breaker is the only way in), the weathered oxide cap sits
+   between. So you **wash** where you stand for whatever came up free, **carry** the
+   locked coarse to the rock-breaking station and **crush** it (`separate.h crush` —
+   the verb already existed), then **pan** the crushed rock.
    Dig shallow for a small clean oxide pile; dig deep for a big mixed one you must
    break harder and sort at the furnace, where the sulfide takes a roast the oxide
    does not.
@@ -720,6 +721,25 @@ built to pay off:
    > gravel"). The crusher stays essential for hard rock and is correctly irrelevant
    > to placer. The wrong claim stays, dated, per the project's practice.*
 
+   > *A **second correction, same day**, went deeper. The first fix modelled **both**
+   > grounds as fresh-broken rock — one PSD for every deposit — and set cassiterite's
+   > liberation to `GRAVEL` to make it "come up free." A probe of the actual wash
+   > exposed the lie: with the tin dumped free into the coarse `GRAVEL` bin, a pan
+   > **cannot concentrate it** — coarse quartz and coarse cassiterite both fall far
+   > faster than the pan's cut and both stay, so panning the raw heap keeps 98% of the
+   > tin at **unchanged** grade. **Free is not won.** A placer is not fresh rock: it is
+   > alluvium a river already broke **and hydraulically sorted**, dropping the free
+   > heavy mineral into a narrow band of pannable **sand** while the barren rock rode on
+   > as coarse cobble. That is now a `Deposit`'s **`Origin`** (`HARDROCK` vs `PLACER`):
+   > hard rock breaks and sizes by the pick's blow (ore locked in coarse composite),
+   > a placer arrives free and pre-classified (ore free in the sand). With it, the
+   > wash — screen off the cobble, pan the sand — lifts the tin creek from **45% → 76%
+   > grade with no stone**, and the same wash at the copper hill wins **~2%**. The
+   > lesson is now measured, not asserted, and `carry.cpp` lets the player **choose the
+   > ground** and feel the fork. (A bonus truth fell out: crushing a placer **loses**
+   > tin, driving the sand below the pan's cut — do not grind what the river already
+   > ground.)*
+
    > *This paragraph said, until 2026-07-11, that the breaker's second step is
    > **cobbing** — "the Era-0 verb that waited three eras finally has a job,"
    > hand-sorting the freed coarse material by eye. Building `breaker.cpp` refuted
@@ -735,15 +755,18 @@ built to pay off:
    > client interaction outside the window of playability (decided with Ross). The
    > wrong claim stays, dated, per the project's practice.*
 
-   The carry is its own layer, because the locked coarse is heavy and mostly waste
-   and only the breaker frees it (the free fines you can wash off at the hole, but at
-   the hard-rock hill that is a sliver). So hauling the locked coarse to the breaker
-   is the cost, and it has rungs like the dig does: **hands → back-load → a cart the
-   player builds.** The pick multiplies what you win *out* of the ground (10× a
-   hand-scoop); the cart multiplies what you can move *to* the station in one trip,
+   The carry is its own layer, because at the **hard-rock** hill the locked coarse is
+   heavy and mostly waste and only the breaker frees it (the free fines you can wash
+   off at the hole, but there that is a sliver). So hauling the locked coarse to the
+   breaker is the cost, and it has rungs like the dig does: **hands → back-load → a
+   cart the player builds.** The pick multiplies what you win *out* of the ground (10×
+   a hand-scoop); the cart multiplies what you can move *to* the station in one trip,
    so a pick without a cart just buries you in rock you can't carry. The cart is also
    what makes a distant deposit worth working — which is how co-location (decision 3)
-   turns from an annoyance into a logistics decision.
+   turns from an annoyance into a logistics decision. At a **placer** the layer
+   inverts: the wash *is* the game, the coarse you'd haul is barren cobble, and the
+   haul is the futile move — which is exactly what the ground teaches the player who
+   tries it. `carry.cpp` lets you choose which ground to work and feel that fork.
 
 3. **Co-location is the gate — as geometry.** Copper ground and tin ground are
    placed hundreds of meters apart, so no single hole yields both. Tin's historic
@@ -765,13 +788,17 @@ sees the `Substance` that comes up, never the hole.
 
 Everything authored here (the valley layout, the tier count, the linear falloff)
 is a placeholder; the tests assert only the field's *shape* — barren-by-default,
-monotone grading, depth-changes-mineral, copper-and-tin-never-together, and that
-placer frees at the face while the sulfide waits for the breaker. Correcting a layout
-number changes no test. Issue #28. The **liberation** side (which minerals free at
-what size) is not a layout knob but sourced grain sizes (`liberation_bin()`), and the
-finding they drive is insensitive to the blow's PSD exponent across its plausible
-range (probe). The honest chain is *dig → **wash the free fines** → haul the locked
-coarse (hand → cart) → crush → pan → furnace* — see the dated liberation note under
+monotone grading, depth-changes-mineral, copper-and-tin-never-together, that the
+placer frees at the face while the sulfide waits for the breaker, and that a wash
+**concentrates** the placer tin (grade climbs, no stone) while barely touching the
+locked copper. Correcting a layout number changes no test. Issue #28. The
+**liberation** and **origin** sides (which minerals free at what size; hard-rock vs
+placer) are not layout knobs but sourced grain sizes and deposit types
+(`liberation_bin()`, `Origin`), and the findings they drive are insensitive to the
+blow's PSD exponent and the placer size-bands across their plausible ranges (probes).
+The honest chain is *dig → **wash** (the free fines at a hard-rock hill, the free sand
+at a placer) → haul the locked coarse (hand → cart) → crush → pan → furnace* — see the
+dated liberation note under
 decision 2 for what this corrected, and the retired-cob note for the step after crush. The peak grade is now capped at `COMPOSITE_TARGET_FRACTION`
 (0.5): a locked grain is half mineral, so no scoop can read richer than a solid ore
 grain. **The dig-bar UI is now built** (`core/dig.cpp`, 2026-07-11): strike down
@@ -801,29 +828,31 @@ fire you did not run). **And the carry loop is now built** (`core/carry.cpp`,
 chain — the walk between the hole and the breaking stone. It stands on no sim header;
 the one thing it must not invent is the distance, and it does not (the walk is measured
 off `geology.h`'s real `DEPOSITS` coordinates — the breaker at an authored 80 m offset,
-the tin ground at the true 323 m). The gesture is the **trip**: load what you can, walk
-it over, haul back, again — with rungs (hands → a shouldered sack → a cart you stop and
-build) that change how much moves per trip. The face is the two piles and the road
-between, never a projected trip count. It teaches, without stating, the finding a
-corrected `geology.h` now carries (see the dated liberation note under decision 2):
-the pick's spoil is a **size distribution**, and liberation rides on it. The **fine**
-end is already-free grains a pan takes at the hole with no breaker; the **coarse** end
-is locked rock the breaker is the only way into — and *how much frees at the face is
-the mineralogy's to decide.* At this hole, the copper hill, it decides against you: a
-wash wins only the oxide's thin free tail (~75 g of 3.6 kg copper, pan lip-losses and
-all), and nearly all the copper is locked in the coarse you must haul and crush. That
-is the lesson, and the true reason hard-rock ore built stamp mills. The knife turns at
-the tin ground, where placer cassiterite comes up coarse and free and the same wash
-takes almost all of it, no stone touched — which is why placer tin was panned by one
-hand. So the slice has **two** gestures now: the **wash** (screen the fines, pan them
-where you stand) and the **trip** (haul the locked coarse). The locked coarse is still
-bigger than your hands, so the cart rungs still matter — 12 kg of it is 6 hand-trips
-/ ~15 min or one cart trip — and the far deposit is still only worth working once the
-cart exists. *(This paragraph said, until 2026-07-11, that "nothing is liberated at the
-hole, the heap is one uniform grade, a shovel without a cart buries you." Monitored
-play refuted it: a pick — not a shovel; a shovel only MOVES loosened rock — breaks
-rock across sizes, and placer fines come up free. The wrong claim's correction is the
-liberation note under decision 2.)* **Nothing of the front half is unbuilt now** —
+the two grounds 323 m apart, both real). You first **choose the ground** — the copper
+hill or the tin creek — and that choice is the fork the slice turns on; then two
+gestures: the **wash** (screen the coarse off, pan the sand where you stand) and the
+**trip** (load the coarse, walk it over, haul back, again), with rungs (hands → a
+shouldered sack → a cart you stop and build) that change how much moves per trip. The
+face is the two piles and the road between, never a projected count. It teaches,
+without stating, the finding a corrected `geology.h` now carries (see the two dated
+notes under decision 2): the state the ore comes up in is set by the deposit's
+**origin**. At the **copper hill** (hard rock) the wash wins only the oxide's thin free
+tail (~75 g of ~3.6 kg copper, pan lip-losses and all); nearly all the copper is locked
+in the coarse you must haul and crush — the true reason hard-rock ore built stamp mills.
+At the **tin creek** (a placer) the knife turns: the river already broke and sorted the
+cassiterite, so it comes up free in the heavy **sand**, and the same wash — screen off
+the barren cobble, pan the sand — **concentrates it (45% → 76% grade) and wins ~59% of
+the tin with no stone touched**, which is why placer tin was panned by one hand. The
+haul then means opposite things: at the hill it carries locked ore to the only tool that
+frees it; at the creek it drags barren cobble, and the reckoning names it as the futile
+move it was. The cart rungs still matter at the hill (12 kg of locked coarse is 6
+hand-trips / ~15 min or one cart trip). *(This paragraph said, until 2026-07-11, that
+"nothing is liberated at the hole, the heap is one uniform grade, a shovel without a
+cart buries you," and then — after the first correction — that the tin ground's contrast
+was only **told**, not played. Monitored play refuted both: a pick, not a shovel, breaks
+rock across sizes; a placer's ore comes up free **and sand-sized**, which a wash
+concentrates; and the slice now lets you **work** either ground. The corrections are the
+two dated notes under decision 2.)* **Nothing of the front half is unbuilt now** —
 dig → carry → break → pan → furnace all run as playable slices, and the sim core
 produces exactly what each consumes.
 
