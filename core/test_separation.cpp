@@ -813,6 +813,30 @@ int main() {
                     100.0 * sheltered_fraction(grit_diameter(minute), d_cut),
                     fire_pan(minute).sharpness);
 
+        // And the shelter is not just a number on a panel any more: it moves the
+        // separation. A wedged grain stays in the pan whatever its velocity, so a
+        // stony floor's concentrate is diluted by fines a working pan rejects.
+        // Isolate the effect by comparing the same fired pan with its shelter zeroed:
+        // the blur is identical, only the second misplacement differs.
+        // *(2026-07-10, #19: the printed fraction became an applied partition.)*
+        const SeparatorParams stony_pan = fire_pan(dirt);          // shelter[] filled
+        SeparatorParams smooth_pan = stony_pan;                    // same blur, no shelter
+        for (int s = 0; s < N_SIZE; ++s) smooth_pan.shelter[s] = 0.0;
+        const SeparationResult cs = separate(dirt, stony_pan);
+        const SeparationResult cl = separate(dirt, smooth_pan);
+        const double conserved = std::fabs(cs.concentrate.total_mass()
+                                           + cs.tailings.total_mass() - dirt.total_mass());
+        check(conserved < 1e-9
+              && recovery(dirt, cl.concentrate, KAOLINITE) < 0.01            // a pan rejects clay
+              && recovery(dirt, cs.concentrate, KAOLINITE) > 0.30            // a stony floor keeps it
+              && cs.concentrate.grade(QUARTZ) < cl.concentrate.grade(QUARTZ) - 0.05,
+              "a stony floor swallows the feed: shelter reports rejected fines to the "
+              "concentrate and dilutes its grade, applied now, not just printed");
+        std::printf("        (stony pan keeps %.1f%% of the clay a smooth floor rejects; "
+                    "quartz grade %.3f vs %.3f)\n",
+                    100.0 * recovery(dirt, cs.concentrate, KAOLINITE),
+                    cs.concentrate.grade(QUARTZ), cl.concentrate.grade(QUARTZ));
+
         // And the grade ceiling is not a ceiling, because levigation separates.
         //
         // *(This read "every vessel and every wait lands on the same grade: the

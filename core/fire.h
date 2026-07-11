@@ -149,14 +149,26 @@ inline double grit_diameter(const Substance& body) {
 // So `roughness_spread` is valid only for d_grit < d_cut, and it is CLAMPED at that
 // edge and returns a LOWER BOUND beyond it. Above the edge, ask `sheltered_fraction`
 // instead; the honest statement about a stony pot is not that it blurs, but that it
-// swallows. Modelling what BECOMES of the sheltered grains -- a hiding-exposure
-// function, Egiazaroff (1965) -- is issue #19 and is not done here. They are
-// counted, and then ignored. Nothing reduces the recovery of a stony pan.
+// swallows.
+//
+// And now it swallows in the arithmetic, not only in the prose (#19, 2026-07-10).
+// `fire_pan` reads `sheltered_fraction` at every grain size into the separator's
+// per-bin `shelter[]`, and `separate.h` sends that share of each bin straight to
+// the concentrate: a wedged grain does not move, so it stays in the pan whatever
+// its velocity. It is a SECOND misplacement, carried independently of the blur,
+// exactly as `screen()` carries `coarse_to_oversize` and `fine_to_oversize`. The
+// hiding-exposure function the issue reached for (Egiazaroff 1965, Wilcock & Crowe
+// 2003) is empirical and would have imported fitted constants; the geometry
+// already derived here -- the grain's centre below z0 -- IS a hiding-exposure
+// function, and evaluating it per size bin closes #19 with no new authored number.
+// The effect is the one the issue predicted: a stony pan's concentrate is diluted
+// toward feed grade by fines it should have rejected but cannot wash out.
 //
 // The consequence is a claim stronger than the one it replaces: within its domain
 // **roughness cannot blur the pan by more than 3.4%.** The spread tops out at 0.213
 // when the grit is as coarse as the grain, sigma_pan tops out at 0.5685, and the
-// 10% blur that #10 priced at 267 um of grit is not purchasable at any grit at all.
+// 10% blur that #10 priced at 267 um of grit is not purchasable at any grit at all
+// -- what a stony floor costs is recovery to shelter, never grade to blur.
 
 inline double WRIST_SHARPNESS = 0.55;  // AUTHORED. The blur of a human wrist,
                                        // and the irreducible floor of any pan.
@@ -200,18 +212,31 @@ inline double roughness_spread(double d_grit, double d_cut) {
     return 2.0 * BED_ELEVATION_SD * r / std::log(0.5 * NIKURADSE / r);
 }
 
-// The fraction of grains whose centres sit below z0 -- wedged between the grit,
-// feeling no flow, leaving the separation before it starts. Zero for any pot thrown
-// from levigated clay; 0.42 for a pot pinched from raw dirt.
-inline double sheltered_fraction(double d_grit, double d_cut) {
+// The fraction of grains of diameter `d_grain` whose centres sit below z0 on a
+// floor of grit `d_grit` -- wedged between the grit, feeling no flow, leaving the
+// separation before it starts. It is a function of the ratio, so it answers for a
+// whole size bin (pass `bin_diameter(s)`) as readily as for the cut grain (pass
+// `d_cut`). Zero for a grain as coarse as its floor; 0.53 for one far finer. This
+// is now APPLIED, not merely reported: `fire_pan` reads it into the separator's
+// per-bin `shelter[]`, and `separate()` sends that share straight to the
+// concentrate (#19). Zero for any pot thrown from levigated clay; ~0.42 at the cut
+// for a pot pinched from raw dirt.
+inline double sheltered_fraction(double d_grit, double d_grain) {
     if (d_grit <= 0.0) return 0.0;
-    return std::fmax(0.0, std::fmin(1.0, 0.5 + 1.0 / NIKURADSE - 0.5 * d_cut / d_grit));
+    return std::fmax(0.0, std::fmin(1.0, 0.5 + 1.0 / NIKURADSE - 0.5 * d_grain / d_grit));
 }
 
 inline SeparatorParams fire_pan(const Substance& body) {
+    const double d_grit = grit_diameter(body);
     const double blur = QUADRATURE *
-        roughness_spread(grit_diameter(body), cut_diameter(PAN.cut_velocity));
-    return SeparatorParams{PAN.cut_velocity, std::hypot(WRIST_SHARPNESS, blur), "fired pan"};
+        roughness_spread(d_grit, cut_diameter(PAN.cut_velocity));
+    SeparatorParams sp{PAN.cut_velocity, std::hypot(WRIST_SHARPNESS, blur), "fired pan"};
+    // The second misplacement, filled per size bin: a grain shelters against the
+    // floor's grit at its own diameter, not the cut's. A smooth (levigated) floor
+    // leaves every entry zero, and separate() then behaves exactly as before.
+    for (int s = 0; s < N_SIZE; ++s)
+        sp.shelter[s] = sheltered_fraction(d_grit, bin_diameter(s));
+    return sp;
 }
 
 // ---------------------------------------------------------------------------

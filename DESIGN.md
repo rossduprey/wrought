@@ -478,9 +478,20 @@ never moves, and the rest is sorted about as well as on a smooth floor.
 `separate.h` learned on 2026-07-09 that **a separator has two misplacements, not
 one**, when a single `efficiency` made hand-picking pebbles cost 15% of the sand.
 `fire.h` was making the identical mistake about floors, one function away, and
-nobody connected them for a day. Modelling what becomes of the sheltered grains (a
-hiding–exposure function; Egiazaroff 1965) is issue #19 and is not done — they are
-counted, and then ignored. What survives authored in the bridge itself is issue #18.
+nobody connected them for a day. Modelling what becomes of the sheltered grains was
+issue #19, and it is now done (2026-07-10): `fire_pan` reads the sheltered fraction
+at every grain size into the separator's per-bin `shelter[]`, and `separate()` sends
+that share straight to the concentrate — a wedged grain does not move, so it stays
+in the pan whatever its velocity. It is a **second misplacement**, carried alongside
+the blur exactly as `screen()` carries its two. The literature's hiding–exposure
+functions (Egiazaroff 1965; Wilcock & Crowe 2003) are empirical and would have
+imported fitted constants; the geometry already derived here — the grain's centre
+below `z₀` — *is* a hiding–exposure function, so evaluating it per size bin closed
+#19 with no new authored number. The effect is what the model always claimed on the
+panel and could not charge: a stony pot's concentrate is diluted toward feed grade by
+the fines it swallows, so its measured enrichment collapses toward 1× — a raw-dirt
+pot lands *below* cupped hands, and the whole ratchet rung is the shelter column
+going to zero, not σ. What survives authored in the bridge itself is issue #18.
 
 ### The law: grade trades against recovery, always
 
@@ -849,14 +860,23 @@ So iterating does nothing. Levigate in the hollow, fire a pot, levigate in the
 pot, fire another — the sharpness is 0.5500 at every generation, now to **nine**
 decimal places rather than four. There is no purity spiral. There is one step:
 
-| the pot you fired from | grit | σ | sheltered | enrichment |
+| the pot you fired from | grit | σ | sheltered | enrichment (measured) |
 |---|---|---|---|---|
-| raw dirt, stones and all | 1852 µm | 0.5685 | **42.2%** | *3.24× (fiction)* |
-| *cupped hands, for comparison* | — | *1.20* | *0%* | *1.75×* |
-| stone-picked dirt | 944 µm | 0.5685 | **31.5%** | *3.24× (fiction)* |
-| **a one-minute decant** | 11.6 µm | **0.5500** | **0%** | **3.37×** |
-| a one-hour decant | 0.9 µm | 0.5500 | 0% | 3.37× |
-| a four-hour decant | 0.9 µm | 0.5500 | 0% | 3.37× |
+| raw dirt, stones and all | 1852 µm | 0.5685 | **42.2%** | **1.21×** |
+| *cupped hands, for comparison* | — | *1.20* | *0%* | *1.26×* |
+| stone-picked dirt | 944 µm | 0.5685 | **31.5%** | 1.26× |
+| **a one-minute decant** | 11.6 µm | **0.5500** | **0%** | **1.59×** |
+| a one-hour decant | 0.9 µm | 0.5500 | 0% | 1.59× |
+| a four-hour decant | 0.9 µm | 0.5500 | 0% | 1.59× |
+
+> *(2026-07-10, #19.)* The enrichment column used to read `3.24× (fiction)` for the
+> stony rows and `3.37×` for the levigated ones — `pow(velocity_ratio, 1/σ)`, the
+> enrichment a pan of that sharpness *would* give if every grain were in play, which
+> for a stony pot was a fiction because half its feed never moves. Shelter is now an
+> applied second misplacement (`separate.h`), so the column is **measured**: a fixed
+> magnetite-over-quartz feed run through each floor, concentrate grade over feed
+> grade. The magnitudes fell because the measurement charges the swallowed fines; the
+> ordering is the finding, and it sharpened.
 
 Two things in that table are worth the whole of step 2, and the first of them is
 not what this document said it was for a day.
@@ -865,11 +885,13 @@ not what this document said it was for a day.
 Forty-two percent of the sand at the cut is wedged between stones coarser than
 itself, sitting below the height at which the flow reaches it, and it does not move
 at any wash strength whatever. The sand that *is* exposed gets sorted about as well
-as it would on a smooth floor — which is why the σ column barely twitches, and why
-the enrichment column reads a healthy 3.24× while describing a pot that has
-swallowed nearly half its feed. A separator has **two misplacements**, not one. The
-first pot is still a downgrade and levigation is still what makes pottery worth
-inventing; but the mechanism is shelter, not blur.
+as it would on a smooth floor — which is why the σ column barely twitches. What
+charges the swallowed feed is the **shelter** column, not σ, and since the
+enrichment is now measured through the floor the raw-dirt pot enriches **1.21× —
+below cupped hands at 1.26×** — while a levigated pot reaches 1.59×. A separator has
+**two misplacements**, not one, and the whole rung from raw dirt to levigated clay
+is the shelter column going to zero. The first pot is a downgrade in the arithmetic
+now, not only in the prose; the mechanism is shelter, not blur.
 
 > *(2026-07-10, #10.)* This table used to read `1.83` and `1.44×` for raw dirt, and
 > the paragraph above used to say **"a pot pinched from dirt you did not levigate is

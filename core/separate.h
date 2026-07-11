@@ -41,6 +41,17 @@ struct SeparatorParams {
     double cut_velocity;  // m/s, v50
     double sharpness;     // sigma in ln-velocity; 0 is a perfect cut
     const char* name;
+    // A separator has TWO misplacements, not one. `sharpness` blurs the cut; this
+    // is the other one. On a rough floor a grain finer than the floor grit wedges
+    // between its elements, feels no flow, and does not move at any cut -- so it
+    // stays in the pan (reports to the concentrate) whatever its velocity, unsorted
+    // feed diluting the product. `shelter[s]` is the fraction of size bin `s` so
+    // wedged. Zero for any smooth tool (hands, a built sluice, an ideal pan); a
+    // fired pan fills it from its floor grit (fire.h `fire_pan`). This is the same
+    // two-misplacement lesson `screen()` learned about size on 2026-07-09 and
+    // `fire.h` learned about floors on 2026-07-10 -- now APPLIED, not just counted
+    // (#19). A smooth default leaves every existing caller unchanged.
+    double shelter[N_SIZE] = {};
 };
 
 // Cupped hands, then a low-fired pinch pot, then a built sluice. One function.
@@ -73,16 +84,23 @@ inline SeparationResult separate(const Substance& in, const SeparatorParams& sp)
     const double T = in.temperature;
     for (int p = 0; p < N_PHASE; ++p)
         for (int s = 0; s < N_SIZE; ++s) {
-            const double cf = in.freegrain[p][s] * partition(free_velocity(p, s, T), sp);
+            // The second misplacement. A `shelter[s]` share of this bin is wedged
+            // in the floor, feels no flow, and stays in the pan whatever its
+            // velocity; only the exposed remainder is actually sorted by the cut.
+            const double phi = sp.shelter[s];
+
+            const double mf = in.freegrain[p][s];
+            const double cf = mf * phi + mf * (1.0 - phi) * partition(free_velocity(p, s, T), sp);
             out.concentrate.freegrain[p][s] = cf;
-            out.tailings.freegrain[p][s]    = in.freegrain[p][s] - cf;
+            out.tailings.freegrain[p][s]    = mf - cf;
 
             // A composite reports as one particle, at one velocity, and its
             // gangue is not consulted. This is where the grade ceiling comes
-            // from.
-            const double cc = in.composite[p][s] * partition(composite_velocity(p, s, T), sp);
+            // from. It shelters by size just as a free grain does.
+            const double mc = in.composite[p][s];
+            const double cc = mc * phi + mc * (1.0 - phi) * partition(composite_velocity(p, s, T), sp);
             out.concentrate.composite[p][s] = cc;
-            out.tailings.composite[p][s]    = in.composite[p][s] - cc;
+            out.tailings.composite[p][s]    = mc - cc;
         }
     return out;
 }

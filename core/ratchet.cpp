@@ -127,22 +127,39 @@ int main() {
     // floors the whole time, one function away.)*
     std::printf("\nwhat the pot is made of, and what the pan it becomes is worth:\n");
     const double vr = free_velocity(MAGNETITE, SAND) / free_velocity(QUARTZ, SAND);
+    // "enrich" used to be pow(vr, 1/sigma): the mag-over-quartz enrichment a pan of
+    // this sharpness WOULD give if every grain were in play. It ignored shelter, so
+    // for a stony pot it was a fiction -- what the sand that still moves would do.
+    // Now shelter is applied (#19), so measure it: run a fixed magnetite/quartz feed
+    // through this pot's actual floor and read the concentrate. A stony floor keeps
+    // the fines it should reject, and the measured enrichment collapses toward 1x.
+    auto mag_over_quartz = [] {
+        Substance f;
+        f.freegrain[MAGNETITE][SAND] = 0.10;
+        f.freegrain[QUARTZ][SAND]    = 0.90;
+        return f;
+    };
+    auto measured_enrich = [&](const SeparatorParams& p) {
+        const Substance feed = mag_over_quartz();
+        const Substance conc = separate(feed, p).concentrate;
+        return feed.grade(MAGNETITE) > 0.0 ? conc.grade(MAGNETITE) / feed.grade(MAGNETITE) : 0.0;
+    };
     auto rate = [&](const char* n, const Substance& b) {
         const SeparatorParams p = fire_pan(b);
         std::printf("  %-38s grit %8.1f um  sigma %.4f  shelter %5.1f%%  enrich %.2fx\n",
                     n, grit_diameter(b) * 1e6, p.sharpness, 100.0 * shelter(b),
-                    std::pow(vr, 1.0 / p.sharpness));
+                    measured_enrich(p));
     };
     std::printf("  %-38s %17s  sigma %.4f  shelter %5.1f%%  enrich %.2fx\n",
                 "cupped hands (no pot at all)", "",
-                HANDS.sharpness, 0.0, std::pow(vr, 1.0 / HANDS.sharpness));
+                HANDS.sharpness, 0.0, measured_enrich(HANDS));
     rate("pot from raw dirt, stones and all", dirt);
     rate("pot from stone-picked dirt", screen(dirt, HAND_COB).undersize);
     rate("pot from a 1-minute decant", decant(screen(dirt, HAND_COB).undersize, HOLLOW, 60.0).liquor);
     rate("pot from a 1-hour decant", decant(dirt, HOLLOW, 3600.0).liquor);
     rate("pot from a 4-hour decant", decant(dirt, HOLLOW, 14400.0).liquor);
-    std::printf("  (the enrichment of a sheltered pot is a fiction: it is what the sand that\n"
-                "   still moves would do, and half of it is not moving.)\n");
+    std::printf("  (enrich is now measured through each floor, shelter and all: the stony\n"
+                "   pot's collapses toward 1x because half its feed never moves. #19 closed.)\n");
 
     // -- 4b. Where the grade ceiling came from, until it stopped being one ---
     // This instrument was written to show that the clay grade was arithmetic on
