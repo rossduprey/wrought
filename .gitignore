@@ -4,6 +4,7 @@ core/test_separation
 core/pan_game
 core/dig_game
 core/breaker_game
+core/furnace_game
 core/ratchet
 Binaries/
 Intermediate/

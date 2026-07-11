@@ -756,10 +756,24 @@ breaker is now built** (`core/breaker.cpp`, 2026-07-11): strike the locked heap 
 a hammer or sledge — a liberation bar climbing over a grind profile going to dust —
 then pan it, and the grade/recovery law lands as the choice of *when to stop
 hammering* (crush too little and the pan wins nothing; too much and the freed ore
-washes over the lip). **Still unbuilt (game layer):** the carry loop itself — the
+washes over the lip). **And the furnace is now built** (`core/furnace.cpp`,
+2026-07-11): the fourth slice, and the one that turns ore into *metal*. It takes the
+breaker's concentrate — still rock, mixing red oxide (cuprite) and dark sulfide
+(chalcocite) copper — and runs on `smelt.h`'s `roast()` and `smelt_copper()`. The
+whole decision is the **draft**: bank it under charcoal and the fire reduces (pours
+the oxide's metal); open it to the air and it roasts (burns the sulfur off). A
+reducing fire cannot touch the sulfide, so you must roast it first to put oxygen on
+before the fire can take it off — two fires of opposite atmosphere, in the one order
+that works. The face is the fire's *colour* (dull-red→cherry→orange→yellow→white,
+the smith's own gauge; the reduce/roast onset is orange, the clean pour yellow-white)
+over the charge as its *materials*, and nowhere a projected yield. It also surfaced a
+finding the docs lacked: **`roast()` only cures the sulfide the crushing freed** — a
+grain still sealed in gangue the hammer left whole is beyond any fire, so the recovery
+ceiling (63%, not 100%) is *set upstream at the breaker*, and the slice reports that
+loss split from the sulfide you simply never roasted (a blow you did not strike vs. a
+fire you did not run). **Still unbuilt (game layer):** only the carry loop itself — the
 cart and the carry-capacity rungs (hands → back-load → cart) that make hauling heavy
-waste from dig to breaker a real cost — and the furnace/roast station the concentrate
-then feeds. The sim core produces exactly what they consume.
+waste from dig to breaker a real cost. The sim core produces exactly what it consumes.
 
 ---
 

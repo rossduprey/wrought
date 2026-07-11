@@ -15,10 +15,13 @@ dig_game: dig.cpp $(HEADERS)
 breaker_game: breaker.cpp $(HEADERS)
 	$(CXX) $(CXXFLAGS) -o $@ breaker.cpp
 
+furnace_game: furnace.cpp $(HEADERS)
+	$(CXX) $(CXXFLAGS) -o $@ furnace.cpp
+
 ratchet: ratchet.cpp $(HEADERS)
 	$(CXX) $(CXXFLAGS) -o $@ ratchet.cpp
 
-.PHONY: test pan dig breaker ratchet-run clean
+.PHONY: test pan dig breaker furnace ratchet-run clean
 test: test_separation
 	./test_separation
 
@@ -37,10 +40,17 @@ dig: dig_game
 breaker: breaker_game
 	./breaker_game
 
+# Fire the ore into metal. What the breaker panned is still rock, mixing oxide and
+# sulfide copper. The draft decides the fire: reduce to pour the oxide, but the
+# sulfide must be roasted in open air first or it goes to slag. The two-fires
+# finding, made a gesture -- and the recovery ceiling was set at the breaker.
+furnace: furnace_game
+	./furnace_game
+
 # Walk Era 0 into Era 1 and watch the ratchet fail to turn. Not a test: a
 # measurement, and it is allowed to come out badly. It did.
 ratchet-run: ratchet
 	./ratchet
 
 clean:
-	rm -f test_separation pan_game dig_game breaker_game ratchet
+	rm -f test_separation pan_game dig_game breaker_game furnace_game ratchet
