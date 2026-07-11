@@ -12,10 +12,13 @@ pan_game: pan.cpp $(HEADERS)
 dig_game: dig.cpp $(HEADERS)
 	$(CXX) $(CXXFLAGS) -o $@ dig.cpp
 
+breaker_game: breaker.cpp $(HEADERS)
+	$(CXX) $(CXXFLAGS) -o $@ breaker.cpp
+
 ratchet: ratchet.cpp $(HEADERS)
 	$(CXX) $(CXXFLAGS) -o $@ ratchet.cpp
 
-.PHONY: test pan dig ratchet-run clean
+.PHONY: test pan dig breaker ratchet-run clean
 test: test_separation
 	./test_separation
 
@@ -28,10 +31,16 @@ pan: pan_game
 dig: dig_game
 	./dig_game
 
+# Break the rock. What the dig hands you comes up locked; the hammer frees it and
+# the pan keeps it -- crush too little and the pan wins nothing, too much and it
+# washes over the lip. The grade/recovery law, made a gesture.
+breaker: breaker_game
+	./breaker_game
+
 # Walk Era 0 into Era 1 and watch the ratchet fail to turn. Not a test: a
 # measurement, and it is allowed to come out badly. It did.
 ratchet-run: ratchet
 	./ratchet
 
 clean:
-	rm -f test_separation pan_game dig_game ratchet
+	rm -f test_separation pan_game dig_game breaker_game ratchet

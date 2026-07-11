@@ -692,11 +692,25 @@ built to pay off:
    country rock, so the scoop reads a *grade* on the panel yet yields nothing a
    separator can win. **The rock stays rock until you carry it to the rock-breaking
    station and crush it** (`separate.h crush` — the verb already existed); only the
-   breaker frees the grains. Then the mixed pile is finally the reason **cobbing**
-   exists: hand-sorting the freed coarse material by eye into oxide, sulfide, and
-   waste before any fuel is spent. Dig shallow for a small clean oxide pile; dig
-   deep for a big mixed one you must break and sort. The Era-0 verb that waited
-   three eras now has a job — after the breaker does its.
+   breaker frees the grains. Then you **pan** the crushed rock, and the pan keeps the
+   heavy freed ore and lets the light waste run off. Dig shallow for a small clean
+   oxide pile; dig deep for a big mixed one you must break harder and sort at the
+   furnace, where the sulfide takes a roast the oxide does not.
+
+   > *This paragraph said, until 2026-07-11, that the breaker's second step is
+   > **cobbing** — "the Era-0 verb that waited three eras finally has a job,"
+   > hand-sorting the freed coarse material by eye. Building `breaker.cpp` refuted
+   > it. Cobbing (`separate.h HAND_COB`) is a **size** screen, and the dig delivers
+   > ore and gangue at the **same** size — both in the `GRAVEL` bin — so it enriches
+   > nothing on this feed; worse, after a crush the freed ore falls to `SAND` and
+   > finer while cob keeps `GRAVEL`, so it throws the ore away (grade and recovery
+   > both fall with every blow). The verb that parts freed ore from freed gangue is
+   > the **pan**, by density. History names the order and agrees: the Cornish floors
+   > ran spalling → cobbing → **bucking** (crush) → **jigging** (gravity), so cobbing
+   > was a *pre*-crush hand-sort **by eye** — a perception, not a size cut — which we
+   > do not model as a player verb because sorting a heap lump-by-lump wants a
+   > client interaction outside the window of playability (decided with Ross). The
+   > wrong claim stays, dated, per the project's practice.*
 
    The carry is its own layer, because the rock is heavy and mostly waste and you
    cannot cob it down at the hole (nothing is liberated there). So hauling the whole
@@ -732,15 +746,20 @@ locked until crushed. Correcting a layout number changes no test. Issue #28. **N
 closed:** the earlier shortcut where the dig handed back pre-liberated free grains.
 The dig fills the **composite** bins, not the free ones, so a fresh scoop reads a
 grade but liberates nothing until the rock-breaking station crushes it — the honest
-chain is *dig locked rock → haul (hand → cart) → crush → cob → furnace*. The peak
-grade is now capped at `COMPOSITE_TARGET_FRACTION` (0.5): a locked grain is half
-mineral, so no scoop can read richer than a solid ore grain. **The dig-bar UI is now
-built** (`core/dig.cpp`, 2026-07-11): strike down through the layers, watch the
-mineral change with depth on a live assay, walk the valley for the twitch, shoulder
-the locked rock and leave for the breaker. **Still unbuilt (game layer):** the
-carry loop itself — the cart and the carry-capacity rungs (hands → back-load → cart)
-that make hauling heavy waste to the breaker a real cost — and the breaker and cob
-stations the dig now feeds. The sim core produces exactly what they consume.
+chain is *dig locked rock → haul (hand → cart) → crush → pan → furnace* (see the
+retired-cob note above). The peak grade is now capped at `COMPOSITE_TARGET_FRACTION`
+(0.5): a locked grain is half mineral, so no scoop can read richer than a solid ore
+grain. **The dig-bar UI is now built** (`core/dig.cpp`, 2026-07-11): strike down
+through the layers, watch the mineral change with depth on a live assay, walk the
+valley for the twitch, shoulder the locked rock and leave for the breaker. **And the
+breaker is now built** (`core/breaker.cpp`, 2026-07-11): strike the locked heap with
+a hammer or sledge — a liberation bar climbing over a grind profile going to dust —
+then pan it, and the grade/recovery law lands as the choice of *when to stop
+hammering* (crush too little and the pan wins nothing; too much and the freed ore
+washes over the lip). **Still unbuilt (game layer):** the carry loop itself — the
+cart and the carry-capacity rungs (hands → back-load → cart) that make hauling heavy
+waste from dig to breaker a real cost — and the furnace/roast station the concentrate
+then feeds. The sim core produces exactly what they consume.
 
 ---
 
@@ -759,7 +778,12 @@ Bare-hand verbs, all of them real:
 - **Dig** — loosen soil. Soil only; rock resists.
 - **Scoop** — take a substance bag from the ground.
 - **Sort / cob** — pick grains by eye. High grade, near-zero throughput, and it
-  works *only* on coarse liberated material. Useless on sand.
+  works *only* on coarse liberated material. Useless on sand. *(Note, 2026-07-11:
+  in `core/` this is modelled as `HAND_COB`, a pure **size** screen — it cannot
+  actually read "liberated," only "coarse." That gap is why cob finds no job in the
+  dig→breaker chain, where ore and gangue arrive the same size and the freed ore
+  comes out fine; see `breaker.cpp` and the geology retired-cob note. True by-eye
+  cobbing is a perception verb we do not model as a player action.)*
 - **Crush** — rock against rock. Raises `liberation`, raises `fines`. The
   tradeoff bites immediately.
 - **Screen** — separation by size and nothing else: shake the coarse off a woven

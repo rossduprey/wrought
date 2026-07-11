@@ -161,9 +161,13 @@ inline Substance sample(Place at, int tier, double mass) {
 // A full-depth dig at one spot: the shovel crosses every tier and the spoil pile
 // MIXES them. This is the mixed column -- oxide from the cap AND sulfide from the
 // root, plus the barren middle, all heaped together. It is the richer haul and the
-// harder problem at once: it must be COBBED (sorted by eye) into oxide, sulfide,
-// and waste before the furnace, because the oxide smelts straight and the sulfide
-// must first be roasted. `mass` is the bite taken from each tier.
+// harder problem at once: it must be CRUSHED to free the grains and PANNED to part
+// ore from waste (separate.h crush, then separate) before the furnace -- and the
+// concentrate still carries both minerals, because the oxide smelts straight and
+// the sulfide must first be roasted. (An earlier note here said the pile must be
+// "cobbed, sorted by eye"; a probe on 2026-07-11 retired that -- cobbing is a size
+// screen and this feed is one size, so it enriches nothing. See breaker.cpp.)
+// `mass` is the bite taken from each tier.
 inline Substance dig_column(Place at, double mass) {
     Substance pile;
     for (int t = 0; t < N_TIER; ++t) pile.add(sample(at, t, mass));

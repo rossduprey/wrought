@@ -30,7 +30,7 @@
 // barren leached middle over a primary sulfide root (geology.h). So the panel does
 // not merely climb as you dig -- it changes character, gaining a sulfide the
 // furnace will refuse until it is roasted. Dig shallow for a small clean oxide
-// pile; dig deep for a big mixed one you will have to sort by eye and smelt in two
+// pile; dig deep for a big mixed one you will have to break, pan, and smelt in two
 // fires. That choice is the decision the slice exists to make legible, and it is
 // never stated, only dug.
 //
@@ -421,8 +421,8 @@ int main() {
     std::printf("   crushed before a single grain of it is free.\n\n");
     if (oxide && sulfide) {
         std::printf("   You dug deep, and the pile is mixed: an oxide from the cap and a\n");
-        std::printf("   sulfide from the root. They do not take the same fire. Once it is\n");
-        std::printf("   crushed you will have to cob them apart by eye -- the sulfide has\n");
+        std::printf("   sulfide from the root. They do not take the same fire. Break it\n");
+        std::printf("   and pan it and the concentrate still holds both -- the sulfide has\n");
         std::printf("   to be roasted before any furnace will look at it.\n\n");
     } else if (oxide && !sulfide) {
         std::printf("   You stayed shallow. The pile is clean oxide -- one ore, one fire.\n");
