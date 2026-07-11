@@ -18,7 +18,7 @@
 // Decided with Ross, and until now carried only in conversation (RUNBOOK.md warns
 // that is not a place a decision survives): the player sees a **bar that shows
 // which layer he is working**, and as he strikes the ground with the hand or the
-// shovel he watches, in real time, the pit cross those layers. That is the whole
+// pick he watches, in real time, the pit cross those layers. That is the whole
 // input model. It is the honest terminal translation of a left-click that eats
 // into the dirt -- one strike is one impulse (the pan's [space] again, because a
 // terminal cannot see a held mouse button any more than it can see a held swirl),
@@ -36,13 +36,15 @@
 //
 // -- What the ground gives, and what it withholds. --------------------------
 //
-// Every scoop comes up as LOCKED ROCK (geology.h): the dig fills the composite
-// bins, so the assay reads a *grade* -- how much copper is in this ground -- but
-// yields nothing a separator can win. The rock stays rock in the hand and in the
-// cart. Only the rock-breaking station (separate.h crush) frees the grains, and
-// that station is a place you walk to. This slice therefore ends where the honest
-// chain says it must: you shoulder the pile and leave to go break it. The panel is
-// honest about a grade it cannot yet let you keep.
+// A pick blow comes up as a SIZE DISTRIBUTION (geology.h, corrected 2026-07-11):
+// the fine end is already-free grains a pan can take at the hole, the coarse end is
+// LOCKED ROCK the rock-breaking station (separate.h crush) is the only way into. How
+// much frees at the face is the mineralogy's -- placer tin comes up coarse and free,
+// disseminated sulfide comes up all but locked, the weathered oxide cap between. So
+// the assay reads a true *grade* -- how much copper is in this ground -- but most of
+// the copper here (hard-rock hill) is locked, and the station is a place you walk to.
+// This slice ends where the honest chain says it must: you shoulder the coarse and
+// leave to go break it. The panel is honest about a grade it cannot yet let you keep.
 //
 // And the valley is mostly barren country rock. Prospecting is walking it and
 // watching for the spot where the numbers twitch. Copper ground and tin ground sit
@@ -72,15 +74,16 @@ using namespace wrought;
 // rates that set how fast the work goes and NOTHING a test or a finding reads.
 // Depth is measured in tiers (1.0 == one DepthTier crossed), so a strike advances
 // the pit by a fraction of a tier and bites some mass of that tier's rock into the
-// spoil pile. The shovel is the classic Era-0-into-1 rung: it multiplies what you
-// pull out of the ground (~10x) AND drives the pit down faster -- which is exactly
-// why a shovel with no cart just buries you in rock you cannot carry (DESIGN.md).
+// spoil pile. The pick is the classic Era-0-into-1 rung: it multiplies what you
+// win from the ground (~10x) AND drives the pit down faster -- which is exactly why
+// a pick with no cart just buries you in rock you cannot carry (DESIGN.md). (A pick
+// WINS rock from the face; the shovel is the loader downstream in the carry loop.)
 // The bite mass is passed straight to geology.sample() as its `mass` argument, so
-// the shovel changes how MUCH rock of a given makeup you take, never the makeup.
-static constexpr double HAND_STEP   = 0.12;  // tiers of depth per bare-hand strike. AUTHORED.
-static constexpr double HAND_BITE   = 0.05;  // kg of rock per bare-hand strike. AUTHORED.
-static constexpr double SHOVEL_STEP = 0.50;  // tiers per shovel strike (~4x deeper). AUTHORED.
-static constexpr double SHOVEL_BITE = 0.50;  // kg per shovel strike (10x the hand). AUTHORED.
+// the pick changes how MUCH rock of a given makeup you take, never the makeup.
+static constexpr double HAND_STEP = 0.12;  // tiers of depth per bare-hand strike. AUTHORED.
+static constexpr double HAND_BITE = 0.05;  // kg of rock per bare-hand strike. AUTHORED.
+static constexpr double PICK_STEP = 0.50;  // tiers per pick strike (~4x deeper). AUTHORED.
+static constexpr double PICK_BITE = 0.50;  // kg per pick strike (10x the hand). AUTHORED.
 
 static constexpr double WALK_STEP   = 10.0;  // m per step across the valley floor. AUTHORED.
 static constexpr double MAX_DEPTH   = (double)N_TIER; // you strike bedrock at the bottom tier.
@@ -236,19 +239,19 @@ static const char* AMBIENT[] = {
     "your palms have blistered and then gone hard",
     "the sun has moved; the shadow of the spoil heap is longer",
     "somewhere below the rock, water is running you cannot reach",
-    "the shovel rings differently down here -- harder ground",
+    "the pick rings differently down here -- harder ground",
     "grit has worked its way into everything you own",
     "a long way off, the smoke of somebody else's fire",
 };
 static const int N_AMBIENT = (int)(sizeof(AMBIENT) / sizeof(AMBIENT[0]));
 
 static void draw(Place at, double depth, const Substance& pile, const Assay& assay,
-                 bool shovel, double t, const char* ambient, const char* nag) {
+                 bool pick, double t, const char* ambient, const char* nag) {
     std::printf("\033[H\033[J");
     std::printf("\n   %-44s  %2d:%02d\n\n", ambient ? ambient : "", (int)t / 60, (int)t % 60);
 
     std::printf("   you are standing at  x=%.0f m  y=%.0f m\n", at.x, at.y);
-    std::printf("   in your hands: %s\n\n", shovel ? "a shovel" : "your two hands");
+    std::printf("   in your hands: %s\n\n", pick ? "a pick" : "your two hands");
 
     // The bar. Each tier is a band three rows tall; the pit edge is '>'.
     const int here = tier_at(depth);
@@ -272,12 +275,12 @@ static void draw(Place at, double depth, const Substance& pile, const Assay& ass
         }
     }
     if (depth >= MAX_DEPTH - 1e-9)
-        std::printf("\n   the shovel is on bedrock. There is nothing deeper here.\n");
+        std::printf("\n   the pick is on bedrock. There is nothing deeper here.\n");
     else
         std::printf("\n   depth: %.1f of %d layers\n", depth, N_TIER);
 
     std::printf("\n   %s\n", nag ? nag : "");
-    std::printf("\n   [space] strike   [t] hand/shovel   [w/a/s/d] walk"
+    std::printf("\n   [space] strike   [t] hand/pick   [w/a/s/d] walk"
                 "   [k] shoulder it and go   [q] quit\n");
 
     draw_assay(pile, assay);
@@ -294,7 +297,7 @@ int main() {
     }
 
     std::printf("\033[H\033[J\n"
-        "   You are standing in a valley with a shovel you made and a bag to fill.\n\n"
+        "   You are standing in a valley with a pick you made and a bag to fill.\n\n"
         "   Somewhere under this ground is copper, and a long walk east of it, tin.\n"
         "   Most of the valley is barren rock and will read as nothing. You find ore\n"
         "   by walking until the ground under you changes.\n\n"
@@ -314,13 +317,13 @@ int main() {
     // gradient to climb. copper-hill is at (0,0), radius 40 (geology.h).
     Place at { 22.0, 0.0 };
     double depth = 0.0, t = 0.0;
-    bool shovel = false;
+    bool pick = false;
     Substance pile;
     Assay assay;
 
     const char* ambient = AMBIENT[0];
     double ambient_t = 0;
-    std::string nag = "You set the point of the shovel against the ground.";
+    std::string nag = "You set the point of the pick against the ground.";
     double nag_t = 6;
 
     bool running = true, quit = false, hauled = false;
@@ -328,14 +331,14 @@ int main() {
         for (int c; (c = poll_key()) >= 0; ) {
             if (c == 'q') { running = false; quit = true; }
             else if (c == 't') {
-                shovel = !shovel;
-                nag = shovel ? "You take up the shovel. It bites deep and heavy."
-                             : "You set the shovel down and work with your hands.";
+                pick = !pick;
+                nag = pick ? "You take up the pick. It bites deep and heavy."
+                             : "You set the pick down and work with your hands.";
                 nag_t = t + 3;
             }
             else if (c == ' ') {
-                const double step = shovel ? SHOVEL_STEP : HAND_STEP;
-                const double bite = shovel ? SHOVEL_BITE : HAND_BITE;
+                const double step = pick ? PICK_STEP : HAND_STEP;
+                const double bite = pick ? PICK_BITE : HAND_BITE;
                 if (depth >= MAX_DEPTH - 1e-9) {
                     nag = "Bedrock. The point skips off it. Move, or take what you have.";
                     nag_t = t + 3;
@@ -345,7 +348,7 @@ int main() {
                     pile.add(sample(at, tier_at(depth), bite));
                     depth = std::fmin(MAX_DEPTH, depth + step);
                     assay_update(assay, pile);
-                    t += shovel ? 4.0 : 1.5;   // a shovel-stroke is slower than a scratch
+                    t += pick ? 4.0 : 1.5;   // a pick-stroke is slower than a scratch
                     const int after = tier_at(depth);
                     if (after != before && t > nag_t) {
                         nag = after == MIDDLE
@@ -381,7 +384,7 @@ int main() {
         if (t > ambient_t) { ambient = AMBIENT[(int)(t / 41) % N_AMBIENT]; ambient_t = t + 41; }
         if (t > nag_t) nag.clear();
 
-        draw(at, depth, pile, assay, shovel, t, ambient, nag.empty() ? nullptr : nag.c_str());
+        draw(at, depth, pile, assay, pick, t, ambient, nag.empty() ? nullptr : nag.c_str());
         nap(0.05);
     }
 
@@ -389,7 +392,7 @@ int main() {
     std::printf("\033[H\033[J\n");
 
     if (quit || !hauled || pile.total_mass() < SPECK) {
-        std::printf("   You drop the shovel and walk away with an empty bag.\n\n");
+        std::printf("   You drop the pick and walk away with an empty bag.\n\n");
         return 0;
     }
 

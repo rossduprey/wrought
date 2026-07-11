@@ -10,51 +10,61 @@
 // fires; the carry has no physics to honor but geometry -- the one thing it must
 // not invent is the DISTANCE, and it does not: the valley's deposits sit at real
 // coordinates in geology.h, and the walk is measured off them. Everything else
-// here (capacities, walk speed, the cost of building a cart) is authored pacing,
-// the carry's counterpart to the pan's STROKE and the furnace's BELLOWS_PUMP, and
-// no test or finding reads it.
+// here (capacities, walk speed, the cost of building a cart, of a wash) is authored
+// pacing, the carry's counterpart to the pan's STROKE and the furnace's BELLOWS_
+// PUMP, and no test or finding reads it.
 //
 // -- The finding this slice is built on. -----------------------------------
 //
-// geology.h's dig hands you LOCKED rock: the ore is disseminated, glued to gangue
-// you cannot tell it apart from until the breaker crushes it. So the spoil pile at
-// the hole is ONE uniform grade -- and a probe (2026-07-11) confirms it is flat: a
-// shovel column off the copper hill reads 30% ore by mass no matter the bite. That
-// is the whole trap. You cannot high-grade the pile at the hole, because you cannot
-// SEE the ore in it; every kilogram of "waste" you leave behind is exactly its
-// grade in copper left behind with it. The heavy, mostly-worthless-looking rock is
-// not worthless -- it is un-sorted -- so the entire pile is the haul, waste and all.
+// CORRECTED 2026-07-11, from monitored play: an earlier version of this slice
+// stood on a falsehood -- that the dig hands you ONE uniform grade of locked rock,
+// so the whole heap must go to the breaker and every kilogram left is ore left. It
+// does not. geology.h now breaks the pick's spoil across a size DISTRIBUTION, and
+// liberation rides on it: the FINE end of the heap is already-free grains a pan can
+// take at the hole with no breaker at all, and the coarse end is locked rock the
+// breaker is the only way into. How much frees at the face is the mineralogy's to
+// decide, not ours (sourced in geology.h) -- and at THIS hole, the copper hill, it
+// decides against you. A probe on the corrected model:
 //
-// And the pile is bigger than your hands. The same probe on the numbers this slice
-// authors:
+//   heap from a pick column (copper hill):  12 kg, 30% ore (3.6 kg copper mineral)
+//   of that, FREE at the face (washable):   ~0.1 kg copper -- the oxide's fine tail
+//   LOCKED in the coarse (breaker only):    ~3.5 kg copper -- nearly all of it
 //
-//   heap from a shovel column:              12 kg, 30% ore (3.6 kg of copper mineral)
-//   HAND-haul it 80 m to the breaker:        6 trips,  ~14 min of walking
-//   BACK-load (a shouldered sack):           3 trips,  ~7 min
-//   CART (built once, up front):             1 trip,   ~2 min
+// So the wash at the hole is real but nearly worthless HERE: this is hard rock, the
+// copper is ground into the gangue, and the stone is the only way to it. That is
+// the lesson, and it is the true reason hard-rock ore built stamp mills. The knife
+// turns at the tin ground: there the ore is placer cassiterite, coarse and weathered
+// free, and the same wash would take almost ALL of it at the hole with no stone
+// touched -- which is why placer tin was panned by a single hand. The slice teaches
+// the tool (a wash, a haul) and lets the ground teach which one this ground rewards.
 //
-// The shovel multiplies what you pull OUT of the ground tenfold; your hands do not
-// grow to match. So a shovel with no cart just buries you in rock you cannot carry,
-// and the cart is the rung that unburies you. It is also what makes DISTANCE
-// affordable: the breaker is 80 m off, but the tin ground is 323 m off (that number
-// is real -- sqrt(300^2+120^2) straight out of geology.h's DEPOSITS), and by hand
-// that is an hour of walking per heap. The cart is what turns a far, rich deposit
-// from a fantasy into a decision. None of this is stated to the player -- it is
-// felt, one trip at a time, and only named at the end as the cost it already was.
+// And the locked coarse is bigger than your hands. The numbers this slice authors:
 //
-// -- The gesture. -----------------------------------------------------------
+//   HAND-haul the coarse 80 m to the breaker:  6 trips,  ~14 min of walking
+//   BACK-load (a shouldered sack):             3 trips,  ~7 min
+//   CART (built once, up front):               1 trip,   ~2 min
 //
-// The other slices each have one gesture hammered many times (swirl, strike, blow,
-// bellows). The carry's is the TRIP: you load what you can and you WALK it, and you
-// do it again, and again, watching the heap at the hole shrink and the pile at the
-// breaker grow. A terminal cannot see you hold a walk key any more than it could see
-// the pan's held swirl, so a trip is an impulse -- one key, one round trip, the walk
-// played out so you feel the road. The rungs (a shouldered sack, then a cart you
-// stop and build) change how much moves per trip, and the only decision the slice
-// withholds is the one it is here to teach: nobody tells you the pile is too big for
-// your hands, or that the cart would pay for itself. You find out by hauling. The
-// display is the two piles and the road between them -- the material, never a
-// projected trip count -- and the cost lands, as always, only at the end.
+// The pick multiplies what you win from the ground tenfold; your hands do not grow
+// to match. So a pick with no cart just buries you in rock you cannot carry, and the
+// cart is the rung that unburies you. It is also what makes DISTANCE affordable: the
+// breaker is 80 m off, but the tin ground is 323 m off (real -- sqrt(300^2+120^2)
+// straight out of geology.h's DEPOSITS), and by hand that is an hour a heap. None of
+// this is stated to the player -- it is felt, one trip at a time, and named only at
+// the end as the cost it already was.
+//
+// -- The gestures. ----------------------------------------------------------
+//
+// Two, where the other slices had one. The WASH is the tin-or-toll question asked
+// at the hole: screen the fines off the heap and pan them where you stand, winning
+// whatever came up free -- everything, at a placer; a sliver, at this hard hill.
+// The TRIP is the haul of what the wash could not free: you load the locked coarse
+// and you WALK it, and again, watching the heap shrink and the pile at the breaker
+// grow. A terminal cannot see you hold a walk key, so a trip is an impulse -- one
+// key, one round trip, the walk played out so you feel the road. The rungs (a
+// shouldered sack, then a cart you stop and build) change how much moves per trip.
+// Nobody tells you the wash is futile here, or that the cart would pay for itself;
+// you find out by doing. The display is the two piles and the road between them --
+// the material, never a projected count -- and the cost lands only at the end.
 //
 // Build: make carry   (needs a terminal; it reads single keypresses)
 
@@ -69,6 +79,7 @@
 #include <unistd.h>
 
 #include "geology.h"
+#include "separate.h"   // screen() + separate(): the wash at the hole is the real pan
 
 using namespace wrought;
 
@@ -78,9 +89,9 @@ using namespace wrought;
 // against are NOT authored here -- the breaker sits at an authored placeholder
 // offset (#28, like the deposit centers), but the deposit-to-deposit geometry the
 // report leans on is geology.h's own DEPOSITS coordinates.
-static constexpr double SHOVEL_BITE = 4.0;    // kg/tier a full-depth shovel dig takes. AUTHORED.
-static constexpr double D_BREAKER   = 80.0;   // m from this hole to the breaking stone. AUTHORED (#28).
-static constexpr double WALK        = 1.1;    // m/s under load. AUTHORED.
+static constexpr double PICK_BITE = 4.0;      // kg/tier a full-depth pick dig wins. AUTHORED.
+static constexpr double D_BREAKER = 80.0;     // m from this hole to the breaking stone. AUTHORED (#28).
+static constexpr double WALK      = 1.1;      // m/s under load. AUTHORED.
 
 static constexpr double CAP_HANDS = 2.0;      // kg your two hands carry in one trip. AUTHORED.
 static constexpr double CAP_BACK  = 5.0;      // kg a shouldered sack carries. AUTHORED.
@@ -88,6 +99,7 @@ static constexpr double CAP_CART  = 20.0;     // kg a cart carries. AUTHORED.
 
 static constexpr double BACK_COST = 30.0;     // in-world s to shoulder a sack. AUTHORED.
 static constexpr double CART_COST = 180.0;    // in-world s to lash a cart together. AUTHORED.
+static constexpr double WASH_COST = 90.0;     // in-world s to screen and pan the fines. AUTHORED.
 
 static constexpr int    LEG_FRAMES = 28;      // ticks to animate one leg of a trip. AUTHORED feel.
 
@@ -102,12 +114,21 @@ static double ore_mass(const Substance& s) {
     return m;
 }
 
-enum Carrier { HANDS, BACK, CART };
+// Take a uniform scoop off the heap: hauling a load removes rock in the proportion
+// it sits in the pile (you cannot high-grade a shovel of locked rock -- only a wash
+// can part it, and only what came up free). Keeps the Substance and its mass in step
+// so a later wash reads the true remainder.
+static void scale(Substance& s, double k) {
+    for (int p = 0; p < N_PHASE; ++p)
+        for (int z = 0; z < N_SIZE; ++z) { s.freegrain[p][z] *= k; s.composite[p][z] *= k; }
+}
+
+enum Carrier { BY_HANDS, BY_BACK, BY_CART };  // BY_* to avoid separate.h's HANDS separator
 static double capacity(Carrier c) {
-    return c == CART ? CAP_CART : c == BACK ? CAP_BACK : CAP_HANDS;
+    return c == BY_CART ? CAP_CART : c == BY_BACK ? CAP_BACK : CAP_HANDS;
 }
 static const char* carrier_name(Carrier c) {
-    return c == CART ? "a cart" : c == BACK ? "a shouldered sack" : "your two hands";
+    return c == BY_CART ? "a cart" : c == BY_BACK ? "a shouldered sack" : "your two hands";
 }
 
 // ---------------------------------------------------------------------------
@@ -171,8 +192,8 @@ static void draw_road(int row, double where, bool walking, bool loaded) {
 }
 
 // A pile, drawn as a heap of broken ground -- a bar of the rock itself scaled to how
-// much of the original heap it holds. You cannot see the ore in it (that is the
-// whole finding), so the panel shows only rock: heavy, coarse, un-sorted.
+// much of the original heap it holds. The panel shows only rock: heavy, coarse, and
+// mostly locked -- what the wash could not free and the breaker still must.
 static void draw_pile(int row, int col, const char* label, double mass, double of) {
     const int W = 18;
     char b[32];
@@ -198,14 +219,15 @@ static const char* AMBIENT[] = {
 static const int N_AMBIENT = (int)(sizeof(AMBIENT) / sizeof(AMBIENT[0]));
 
 static void draw(double heap, double delivered, double of, Carrier carrier,
-                 double load, int trips, double t, bool walking, double where,
-                 bool loaded, const char* ambient, const char* nag) {
+                 double load, int trips, double t, double won_here, bool walking,
+                 double where, bool loaded, const char* ambient, const char* nag) {
     std::printf("\033[H\033[J");
     std::printf("\n   %-52s  %2d:%02d\n\n", ambient ? ambient : "",
                 (int)t / 60, (int)t % 60);
 
     std::printf("   the spoil heap at the hole, and the road to the breaking stone\n\n");
-    std::printf("   trips to the stone: %d\n\n", trips);
+    std::printf("   trips to the stone: %-3d   washed free at the hole: %.0f g copper\n\n",
+                trips, won_here * 1000.0);
 
     draw_pile(6, 4, "at the hole", heap, of);
     draw_pile(7, 4, "at the stone", delivered, of);
@@ -222,7 +244,7 @@ static void draw(double heap, double delivered, double of, Carrier carrier,
 
     std::printf("\033[14;4H%s\n", nag ? nag : "");
 
-    std::printf("\033[16;4H[g] load up and haul a trip to the stone\n");
+    std::printf("\033[16;4H[w] wash the loose fines here   [g] load up and haul a trip\n");
     std::printf("\033[17;4H[b] shoulder a sack   [c] build a cart\n");
     std::printf("\033[18;4H[q] set the load down and stop\n");
     std::printf("\033[24;1H");
@@ -230,38 +252,44 @@ static void draw(double heap, double delivered, double of, Carrier carrier,
 }
 
 // ---------------------------------------------------------------------------
-// The reckoning. Only what you could know standing between the two piles: how much
-// rock you moved, how much you left at the hole, how many trips it took, how long.
-// And then the two things the walking taught without saying: the rock you left is
-// ORE you left (the pile was one grade, so there was no waste to leave, only un-
-// sorted ore), and what the cart was worth -- named only now, as the cost it was.
-static void report(double heap_left, double delivered, double grade,
+// The reckoning. Only what you could know standing between the two piles: what the
+// wash won you here, how much locked rock you hauled, how much you left, how long.
+// And then the things the work taught without saying: at this hard hill almost none
+// of the copper would come free at the face, so the coarse you left is LOCKED ore
+// the breaker never got to; what the cart was worth; and the tin ground, where the
+// same wash would have taken it all. Named only now, as the cost it already was.
+static void report(double heap_left, double delivered, double won_here, double grade,
                    Carrier carrier, int trips, double t) {
     std::printf("   You set the load down and straighten your back.\n\n");
 
+    if (won_here > SPECK)
+        std::printf("   Washing the loose fines at the hole won you %.0f g of copper without a\n"
+                    "   single step -- the little of this ore that came up already free.\n\n",
+                    won_here * 1000.0);
+
     if (delivered * 1.0 < SPECK) {
-        std::printf("   You carried nothing to the stone. The whole heap is still at the\n"
-                    "   hole, and every grain of ore in it with the rock.\n\n");
-        return;
+        std::printf("   You carried nothing to the stone. The locked rock -- nearly all of the\n"
+                    "   copper -- is still at the hole, and no wash will free it. Only the\n"
+                    "   breaker can, and it is a walk away.\n\n");
+    } else {
+        std::printf("   You carried %.0f kg of locked rock to the breaking stone in %d %s,\n",
+                    delivered, trips, trips == 1 ? "trip" : "trips");
+        std::printf("   across %d minutes and %d seconds of walking.\n\n",
+                    (int)t / 60, (int)t % 60);
     }
 
-    std::printf("   You carried %.0f kg of broken ground to the breaking stone in %d %s,\n",
-                delivered, trips, trips == 1 ? "trip" : "trips");
-    std::printf("   across %d minutes and %d seconds of walking.\n\n",
-                (int)t / 60, (int)t % 60);
-
     if (heap_left * 1.0 > 0.5) {
-        // The finding, as consequence: uniform grade means left rock is left ore.
+        // The finding, as consequence: what you left is coarse LOCKED ore -- not
+        // free, so the wash could not save it, and it never reached the stone.
         const double ore_left = grade * heap_left;
-        std::printf("   %.0f kg is still at the hole. You could not tell its ore from its\n"
-                    "   waste -- nothing is freed until the stone crushes it -- so the heap\n"
-                    "   was one grade throughout, and the rock you walked away from carried\n"
-                    "   %.0f g of copper away with it. Not waste left behind: ore left behind,\n"
-                    "   still un-sorted, back at the hole where no fire will ever find it.\n\n",
+        std::printf("   %.0f kg is still at the hole -- coarse, locked rock. The wash could not\n"
+                    "   part it (the ore is ground into the gangue) and it never reached the\n"
+                    "   stone, so the roughly %.0f g of copper in it is ore left behind: not\n"
+                    "   waste, un-freed ore, back where no fire will ever find it.\n\n",
                     heap_left, ore_left * 1000.0);
-    } else {
-        std::printf("   The hole is bare -- you moved the whole heap. Every grain the dig\n"
-                    "   turned up is at the stone now, waiting on the hammer.\n\n");
+    } else if (delivered >= SPECK) {
+        std::printf("   The hole is bare -- the locked coarse is all at the stone now, waiting\n"
+                    "   on the hammer that is the only way into it.\n\n");
     }
 
     // What the carrier cost or saved, named only now. The distance to the far
@@ -270,22 +298,24 @@ static void report(double heap_left, double delivered, double grade,
         (DEPOSITS[0].cx - DEPOSITS[1].cx) * (DEPOSITS[0].cx - DEPOSITS[1].cx) +
         (DEPOSITS[0].cy - DEPOSITS[1].cy) * (DEPOSITS[0].cy - DEPOSITS[1].cy));
 
-    if (carrier == HANDS && trips >= 4) {
-        std::printf("   You did the whole haul in your two hands, a few kilograms a trip.\n"
+    if (carrier == BY_HANDS && trips >= 4) {
+        std::printf("   You hauled the locked coarse in your two hands, a few kilograms a trip.\n"
                     "   A cart carries ten times that -- what took you %d trips would have\n"
-                    "   been one or two. The shovel filled the heap faster than your hands\n"
-                    "   could empty it; that is the shape of it, and the cart is the fix.\n\n",
+                    "   been one or two. The pick filled the heap faster than your hands could\n"
+                    "   empty it; that is the shape of it, and the cart is the fix.\n\n",
                     trips);
-    } else if (carrier == CART) {
+    } else if (carrier == BY_CART) {
         std::printf("   The cart earned back the time you spent building it and then some --\n"
                     "   it swallowed in a load or two what your hands could not have matched\n"
                     "   in an afternoon of trips.\n\n");
     }
 
-    std::printf("   This stone is %.0f m off. The tin ground is %.0f m -- four times the\n"
-                "   walk, and by hand that is the better part of an hour a heap. Far, rich\n"
-                "   ground is only worth turning over once you have a cart to carry it.\n\n",
-                D_BREAKER, gap);
+    std::printf("   This is hard rock: the wash at the hole barely helped, and the stone was\n"
+                "   the only way in. It would not be so at the tin ground, %.0f m off (this\n"
+                "   stone is %.0f m) -- placer tin comes up coarse and free, and there the\n"
+                "   wash you just did would have taken nearly all of it, no stone touched.\n"
+                "   Which ground rewards the pan and which the breaker is the ground's to say.\n\n",
+                gap, D_BREAKER);
 }
 
 // ---------------------------------------------------------------------------
@@ -297,32 +327,34 @@ int main() {
     }
 
     std::printf("\033[H\033[J\n"
-        "   You have dug a full-depth column at the copper hill: a heap of broken\n"
-        "   ground, oxide and sulfide and barren rock all heaped together. It is\n"
-        "   locked rock -- nothing in it is freed yet, so you cannot tell the ore\n"
-        "   from the waste by looking. The whole heap has to go to the breaking\n"
-        "   stone before any of it is worth a thing.\n\n"
-        "   The stone is a walk off. You carry the rock there yourself, a load at a\n"
-        "   time, and haul back for more. Your two hands do not hold much. There is\n"
-        "   a sack you can shoulder, and a cart you can stop and build, if you judge\n"
-        "   the heap worth the trouble -- but nobody is going to tell you whether it\n"
-        "   is. Load up, walk it over, and find out what the haul costs.\n\n"
+        "   You have picked a full-depth column at the copper hill: a heap of broken\n"
+        "   ground, oxide and sulfide and barren rock heaped together. The pick left\n"
+        "   it in every size, from dust to fist-sized stone. The loose fines you can\n"
+        "   wash right here, and keep whatever came up free. The coarse rock is\n"
+        "   locked -- the ore ground into it -- and only the breaking stone, a walk\n"
+        "   off, can free that.\n\n"
+        "   Wash the fines where you stand, or load the coarse and carry it to the\n"
+        "   stone yourself, a load at a time. Your two hands do not hold much. There\n"
+        "   is a sack you can shoulder, and a cart you can stop and build, if you\n"
+        "   judge the heap worth it -- but nobody will tell you whether the wash is\n"
+        "   worth doing here, or whether the cart pays. Try them, and find out.\n\n"
         "   [press any key]\n");
     std::fflush(stdout);
     raw_tty();
     while (poll_key() < 0) nap(0.02);
 
-    // The heap: a shovel full-depth dig at the copper hill center. Materialized the
+    // The heap: a pick full-depth dig at the copper hill center. Materialized the
     // way every slice materializes its feed -- so this one stands alone but is fed
-    // exactly what the dig produces: locked, mixed, one uniform grade.
-    Substance heap = dig_column(Place{0.0, 0.0}, SHOVEL_BITE);
+    // exactly what the dig produces: a size distribution, free fines over locked
+    // coarse, the copper mostly in the locked part (that is the finding).
+    Substance heap = dig_column(Place{0.0, 0.0}, PICK_BITE);
     const double heap0 = heap.total_mass();
-    const double ore0  = ore_mass(heap);
-    const double grade = heap0 > SPECK ? ore0 / heap0 : 0.0;  // uniform: the finding
+    const double grade = heap0 > SPECK ? ore_mass(heap) / heap0 : 0.0; // for the ore-left estimate
     double heap_mass = heap0;
     double delivered = 0.0;
+    double won_here  = 0.0;   // copper won by washing the free fines at the hole
 
-    Carrier carrier = HANDS;
+    Carrier carrier = BY_HANDS;
     int trips = 0;
     double t = 0.0;
 
@@ -341,6 +373,41 @@ int main() {
         for (int c; (c = poll_key()) >= 0; ) {
             if (walking) continue;   // you cannot re-tool or re-load mid-stride
             if (c == 'q') { running = false; quit = true; }
+            else if (c == 'w') {
+                // Wash the loose fines where you stand: screen the sand-and-finer off
+                // the coarse (cut at GRAVEL) and pan it. You keep the free ore it
+                // holds; the locked coarse stays to haul. At this hard hill that ore
+                // is a sliver -- but the gesture is real and the ground decides.
+                if (heap_mass < 0.5) {
+                    nag = "The hole is bare -- there is nothing left to wash.";
+                    nag_t = t + 4;
+                } else {
+                    ScreenResult sc = screen(heap, 0.95, GRAVEL);      // sand-and-finer to undersize
+                    SeparationResult pr = separate(sc.undersize, PAN); // pan those fines
+                    // Won = only the FREE ore the pan kept. Locked composite that
+                    // leaked through the screen is NOT won -- it is still locked, so
+                    // it stays in the haul; a pan cannot free what the breaker must.
+                    double won = 0.0;
+                    for (int p = 0; p < N_PHASE; ++p)
+                        if (is_copper_ore(p))
+                            for (int z = 0; z < N_SIZE; ++z) won += pr.concentrate.freegrain[p][z];
+                    won_here += won;
+                    // The haul: the coarse oversize, plus every locked grain that
+                    // rode into the pan (kept or spilled -- still locked, still ore,
+                    // so neither won nor lost). Free fine gangue and any fine ore lost
+                    // over the lip stay at the hole as tailings.
+                    heap = sc.oversize;
+                    for (int p = 0; p < N_PHASE; ++p)
+                        for (int z = 0; z < N_SIZE; ++z)
+                            heap.composite[p][z] += pr.concentrate.composite[p][z]
+                                                  + pr.tailings.composite[p][z];
+                    heap_mass = heap.total_mass();
+                    t += WASH_COST;
+                    nag = "You screen the fines off and pan them where you stand. The heavy "
+                          "specks that stay are the ore that came up free.";
+                    nag_t = t + 6;
+                }
+            }
             else if (c == 'g') {
                 if (heap_mass < 0.5) {
                     nag = "The hole is bare -- there is nothing left to carry.";
@@ -348,13 +415,14 @@ int main() {
                 } else {
                     load = capacity(carrier);
                     if (load > heap_mass) load = heap_mass;
+                    scale(heap, (heap_mass - load) / heap_mass); // a uniform scoop off the pile
                     heap_mass -= load;
                     walking = true; outbound = true; leg = 0;
                 }
             }
             else if (c == 'b') {
-                if (carrier == HANDS) {
-                    carrier = BACK;
+                if (carrier == BY_HANDS) {
+                    carrier = BY_BACK;
                     t += BACK_COST;
                     nag = "You knot a sack and swing it up onto your shoulder. It holds "
                           "more than your hands, and rides worse.";
@@ -365,8 +433,8 @@ int main() {
                 }
             }
             else if (c == 'c') {
-                if (carrier != CART) {
-                    carrier = CART;
+                if (carrier != BY_CART) {
+                    carrier = BY_CART;
                     t += CART_COST;
                     nag = "You stop and lash a cart together -- poles, a bed, a pair of "
                           "wheels. It costs you the time now. It carries ten hands' worth.";
@@ -408,21 +476,21 @@ int main() {
         if (t > ambient_t) { ambient = AMBIENT[(int)(t / 37) % N_AMBIENT]; ambient_t = t + 37; }
         if (t > nag_t) nag.clear();
 
-        draw(heap_mass, delivered, heap0, carrier, load, trips, t, walking, where,
-             outbound, ambient, nag.empty() ? nullptr : nag.c_str());
+        draw(heap_mass, delivered, heap0, carrier, load, trips, t, won_here, walking,
+             where, outbound, ambient, nag.empty() ? nullptr : nag.c_str());
         nap(0.05);
     }
 
     restore_tty();
     std::printf("\033[H\033[J\n");
 
-    if (quit && delivered < SPECK) {
-        std::printf("   You walk away from the heap without carrying a stone of it. The ore\n"
-                    "   is still in the ground you turned over, which is the same as still in\n"
-                    "   the ground.\n\n");
+    if (quit && delivered < SPECK && won_here < SPECK) {
+        std::printf("   You walk away from the heap without washing a pan or carrying a stone\n"
+                    "   of it. The ore is still in the ground you turned over, which is the\n"
+                    "   same as still in the ground.\n\n");
         return 0;
     }
 
-    report(heap_mass, delivered, grade, carrier, trips, t);
+    report(heap_mass, delivered, won_here, grade, carrier, trips, t);
     return 0;
 }

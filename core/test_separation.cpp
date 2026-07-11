@@ -1757,7 +1757,7 @@ int main() {
         // (d) the mixed column: a full-depth dig heaps oxide AND sulfide AND waste
         // into one pile -- richer haul, harder problem -- and mass is conserved
         // across the tiers. No single tier holds both minerals; the pile does,
-        // which is the whole reason it must be cobbed.
+        // which is why parting it is a job downstream, not at the hole.
         const Substance pile = dig_column(cu_center, 1.0);
         check(pile.grade(CUPRITE) > 0.0 && pile.grade(CHALCOCITE) > 0.0
               && pile.grade(QUARTZ) > 0.0
@@ -1773,36 +1773,49 @@ int main() {
               && at_sn.grade(CUPRITE) < 1e-12 && at_sn.grade(CHALCOCITE) < 1e-12, // tin body: no copper
               "co-location is the gate: copper carries no tin and tin no copper -- bronze forces travel");
 
-        // (f) hands sample, the shovel hauls: the tool sets the mass, never the
-        // makeup. Same grade on the panel, ten times the load.
+        // (f) hands sample, the pick wins: the tool sets the mass, never the
+        // makeup. Same grade on the panel, ten times the load. (The shovel is not
+        // the winning tool -- it is the loader downstream in the carry loop.)
         const Substance hand = sample(cu_center, SURFACE, 0.1);
-        const Substance shovel = sample(cu_center, SURFACE, 1.0);
-        check(std::fabs(shovel.total_mass() - 10.0 * hand.total_mass()) < 1e-12
-              && std::fabs(shovel.grade(CUPRITE) - hand.grade(CUPRITE)) < 1e-12,
-              "hands sample, the shovel hauls: the tool sets the load, not the makeup");
+        const Substance pick = sample(cu_center, SURFACE, 1.0);
+        check(std::fabs(pick.total_mass() - 10.0 * hand.total_mass()) < 1e-12
+              && std::fabs(pick.grade(CUPRITE) - hand.grade(CUPRITE)) < 1e-12,
+              "hands sample, the pick wins: the tool sets the load, not the makeup");
 
-        // (g) the ore comes up LOCKED: a fresh scoop reads a grade on the panel
-        // but is all composite rock -- nothing a separator can win -- until it is
-        // carried to the rock-breaking station and crushed. The rock stays rock in
-        // the hand and the cart; only the breaker frees the grains. This is why a
-        // deposit must be hauled, not read-and-run, and why the cart earns its keep.
-        const Substance dug = sample(cu_center, SURFACE, 1.0);
-        const Substance broken = crush(dug, 1.0);
-        double dug_free = 0.0, broken_free = 0.0;
-        for (int s = 0; s < N_SIZE; ++s) {
-            dug_free    += dug.freegrain[CUPRITE][s];
-            broken_free += broken.freegrain[CUPRITE][s];
-        }
-        check(dug.grade(CUPRITE) > 0.0 && dug_free < 1e-12   // grade on the panel, nothing free yet
-              && broken_free > 0.0,                          // the breaker liberates it
-              "the ore comes up locked: a scoop reads a grade but frees no mineral until the breaker crushes the rock");
+        // (g) liberation is a SIZE, not a toll. What a blow frees depends on how the
+        // mineral occurs. Placer tin is coarse and weathered free, so it comes up
+        // essentially all FREE at the face -- pannable on the spot, the crusher
+        // never needed. The disseminated sulfide root comes up essentially all
+        // LOCKED, freeing almost nothing until the breaker crushes it toward grain
+        // size. This is why placers were panned by one hand and hard rock built
+        // stamp mills; it is also the fact the carry loop's cost turns on.
+        auto free_fraction = [](const Substance& sub, int mineral) {
+            double free_m = 0.0, tot_m = 0.0;
+            for (int s = 0; s < N_SIZE; ++s) {
+                free_m += sub.freegrain[mineral][s];
+                tot_m  += sub.freegrain[mineral][s]
+                          + COMPOSITE_TARGET_FRACTION * sub.composite[mineral][s];
+            }
+            return tot_m > 0.0 ? free_m / tot_m : 0.0;
+        };
+        const double tin_free  = free_fraction(dig_column(tin_center, 1.0), CASSITERITE);
+        const Substance root   = sample(cu_center, DEEP, 1.0);       // chalcocite, disseminated
+        const double root_free = free_fraction(root, CHALCOCITE);
+        const double root_crushed = free_fraction(crush(root, 1.0), CHALCOCITE);
+        check(tin_free > 0.99            // placer tin: all but free at the face
+              && root_free < 0.01        // sulfide root: all but locked
+              && root_crushed > root_free, // and the breaker is what frees it
+              "liberation is a size, not a toll: placer tin comes up free at the face, the sulfide root stays locked until the breaker");
 
         const double sep = std::sqrt(300.0 * 300.0 + 120.0 * 120.0);
+        const double cap_face = free_fraction(sample(cu_center, SURFACE, 1.0), CUPRITE);
         std::printf("        (copper body: surface %.0f%% cuprite, deep %.0f%% chalcocite; full column "
-                    "%.0f%% oxide + %.0f%% sulfide + %.0f%% waste, one pile to cob; tin body %.0f m away, 0%% copper)\n",
+                    "%.0f%% oxide + %.0f%% sulfide + %.0f%% waste; at the face tin %.0f%% free, "
+                    "oxide cap %.0f%% free, sulfide %.1f%% free; tin body %.0f m away, 0%% copper)\n",
                     100.0 * cap.grade(CUPRITE), 100.0 * deep.grade(CHALCOCITE),
                     100.0 * pile.grade(CUPRITE), 100.0 * pile.grade(CHALCOCITE),
-                    100.0 * pile.grade(QUARTZ), sep);
+                    100.0 * pile.grade(QUARTZ),
+                    100.0 * tin_free, 100.0 * cap_face, 100.0 * root_free, sep);
     }
 
     // ---- The picture -------------------------------------------------------
