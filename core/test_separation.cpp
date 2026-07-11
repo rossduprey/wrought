@@ -31,6 +31,7 @@
 #include "smelt.h"
 #include "forge.h"
 #include "geology.h"
+#include "fuel.h"
 
 using namespace wrought;
 
@@ -1842,6 +1843,47 @@ int main() {
                     "tin %.0f%% -> %.0f%% grade with no stone; the same wash at the copper hill "
                     "reaches %.0f%%)\n",
                     100.0 * tin_feed, 100.0 * tin_wash, 100.0 * cu_wash);
+    }
+
+    // ---- Fuel: the two gates a fire has -----------------------------------
+    // Charcoal is the reductant (a chemical gate); peak temperature is the melt
+    // gate (thermal); the two are independent -- fuel.h. A wood fire clears the
+    // reduction onset and still smelts nothing, because wood carries no carbon.
+    {
+        const double wood = 2.0;
+        const Substance charcoal = pyrolyze(wood, 0.0);
+        check(std::fabs(charcoal.phase_mass(CARBON) - wood * CHAR_YIELD) < 1e-12,
+              "pyrolysis: charcoal carbon is CHAR_YIELD of the dry wood, landing in Substance as CARBON");
+
+        // Gate 2, the melt tiers, reproduce history against smelt.h's own numbers.
+        check(peak_temperature(WOOD, OPEN) > TM_TIN
+              && peak_temperature(WOOD, OPEN) < TM_COPPER,
+              "tiers: an open wood fire pours tin but cannot pour copper");
+        check(peak_temperature(CHARCOAL, NATURAL) >= TM_COPPER
+              && peak_temperature(CHARCOAL, NATURAL) < BLOOM_ENVELOPE_T,
+              "tiers: charcoal on natural draft pours copper but cannot reach the bloom");
+        check(peak_temperature(CHARCOAL, FORCED) >= BLOOM_ENVELOPE_T
+              && peak_temperature(CHARCOAL, FORCED) < TM_IRON,
+              "tiers: only charcoal under forced air reaches the bloom -- and even it never melts iron");
+
+        // Gate 1, the reductant, is chemical not thermal. A clean hematite charge
+        // (no silica, so the fayalite wall is not what is under test) reduces
+        // NOTHING on a carbon-less fire, however reducing the envelope is called --
+        // wood carries no carbon into the charge. The same charge smelts on charcoal.
+        Substance ore; ore.freegrain[HEMATITE][SAND] = 1.0;
+        const Substance no_fuel;   // a wood fire: heat, but zero carbon in the charge
+        const BloomResult dry_fire  = bloomery(ore, no_fuel,        /*reducing=*/true);
+        const BloomResult with_char = bloomery(ore, pyrolyze(wood), /*reducing=*/true);
+        check(dry_fire.bloom_iron == 0.0 && with_char.bloom_iron > 0.0,
+              "two gates: a hot carbon-less fire reduces no iron -- the reductant, not the heat, is the gate");
+
+        std::printf("\n  fire tiers (K) vs smelt gates: tin %.0f, copper %.0f, bloom %.0f, iron-melt %.0f\n",
+                    TM_TIN, TM_COPPER, BLOOM_ENVELOPE_T, TM_IRON);
+        std::printf("  %-26s %8.0f\n", "wood, open", peak_temperature(WOOD, OPEN));
+        std::printf("  %-26s %8.0f\n", "charcoal, natural draft", peak_temperature(CHARCOAL, NATURAL));
+        std::printf("  %-26s %8.0f\n", "charcoal, forced air", peak_temperature(CHARCOAL, FORCED));
+        std::printf("  char yield %.0f%%: %.2f kg wood -> %.2f kg charcoal -> %.2f kg iron (silica-free charge)\n",
+                    100.0 * CHAR_YIELD, wood, charcoal.phase_mass(CARBON), with_char.bloom_iron);
     }
 
     // ---- The picture -------------------------------------------------------

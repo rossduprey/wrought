@@ -19,7 +19,7 @@ At the far end, past the bloomery and the drawn copper wire, you build a relay, 
 One design document, two license files, and `core/` — a few hundred lines of dependency-free C++17. No engine, no renderer, no art.
 
 ```
-cd core && make test        # 128 assertions about the physics
+cd core && make test        # checks the physics
 cd core && make pan         # kneel in the river and wash it yourself
 cd core && make ratchet-run # a measurement, not a test
 ```

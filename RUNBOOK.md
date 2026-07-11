@@ -10,7 +10,7 @@ Debian 13, `g++ 14.2.0`, `GNU Make 4.4.1`. No dependencies, no build system beyo
 
 ```
 cd core
-make test          # 128 assertions; must print "ok (0 failures)"
+make test          # must print "ok (0 failures)"
 make ratchet-run   # a measurement, not a test — allowed to come out badly
 make pan | dig | breaker | furnace | carry   # the playable slices
 make clean

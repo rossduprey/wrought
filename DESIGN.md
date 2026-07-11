@@ -231,10 +231,12 @@ Hands are tool #1 — the worst point on every curve, not "no tool." Verbs:
 - **Screen** — separation by size. Two verbs: **scalp** (pebbles off the top), **deslime** (mud off the top). Both mandatory before a wash does anything, because a gravity separator obeys grade/recovery only on one size class. A real screen misplaces material back into the mill (two misplacements), which is where everything interesting about grinding lives.
 - **Wash** — cupped hands or a bedrock depression; separation by settling velocity, atrocious curve. Enriches magnetite 1.75×/pass vs a fired pan's 3.37×.
 - **Settle / decant** — costs standing water and patience. This is the one that pays.
-- **Gather** — fuel wood.
-- **Fire** — bow drill.
+- **Gather** — pull dead sticks from a standing tree (no axe, you do not fell it), rake needles for tinder, pick up loose stone. A wood source, not a renewable with a season clock.
+- **Fire** — bow drill; needs dry tinder to catch.
 
 **The vessel bootstrap:** you cannot pan without a pan, and a pan is clay and fire — but the first vessel is a hollow dug into clay-rich ground, which holds water because clay is impermeable (how dew ponds work). The ground gives the container that refines the clay that makes the pan.
+
+**The tool bootstrap:** a pick or axe is a head plus a haft, and a haft is worked wood — but working wood needs a cutting edge, and the first edge is not metal. Hands gather loose stone; a hammerstone knaps it to an edge (its own mechanism with its own irreducible sharpness — the staircase again, not a sharpened hand); the edge shapes a haft; the hafted **axe** fells timber and the hafted **pick** wins hard rock. Metal heads (Era 2, `forge.h`) re-haft the same handles later — the staircase runs stone edge → metal edge, never a refined stone one. This closes a circle the model had hand-waved: the pick every `dig` assumes and the charcoal every furnace burned both needed a tool that needed wood that needed a tool.
 
 ### Era 1 — Earth
 
@@ -264,7 +266,7 @@ Rules that keep it honest: **found, not made** (a struck outcrop; never fabricat
 
 ### Era 2 — Fire and air
 
-Charcoal is pyrolysis (wood + fire − oxygen), needs a pit and dirt. Tuyère (fired clay tube) and crucible are the other children of Era 1. Only now does the Era-0 concentrate become useful.
+**Fuel** (`fuel.h`). Charcoal is pyrolysis — wood with its oxygen and hydrogen driven off in an oxygen-starved **pit or pile** (a station of its own: bank the wood, choke the air, wait), leaving near-pure carbon at ~22% of the dry mass (#30). A fire has **two independent gates**. (1) *Reductant:* a smelt wins metal by stripping oxygen, and only carbon carried in the charge does the stripping — raw wood is already-oxidised cellulose and reduces nothing, so charcoal is mandatory *at any temperature* (`smelt.h` already gates reduction on charge carbon). (2) *Peak temperature*, set by fuel × air (#31): open wood ~900 °C fires a pot and pours tin; charcoal on natural draft ~1100 °C pours copper; only charcoal under forced air ~1300 °C reaches the bloom, and even that never melts iron. So a bare wood fire clears the ~800 °C reduction onset and still smelts nothing — **the gate is the reductant, not the heat.** The tiers and yield are authored (fuel is gathered items feeding fire tiers, not a calorific model); the two-gate structure is not. Tuyère (fired clay tube) and crucible are the other children of Era 1. Only now does the Era-0 concentrate become useful.
 
 > Possibility is not the gate. Efficiency is.
 
