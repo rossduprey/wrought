@@ -65,6 +65,10 @@ If temperature is a real simulation variable, hot steel glows because it is hot.
 
 **Corollary — hard rule:** the simulation layer must never reference a render asset. Substances carry appearance data (albedo, roughness, emissive-vs-temperature); the render layer reads it. Same constraint that keeps the headless server able to boot (§Architecture), reached from the opposite direction.
 
+### Why the slice prose is also the tutorial foundation
+
+*(Ross, 2026-07-12.)* The `core/` slices already author narrative reckonings — `gather`'s "the match is the thing you did not stoop for," `carry`'s "one hand panned tin; the other built stamp mills." That prose is not flavour for a terminal toy: it is written to **teach the tool, never the wisdom** (an interface may explain input→action; it may not state the strategy that emerges), and so it *is* the tutorial layer the eventual UE overlay consumes. The frontend panel reads the core's teaching strings the same way the render layer reads `emissive-vs-temperature` — downstream of the core, not reinvented in the engine. So a teaching string is a first-class output of a slice, authored to the same rule, and the frontend gets its tutorial foundation for free: loading a fire station with no smolder kit surfaces "where is the spark?" — teaching that fire has a bottom rung the player is not handed, without ever stating *why* the spark is itself a technology. The player earns the wisdom; the panel only ever hands over the tool.
+
 ### Scope discipline
 
 Process fidelity is expensive per-process. Do one chain properly, end to end — dirt → concentrate → bloom → bar → tool — and leave everything else an abstract swap until it earns the detail.
