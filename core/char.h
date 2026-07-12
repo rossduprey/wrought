@@ -1,6 +1,7 @@
 #pragma once
 
 #include "fuel.h"
+#include "firekit.h"
 
 // The charcoal pit: the station where wood becomes the reductant, and the one
 // gate that station turns on.
@@ -69,6 +70,18 @@ inline Substance char_pit(double wood_kg, double moisture, PitSeal seal) {
 }
 inline Substance char_pit(const Wood& w, PitSeal seal) {
     return char_pit(w.burnable(), w.moisture, seal);
+}
+
+// A pit is a FIRE before it is a kiln. The two overloads above are the ideal
+// transform -- they assume the pit is already burning. But nothing burns itself:
+// firekit.h makes the spark a MADE tool, and a pit banked with no smolder kit (or no
+// dry tinder to catch) never lights, so unlit wood chars to nothing. This overload
+// is the honest station: bank a FireKit, strike it with the smolder tool, and only a
+// pit that CATCHES yields char -- scaled, as ever, by the seal. The tinder rung is
+// spent lighting it; the burnable mass (sticks and any timber) is the charge.
+inline Substance char_pit(const FireKit& kit, const SmolderKit& spark, PitSeal seal) {
+    if (!ignite(kit, spark).lit) return Substance{};   // no spark, no fire, no char.
+    return char_pit(kit.burnable(), kit.moisture, seal);
 }
 
 } // namespace wrought

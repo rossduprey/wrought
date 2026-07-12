@@ -1948,6 +1948,19 @@ int main() {
         // What survives is still the reductant a smelt reads: free CARBON.
         check(sealed.freegrain[CARBON][GRAVEL] > 0.0,
               "char pit: the drawn char is free CARBON -- exactly what smelt.h reduces with");
+
+        // The pit is a fire before a kiln: it must be LIT (firekit.h). Banked with
+        // tinder and struck with a smolder kit it chars exactly as the ideal pit;
+        // with no spark it never catches, and unlit wood yields nothing.
+        FireKit banked; banked.tinder = 0.2; banked.sticks = wood; banked.moisture = 0.0;
+        Wood stock; stock.sticks = 0.1; stock.moisture = 0.15;
+        const SmolderKit spark = make_smolder(stock);
+        const Substance lit    = char_pit(banked, spark,          PIT_SEALED);
+        const Substance nospark = char_pit(banked, SmolderKit{},  PIT_SEALED);
+        check(std::fabs(lit.phase_mass(CARBON) - sealed.phase_mass(CARBON)) < 1e-12,
+              "char pit: a lit, sealed pit chars exactly the ideal yield -- the spark gates, not the transform");
+        check(nospark.phase_mass(CARBON) == 0.0,
+              "char pit: no smolder kit, no fire, no char -- unlit wood does not carbonise");
     }
 
     // ---- The fire kit: the ignition ladder, and the spark is a tool --------

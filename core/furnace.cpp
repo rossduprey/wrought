@@ -101,11 +101,18 @@ static constexpr double SPECK = 1e-6;
 // (CARBON_PER_CU is grams per kg of copper, not kilos). The reductant gate is
 // cheap; the fire's real fuel cost is HEAT -- the bellows here, and the bloomery's
 // blast for iron -- not the carbon in the charge. The tap says so.
+//
+// And the pit is a FIRE, not a heap: it must be LIT before it chars, with a spark
+// that is itself a made tool (firekit.h). So the bank carries tinder to catch, and
+// the pit is struck with a smolder kit the smith carved -- no free match. By the
+// copper furnace the kit is long since possessed, like the pick, so this always
+// lights; but it lights honestly now, through ignite(), not by fiat.
+static constexpr double PIT_TINDER   = 0.2;  // kg dry litter to catch the pit. AUTHORED pacing.
 static constexpr double PIT_STICKS   = 3.0;  // kg hand-pulled sticks banked in the pit. AUTHORED pacing.
 static constexpr double PIT_MOISTURE = 0.15; // as gather.cpp wins it, green off the tree. AUTHORED pacing.
-static Substance pit_charcoal() {
-    Wood w; w.sticks = PIT_STICKS; w.moisture = PIT_MOISTURE;
-    return char_pit(w, PIT_SEALED);
+static Substance pit_charcoal(const SmolderKit& spark) {
+    FireKit w; w.tinder = PIT_TINDER; w.sticks = PIT_STICKS; w.moisture = PIT_MOISTURE;
+    return char_pit(w, spark, PIT_SEALED);
 }
 
 static bool is_copper_ore(int p) { return p == CUPRITE || p == CHALCOCITE; }
@@ -333,11 +340,13 @@ static void report_pour(const MeltResult& r, double cu_feed, double locked_su,
     // fiat; it was made, and cheaply -- which is the last thing this fire teaches.
     std::printf("   And the charcoal you banked to reduce it was not free. It was a pit\n"
                 "   of dead sticks, pulled from a standing tree by hand and charred down --\n"
-                "   no axe, no felled timber in it -- and it gave carbon to spare. A copper\n"
-                "   reduction sips only a fraction of what so small a pit yields; the fire's\n"
-                "   real cost was the HEAT you pumped, not the carbon in the charge. The\n"
-                "   reductant gate is cheap. The fuel wall bites elsewhere -- at the bloom,\n"
-                "   where iron's blast eats charcoal by the basketful.\n\n");
+                "   no axe, no felled timber in it -- and even that pit had to be LIT: no\n"
+                "   spark catches a log, and the spark itself was a friction set you carved,\n"
+                "   not a match you were handed. It gave carbon to spare all the same. A\n"
+                "   copper reduction sips only a fraction of what so small a pit yields; the\n"
+                "   fire's real cost was the HEAT you pumped, not the carbon in the charge.\n"
+                "   The reductant gate is cheap. The fuel wall bites elsewhere -- at the\n"
+                "   bloom, where iron's blast eats charcoal by the basketful.\n\n");
 }
 
 // ---------------------------------------------------------------------------
@@ -382,6 +391,12 @@ int main() {
     for (int p = 0; p < N_PHASE; ++p) if (is_copper_ore(p)) cu_feed += charge.phase_mass(p);
     const double locked_su = locked_sulfide_copper(charge);
 
+    // The spark, carved once and carried. By the copper furnace the smith has long
+    // climbed the staircase, so the kit is in hand -- made, per firekit.h, from dry
+    // dead stock, and it does not wear. It is what lights the char pit below.
+    Wood dry_stock; dry_stock.sticks = 0.1; dry_stock.moisture = 0.15;
+    const SmolderKit spark = make_smolder(dry_stock);
+
     double heat = HEARTH_START;
     bool reducing = false;   // a bare hearth is open to the air
     int roasts = 0;
@@ -414,7 +429,7 @@ int main() {
             else if (c == 'f') {
                 if (reducing) {
                     // The smelt: terminal. It pours what it can and the charge is spent.
-                    pour = smelt_copper(charge, pit_charcoal(), heat);
+                    pour = smelt_copper(charge, pit_charcoal(spark), heat);
                     if (!pour.lit) {
                         nag = "The fire is too cool to catch -- the ore just sits in it. "
                               "Bring it up to orange at least.";
