@@ -24,10 +24,13 @@ carry_game: carry.cpp $(HEADERS)
 char_game: char.cpp $(HEADERS)
 	$(CXX) $(CXXFLAGS) -o $@ char.cpp
 
+gather_game: gather.cpp $(HEADERS)
+	$(CXX) $(CXXFLAGS) -o $@ gather.cpp
+
 ratchet: ratchet.cpp $(HEADERS)
 	$(CXX) $(CXXFLAGS) -o $@ ratchet.cpp
 
-.PHONY: test pan dig breaker furnace carry char ratchet-run clean
+.PHONY: test pan dig breaker furnace carry char gather ratchet-run clean
 test: test_separation
 	./test_separation
 
@@ -66,10 +69,18 @@ carry: carry_game
 char: char_game
 	./char_game
 
+# Gather the wood by hand -- and meet the wall the whole staircase leans on. You rake
+# tinder and pull dead sticks, but the timber, the bulk of every trunk and the only
+# stock a haft is cut from, stays standing: felling it wants an axe that wants a stone
+# edge. Hands are tool #1, the worst point on the curve. The tool-bootstrap, made a
+# gesture -- the forest full of wood your hands reach almost none of.
+gather: gather_game
+	./gather_game
+
 # Walk Era 0 into Era 1 and watch the ratchet fail to turn. Not a test: a
 # measurement, and it is allowed to come out badly. It did.
 ratchet-run: ratchet
 	./ratchet
 
 clean:
-	rm -f test_separation pan_game dig_game breaker_game furnace_game carry_game char_game ratchet
+	rm -f test_separation pan_game dig_game breaker_game furnace_game carry_game char_game gather_game ratchet

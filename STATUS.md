@@ -6,7 +6,7 @@ What is built and what is open. Updated per session. Why the sim is shaped this 
 
 - **Core (`core/`, header-only):** phase table, substance, settling, separation (Tromp), magnetic, smelt (bloomery + copper/tin furnace + roast), forge (consolidate + shape + cast + alloy), levigate (+ flocculate), fire, geology (spatial field), fuel (wood → pyrolysis → charcoal; the two-gate finding; fire tiers), char (the charcoal-pit transform; the seal is the gate).
 - **Chain:** dig → carry → break → pan → furnace, end to end. Three metals (iron, copper, tin) + one alloy (bronze); both faces of the sulfur problem (red-short in iron, roast in copper).
-- **Playable slices (8 TUs):** pan, dig, breaker, furnace, carry, char. `ratchet` is an instrument, not a slice.
+- **Playable slices (9 TUs):** pan, dig, breaker, furnace, carry, char, gather. `ratchet` is an instrument, not a slice.
 
 ## Settled findings
 
@@ -29,10 +29,11 @@ One line each; full statements in `DESIGN.md`, reversals in `CORRECTIONS.md`.
 - Charcoal is the reductant, not merely a hotter fuel — a wood fire clears the reduction onset and still smelts nothing.
 - A fire has two independent gates: reductant (carbon in the charge, chemical) and peak temperature (fuel × air, thermal).
 - A charcoal pit works by suffocating its own fire — open it to the air and it burns the char to ash; the seal, not the wood, sets the yield.
+- Gathering by hand wins tinder and sticks, never timber — the bulk fuel and every haft are locked behind the axe (hands are tool #1, the worst point on the curve).
 
 ## Open
 
 - **Citation chores** (authored/unverified numbers): #1, #2, #5, #7, #12, #16, #17, #18, #20, #21, #22, #23, #24, #25, #26, #27, #29, #30 (char yield), #31 (fire-tier peaks), #32 (tinder/moisture gates), #33 (pit seal retention).
-- **Unbuilt rungs** (the fuel/tool staircase, model in `fuel.h`, stations/verbs pending): the gather verb (pull sticks / fell timber / pick up stone); knapping (stone → edge); hafting (edge + head → pick/axe).
+- **Unbuilt rungs** (the fuel/tool staircase, model in `fuel.h`, stations/verbs pending): knapping (stone → edge); hafting (edge + head → pick/axe); wiring gathered/pit char into `furnace.cpp` to retire the free `charcoal_bed()`.
 - **#28:** authored valley layout (deposit centers, radii, peak grades capped 0.5, `N_TIER`, linear falloff) — placeholders; tests assert only field shape.
 - **Design questions Ross owns:** three-clause test as an owned DESIGN.md section; "teach the tool, never the wisdom" as a stated rule; §2b two-actor experiment; the re-panning verb; is `pick` a tax or a decision; how a panner's tilt becomes a gesture.
