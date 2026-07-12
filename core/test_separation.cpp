@@ -35,6 +35,8 @@
 #include "char.h"
 #include "knap.h"
 #include "haft.h"
+#include "split.h"
+#include "season.h"
 #include "dress.h"
 
 using namespace wrought;
@@ -2041,50 +2043,72 @@ int main() {
               "haft: the head's geometry decides the tool -- axe fells, pick wins rock, adze dresses wood");
     }
 
-    // ---- Dressing: the axe wins the trunk, the adze makes the haft ----------
-    // The rung that closes the loop, dress.h. haft.h fells the tree and then hands
-    // you finished TIMBER for free -- but a felled trunk is a green log, not a haft.
-    // Dressing is the second verb: the SAME knapped edge hafted the OTHER way (an adze,
-    // EDGE_INLINE) pares the log true along its grain. Two findings: the axe that
-    // felled the trunk cannot dress it (geometry, not force), and dressing needs no
-    // fell-wall -- a crude sapling adze wins the haft, because the edge dresses where
-    // the lever fells.
+    // ---- Split, season, dress: the log becomes a haft in three verbs -------
+    // dress.h once did all three in one adze pass -- it rived the log, called it seasoned,
+    // and trued it. It does only the last. Between the trunk and the haft sit two edgeless
+    // stations: split.h (a wedge and the grain, no edge) rives the round log into billets,
+    // and season.h (the clock) dries them. Only then does the adze true the seat (dress.h).
+    // The chain: trunk -> split -> season -> dress -> TIMBER, and every station is a gate.
     {
         const StoneEdge head { 0.40, STONE_EDGE_FLOOR, true };   // knap's floored edge, carried in
         const Trunk trunk { 12.0 };                              // the green log the sapling axe just felled
 
-        // The one edge, hafted three ways -- all crude, all on the sapling you start with.
-        const Hafted sap_axe  = haft(head, 0.55, SAPLING, BIND_SEATED, EDGE_ACROSS);
-        const Hafted sap_adze = haft(head, 0.55, SAPLING, BIND_SEATED, EDGE_INLINE);
-        const Hafted sap_pick = haft(head, 0.55, SAPLING, BIND_SEATED, HEAD_POINT);
-
-        // Finding 1, geometry not force: only the adze dresses. The axe that felled the
-        // trunk cannot pare it (its edge crosses the grain), nor can a pick, nor a loose
-        // head -- and the adze wins timber where every other helve of the same head leaves
-        // you on the sapling. The bootstrap turns on the same edge hafted twice.
+        // The one edge, hafted four ways -- all crude, all on the sapling you start with.
+        const Hafted sap_axe   = haft(head, 0.55, SAPLING, BIND_SEATED, EDGE_ACROSS);
+        const Hafted sap_adze  = haft(head, 0.55, SAPLING, BIND_SEATED, EDGE_INLINE);
+        const Hafted sap_pick  = haft(head, 0.55, SAPLING, BIND_SEATED, HEAD_POINT);
         const Hafted loose_adze = haft(head, 0.55, SAPLING, BIND_NONE, EDGE_INLINE);
-        check(dress(trunk, sap_adze, ALONG_GRAIN) == TIMBER
-              && dress(trunk, sap_axe,  ALONG_GRAIN) == SAPLING
-              && dress(trunk, sap_pick, ALONG_GRAIN) == SAPLING
-              && dress(trunk, loose_adze, ALONG_GRAIN) == SAPLING,
-              "dress: only a sound adze makes a haft -- the axe that felled the trunk cannot dress it");
 
-        // Finding 2, the grain: even the right tool wins nothing across the grain -- a
-        // crosscut billet is short-grained, a stick that snaps, no better than a sapling.
-        check(dress(trunk, sap_adze, ACROSS_GRAIN) == SAPLING,
-              "dress: the billet must be riven along the grain -- crosscut it is a stick that snaps");
+        // Station 1 (split.h), the wedge and the grain, no edge: split ALONG the grain and
+        // the fibres run the billet's full length -- a true billet; rive ACROSS and you get
+        // short-grained waste, a stick that snaps. The tool never enters it.
+        const Stave billet = split(trunk, ALONG_GRAIN, 0.020);   // riven thin, along the grain
+        const Stave waste  = split(trunk, ACROSS_GRAIN, 0.020);  // crosscut -- short grain
+        check(billet.sound && !waste.sound,
+              "split: along the grain wins a billet, across it wins waste -- the wedge follows the grain, it does not cut");
 
-        // Finding 3, the edge dresses where the lever fells: dressing needs no fell-wall,
-        // so the crude SAPLING adze wins timber with no timber of its own -- which is the
-        // only reason the first haft can exist. And the timber it makes seats a joint the
-        // sapling never could (haft.h's stock is the ceiling), closing the bootstrap: the
-        // dressed haft's axe out-bites the sapling axe that felled the very trunk it came
-        // from, with an edge that never got keener at any step.
-        const HaftStock won = dress(trunk, sap_adze, ALONG_GRAIN);
+        // Station 2 (season.h), the calendar: off the wedge the billet is soaking green --
+        // above fibre saturation, no stiffness earned, not a haft. Only time drops it, and
+        // the drop is monotone in time and slower by the SQUARE of thickness (split thin or
+        // wait a lifetime), and nothing stiffens until it falls below fibre saturation.
+        check(billet.moisture >= FIBER_SATURATION && seasoned_fraction(billet) == 0.0 && !is_seasoned(billet),
+              "season: a fresh billet is green -- above fibre saturation, no stiffness, not yet a haft");
+
+        const Stave dried   = season(billet, 5.0);                           // thin billet, air-dry
+        const Stave halfway = season(billet, 0.5);                           // same billet, less time
+        const Stave thick   = season(split(trunk, ALONG_GRAIN, 0.100), 5.0); // 5x thicker, same time
+        check(dried.moisture < halfway.moisture && halfway.moisture < billet.moisture
+              && thick.moisture > dried.moisture
+              && is_seasoned(dried) && !is_seasoned(thick)
+              && seasoned_fraction(dried) > seasoned_fraction(halfway),
+              "season: moisture falls with time, slower by the square of thickness -- and the whole log never dries");
+
+        // Station 3 (dress.h), the adze trues the seat: TIMBER is earned only by a billet
+        // that passed BOTH gates before it, and only the adze can true it. The axe that
+        // felled the trunk still cannot make the haft -- its edge crosses the grain.
+        check(dress(dried, sap_adze) == TIMBER
+              && dress(dried, sap_axe)  == SAPLING
+              && dress(dried, sap_pick) == SAPLING
+              && dress(dried, loose_adze) == SAPLING,
+              "dress: only a sound adze trues the seat -- the axe that felled the trunk cannot make the haft");
+
+        // The calendar is a gate the tool cannot pass: the SAME billet dresses to TIMBER
+        // seasoned but only to SAPLING green -- green wood shrinks out from under the head.
+        check(dress(billet, sap_adze) == SAPLING && dress(dried, sap_adze) == TIMBER,
+              "dress: a green billet trues to no better than a sapling -- seasoning, not the adze, earns the timber");
+
+        // And waste is waste: short-grained across the grain, no calendar or edge saves it.
+        check(dress(season(waste, 5.0), sap_adze) == SAPLING,
+              "dress: short-grained waste never becomes a haft, however long it dries or how true the adze");
+
+        // The earned TIMBER lifts the joint every tool after rides: the dressed axe out-bites
+        // the sapling axe that felled the very trunk it came from -- edge unchanged at every
+        // step. Knap once, split, season, haft.
+        const HaftStock won = dress(dried, sap_adze);
         const Hafted dressed_axe = haft(head, 0.70, won, BIND_SEATED, EDGE_ACROSS);
         check(won == TIMBER && !can_dress(sap_axe)
               && dressed_axe.joint > sap_axe.joint && dressed_axe.bite() > sap_axe.bite(),
-              "dress: the sapling adze wins the timber that seats every tool after -- knap once, haft twice");
+              "dress: the seasoned haft seats a joint the sapling never could -- one edge, two edgeless verbs, two haftings");
     }
 
     // ---- The picture -------------------------------------------------------

@@ -26,11 +26,13 @@
 // locked behind the very axe you are building (fuel.h, gather.cpp). So your first haft
 // can only be a hand-cut SAPLING: springy, splitty, a joint that will never fully seat.
 // The first axe is crude by necessity -- and it is still just enough to bring down one
-// trunk. But a felled trunk is a green log, not a haft: the axe wins the wood, and the
-// ADZE -- the same edge hafted the other way (dress.h) -- pares that log into the timber
-// every tool after is cut from. So the bootstrap does not turn on one tool but on one
-// EDGE hafted twice, and this slice is both turns: swing a sapling axe to fell the tree,
-// then set the same head as an adze and dress the log into the haft you could never reach.
+// trunk. But a felled trunk is a green log, not a haft, and three verbs stand between
+// them -- two of which need no edge at all. A WEDGE rives the log into a billet along
+// its grain (split.h); the CALENDAR seasons the green billet stiff and dry (season.h);
+// and only then does the ADZE -- the same edge hafted the other way (dress.h) -- true
+// the seat. So the bootstrap turns on one EDGE hafted twice, with a wedge and a calendar
+// between, and this slice is all four turns: swing a sapling axe to fell the tree, split
+// a billet, season it through the turning years, and set the head as an adze to true it.
 //
 // -- The gesture. ----------------------------------------------------------
 //
@@ -55,6 +57,8 @@
 #include <unistd.h>
 
 #include "haft.h"
+#include "split.h"
+#include "season.h"
 #include "dress.h"
 
 using namespace wrought;
@@ -141,7 +145,8 @@ static const char* joint_face(double work) {
 static const int PANEL_COL = 46;
 
 static void draw_panel(double bind_work, ToolKind kind, bool have_timber,
-                       double tree_left, bool felled, const char* last_swing) {
+                       double tree_left, bool felled, const Stave& billet,
+                       const char* last_swing) {
     int row = 2;
     auto line = [&](const char* fmt, ...) {
         std::printf("\033[%d;%dH", row++, PANEL_COL);
@@ -168,14 +173,24 @@ static void draw_panel(double bind_work, ToolKind kind, bool have_timber,
     line("  %s", joint_face(bind_work));
     line("%s", "");
 
-    // The trunk -- the wall gather could not cross, here to be swung at.
-    if (have_timber)
-        line("  the tree  |%s| DOWN and dressed -- the timber is yours", bar16(0.0, '#'));
-    else if (felled)
-        line("  the tree  |%s| DOWN -- a raw log; dress it with the adze [3]+[t]", bar16(0.0, '#'));
-    else
-        line("  the tree  |%s| standing -- swing to fell it", bar16(tree_left / TREE_FULL, '#'));
-    line("%s", "");
+    // The log's road to a haft: standing -> down -> split -> seasoning -> dressed.
+    // Four verbs and two edgeless stations between the axe's two turns.
+    if (have_timber) {
+        line("  the log   |%s| DRESSED -- a seasoned timber haft, the stock every tool wants", bar16(1.0, '#'));
+        line("%s", "");
+    } else if (!felled) {
+        line("  the log   |%s| standing -- swing to fell it", bar16(tree_left / TREE_FULL, '#'));
+        line("%s", "");
+    } else if (!billet.sound) {
+        line("  the log   |%s| DOWN -- a raw round log; rive a billet from it [p]", bar16(0.0, '#'));
+        line("%s", "");
+    } else {
+        const double frac = seasoned_fraction(billet);   // 0 green -> 1 air-dry (the stiffness earned)
+        line("  the log   |%s| a green billet, seasoning [s]   (stiff %2.0f%%)", bar16(frac, '~'), frac * 100.0);
+        line("  %s", is_seasoned(billet)
+             ? "air-dry and stiff -- set the head as an ADZE [3] and true the seat [t]"
+             : "still green -- a head bound now would work loose as the wood dries");
+    }
 
     line("%s", last_swing ? last_swing : "you have not swung yet");
 }
@@ -193,7 +208,7 @@ static const char* AMBIENT[] = {
 static const int N_AMBIENT = (int)(sizeof(AMBIENT) / sizeof(AMBIENT[0]));
 
 static void draw(double bind_work, ToolKind kind, bool have_timber, double tree_left,
-                 bool felled, bool binding, double t, const char* ambient,
+                 bool felled, bool binding, double t, const Stave& billet, const char* ambient,
                  const char* nag, const char* last_swing) {
     std::printf("\033[H\033[J");
     std::printf("\n   %-52s  %2d:%02d\n\n", ambient ? ambient : "", (int)t / 60, (int)t % 60);
@@ -201,8 +216,8 @@ static void draw(double bind_work, ToolKind kind, bool have_timber, double tree_
     std::printf("   %s\n\n", nag ? nag : "");
     std::printf("   [l] work the joint%s   set head:  [1] axe  [2] pick  [3] adze\n",
                 binding ? "  (binding...)" : "");
-    std::printf("   [w] swing at the tree   [t] dress a haft from the log   [r] keep it and go   [q] walk away\n");
-    draw_panel(bind_work, kind, have_timber, tree_left, felled, last_swing);
+    std::printf("   [w] swing/fell   [p] split a billet   [s] season it   [t] true the haft   [r] keep   [q] go\n");
+    draw_panel(bind_work, kind, have_timber, tree_left, felled, billet, last_swing);
     std::printf("\033[24;1H");
     std::fflush(stdout);
 }
@@ -218,21 +233,24 @@ static void report_haft(bool felled, bool have_timber, bool ever_flew, ToolKind 
                     "   the haft's gift: not a sharper edge but the FORCE a lever puts behind the one\n"
                     "   you had. Gather's wall -- hands never win timber -- is the wall this axe walked\n"
                     "   through.\n\n");
-        std::printf("   But a felled trunk is a green log, not a haft, and the axe that felled it cannot\n"
-                    "   pare it -- its edge crosses the grain a haft must follow. You stopped one step\n"
-                    "   short: the SAME edge, hafted the other way as an adze, is what dresses the log\n"
-                    "   into the stock every tool after rides. Knap once, haft twice.\n\n");
+        std::printf("   But a felled trunk is a green log, not a haft, and three verbs stand between them\n"
+                    "   -- none of which the axe can do. A wedge rives the log into a billet along its\n"
+                    "   grain (no edge needed); the calendar seasons the green billet stiff and dry; and\n"
+                    "   only THEN does the adze, the same edge hafted the other way, true the seat. You\n"
+                    "   stopped short of a finished haft. Split it, season it, dress it.\n\n");
         return;
     }
 
-    if (felled) {   // felled AND dressed -- both turns of the bootstrap
-        std::printf("   The trunk came down, and then you dressed it. First the axe: a floored edge on a\n"
-                    "   sapling, swung across the grain with the FORCE a lever lends, felling the tree\n"
-                    "   gather's bare hands could not touch. Then the adze: the same edge hafted in line,\n"
-                    "   paring the fallen log true ALONG its grain -- no force needed, only the edge.\n\n");
-        std::printf("   Two verbs, one stone. The bootstrap has turned: hands -> stone edge -> sapling\n"
-                    "   axe -> the felled trunk -> the adze -> a seasoned timber haft, the stock every\n"
-                    "   tool after is cut from -- and the edge never got keener at any step.\n\n");
+    if (felled) {   // felled AND dressed -- both turns of the bootstrap, with two edgeless verbs between
+        std::printf("   The trunk came down, and then you made it into a haft. First the axe: a floored\n"
+                    "   edge on a sapling, swung across the grain with the FORCE a lever lends, felling\n"
+                    "   the tree gather's bare hands could not touch. Then a wedge split it thin along\n"
+                    "   the grain -- no edge at all. Then the seasons dried it stiff -- no tool at all.\n"
+                    "   Then the adze, the same edge hafted in line, trued the seat ALONG the grain.\n\n");
+        std::printf("   One stone edge, hafted twice, with a wedge and a calendar between. The bootstrap\n"
+                    "   has turned: hands -> stone edge -> sapling axe -> the felled trunk -> a riven\n"
+                    "   billet -> a seasoned billet -> the adze -> a timber haft, the stock every tool\n"
+                    "   after is cut from -- and the edge never got keener at any step.\n\n");
         return;
     }
 
@@ -276,8 +294,9 @@ int main() {
         "   is barely on -- swing and it flies off, the edge undelivered. Seat it, choose\n"
         "   an axe, and swing at the trunk. A lever's blow grows with the square of its\n"
         "   length, so the tree yields to the FORCE the haft puts behind your floored edge,\n"
-        "   not to any sharpness. Bring it down -- then set the same edge as an ADZE and\n"
-        "   dress the fallen log along its grain into the haft you could never reach.\n\n"
+        "   not to any sharpness. Bring it down -- then rive the log into a billet with a\n"
+        "   wedge, season it dry through the turning years, and set the same edge as an ADZE\n"
+        "   to true it into the haft you could never reach.\n\n"
         "   [press any key]\n");
     std::fflush(stdout);
     raw_tty();
@@ -291,6 +310,11 @@ int main() {
     bool felled = false, binding = false, ever_flew = false;
     double best_bite = 0.0;
     double t = 0.0;
+
+    Trunk trunk;                          // the green log, once the tree is down (split.h)
+    Stave billet;                         // the log riven into a billet -- green until seasoned
+    const double RIVE_THICK  = 0.020;     // m -- you rive it thin, so it seasons in a few (compressed) years
+    const double SEASON_STEP = 0.35;      // compressed years advanced per press of [s] -- the clock, sped up
 
     const StoneEdge head { HEAD_MASS, STONE_EDGE_FLOOR, true };  // knap's floored edge, carried in.
 
@@ -333,8 +357,9 @@ int main() {
             if (bind == BIND_LASHED) bind_work -= LASH_LOOSEN;   // an unseated joint works loose under load
             if (tree_left <= SPECK) {
                 tree_left = 0.0; felled = true;
+                trunk.mass = 12.0;   // a green log at your feet (mass is pass-through -- split.h reads only the grain)
                 last_swing = "the trunk cracks, leans, and comes down -- a green log at your feet, not yet a haft";
-                nag = "It is DOWN -- but a felled trunk is a raw log. Set the head as an ADZE [3], seat it, then [t] to dress a haft.";
+                nag = "It is DOWN -- but a felled trunk is a raw round log. Rive a billet from it: press [p] (a wedge, no edge).";
                 nag_t = t + 10;
             } else {
                 last_swing = bind == BIND_LASHED
@@ -358,24 +383,70 @@ int main() {
             else if (c == '2') { kind = PICK; helve = HEAD_POINT;  binding = false; }
             else if (c == '3') { kind = ADZE; helve = EDGE_INLINE; binding = false; }
             else if (c == 'w') { swing(); }
-            else if (c == 't') {
-                if (have_timber) {          // already dressed -- re-haft on the timber you won
-                    bind_work = 0.0;
-                    nag = "You split a fresh timber haft from the trunk and start the joint clean -- it seats far tighter than the sapling.";
-                    nag_t = t + 7;
-                } else if (!felled) {       // the locked beat, like gather's [f] -- nothing felled to dress
-                    nag = "There is no trunk to dress -- it is still standing. That is the tree you are trying to fell with the axe.";
+            else if (c == 'p') {            // split.h: rive the felled log into a billet -- a wedge, no edge
+                if (have_timber) {
+                    nag = "You already have your haft -- the billet is long split, seasoned, and dressed.";
                     nag_t = t + 6;
-                } else {                    // a log on the ground: the adze's verb, not the axe's (dress.h)
-                    const Hafted cur = haft(head, SAPLING_LEN, SAPLING, bind_of(bind_work), helve);
-                    if (can_dress(cur)) {   // a sound adze pares the log along the grain -> timber
-                        have_timber = true;
-                        bind_work = 0.0;    // a fresh timber haft is a fresh joint -- but the ceiling is higher now
-                        last_swing = "the adze skims the log along its grain, paring it flat and true -- a haft, at last";
-                        nag = "Dressed. The same edge that felled the trunk, hafted the other way, made the haft -- knap once, haft twice. Now re-seat it.";
+                } else if (!felled) {
+                    nag = "There is no log to split -- the tree is still standing. Fell it first with the axe.";
+                    nag_t = t + 6;
+                } else if (billet.sound) {
+                    nag = "Already riven -- you have a green billet. It must season before it will hold a head: press [s].";
+                    nag_t = t + 7;
+                } else {                    // the grain, not the tool: no edge needed here
+                    billet = split(trunk, ALONG_GRAIN, RIVE_THICK);
+                    last_swing = "you set a wedge and the log splits down its length -- a green billet, riven thin along the grain";
+                    nag = "Riven with a wedge, no edge -- the grain did the splitting. But it is soaking green: it must season. Press [s].";
+                    nag_t = t + 9;
+                }
+            }
+            else if (c == 's') {            // season.h: dry the green billet -- time compressed
+                if (have_timber) {
+                    nag = "The haft is made -- it seasoned long ago.";
+                    nag_t = t + 6;
+                } else if (!billet.sound) {
+                    nag = "Nothing to season yet -- rive a billet from the felled log first: [p].";
+                    nag_t = t + 6;
+                } else if (is_seasoned(billet)) {
+                    nag = "It is seasoned -- air-dry and stiff. Now the adze trues the seat: set it [3] and press [t].";
+                    nag_t = t + 7;
+                } else {
+                    billet = season(billet, SEASON_STEP);   // the clock, sped up -- moisture falls toward air-dry
+                    if (is_seasoned(billet)) {
+                        last_swing = "the seasons turn -- the billet dries below fibre saturation, shrinks, and stiffens; it rings when you tap it";
+                        nag = "Seasoned at last. Green wood would have loosened by autumn; this will not. Set the head as an ADZE [3] and true it, [t].";
                         nag_t = t + 10;
                     } else {
-                        nag = "The trunk is down but it is a raw green log. The axe that felled it cannot pare it -- set the head as an ADZE [3], seat it, then [t].";
+                        last_swing = "another season passes -- the billet sheds water, lighter but not yet dry to the core";
+                        nag = "Still drying. It is the calendar, not the tool, that makes a haft here -- keep seasoning it [s].";
+                        nag_t = t + 6;
+                    }
+                }
+            }
+            else if (c == 't') {            // dress.h: the adze trues the seasoned billet's seat -> timber
+                if (have_timber) {          // already dressed -- re-haft on the timber you won
+                    bind_work = 0.0;
+                    nag = "You take a fresh seasoned haft and start the joint clean -- it seats far tighter than the sapling.";
+                    nag_t = t + 7;
+                } else if (!felled) {
+                    nag = "There is no log to work -- it is still standing. Fell it first.";
+                    nag_t = t + 6;
+                } else if (!billet.sound) {
+                    nag = "The felled log is round and whole -- the head cannot bed on it. Rive a billet first: [p].";
+                    nag_t = t + 7;
+                } else if (!is_seasoned(billet)) {
+                    nag = "The billet is riven but green -- true it now and it loosens by autumn. Season it first: [s].";
+                    nag_t = t + 7;
+                } else {                    // split and seasoned: the model decides on the tool (adze or not)
+                    const Hafted cur = haft(head, SAPLING_LEN, SAPLING, bind_of(bind_work), helve);
+                    if (dress(billet, cur) == TIMBER) {
+                        have_timber = true;
+                        bind_work = 0.0;    // a fresh timber haft is a fresh joint -- but the ceiling is higher now
+                        last_swing = "the adze skims the seasoned billet along its grain, paring the seat flat and true -- a haft, at last";
+                        nag = "Dressed. One edge hafted twice -- the axe felled it, the adze trued it -- with a wedge and the calendar between. Now re-seat it.";
+                        nag_t = t + 10;
+                    } else {
+                        nag = "A seasoned billet, but the axe cannot true it -- its edge crosses the grain. Set the head as an ADZE [3], seat it, then [t].";
                         nag_t = t + 8;
                     }
                 }
@@ -393,7 +464,7 @@ int main() {
         if (t > ambient_t) { ambient = AMBIENT[(int)(t / 43) % N_AMBIENT]; ambient_t = t + 43; }
         if (t > nag_t) nag.clear();
 
-        draw(bind_work, kind, have_timber, tree_left, felled, binding, t, ambient,
+        draw(bind_work, kind, have_timber, tree_left, felled, binding, t, billet, ambient,
              nag.empty() ? nullptr : nag.c_str(), last_swing.empty() ? nullptr : last_swing.c_str());
         nap(dt);
     }
