@@ -21,10 +21,13 @@ furnace_game: furnace.cpp $(HEADERS)
 carry_game: carry.cpp $(HEADERS)
 	$(CXX) $(CXXFLAGS) -o $@ carry.cpp
 
+char_game: char.cpp $(HEADERS)
+	$(CXX) $(CXXFLAGS) -o $@ char.cpp
+
 ratchet: ratchet.cpp $(HEADERS)
 	$(CXX) $(CXXFLAGS) -o $@ ratchet.cpp
 
-.PHONY: test pan dig breaker furnace carry ratchet-run clean
+.PHONY: test pan dig breaker furnace carry char ratchet-run clean
 test: test_separation
 	./test_separation
 
@@ -56,10 +59,17 @@ furnace: furnace_game
 carry: carry_game
 	./carry_game
 
+# Burn a pit of wood down to charcoal -- the fuel the furnace eats and never told
+# you it was spending. The pit needs air to catch and come up hot, but the same fire
+# left breathing burns the charcoal back to ash, so you must smother it once it is
+# going: light, heat, choke, hold. The seal-is-the-gate finding, made a gesture.
+char: char_game
+	./char_game
+
 # Walk Era 0 into Era 1 and watch the ratchet fail to turn. Not a test: a
 # measurement, and it is allowed to come out badly. It did.
 ratchet-run: ratchet
 	./ratchet
 
 clean:
-	rm -f test_separation pan_game dig_game breaker_game furnace_game carry_game ratchet
+	rm -f test_separation pan_game dig_game breaker_game furnace_game carry_game char_game ratchet
