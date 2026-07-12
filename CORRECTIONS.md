@@ -2,6 +2,10 @@
 
 Claims that turned out wrong. The project keeps wrong claims rather than erasing them — but here, not inline. `DESIGN.md` / `RUNBOOK.md` / `README.md` state current truth only; the history is here. One entry per reversal: claimed / wrong because / now. Newest first. Updated every turn a finding is overturned.
 
+## 2026-07-12
+
+**geology, dig — the pick is reach, not only rate.** Claimed: a tool sets how *much* rock you win of a given makeup, never the makeup, so a patient bare hand reaches any depth just slower (dig.cpp's rate-only pick; the "hands sample, the pick wins the load" framing). Wrong by omission: weathering makes the oxide cap friable but leaves the sulfide root fresh, competent rock a bare hand skips off — so the hand cannot win the deep ore *at all*, not merely slower. Now: `rock_competence(origin, tier)` is a wall (SURFACE 0.001 < MIDDLE 0.02 < DEEP 0.10, placer 0), and a strike wins a tier only if its blow energy clears it. Against real `haft.h` energies the bare hand (0.002) takes the cap and the placer and skips the root; even a crude sapling pick (0.198) wins the whole column — so roast-grade copper is gated behind the tool bootstrap, and the tin creek needs no pick. The old finding survives intact where both tools win: `sample()` is tool-blind, so a hand and a pick that both open a tier win the very same makeup. The tool changed reach and rate, never makeup.
+
 ## 2026-07-11
 
 **geology, carry — free is not won.** Claimed: a placer's tin, freed into the GRAVEL bin, is won by panning. Wrong: coarse cassiterite (1.42 m/s) and coarse quartz (0.745 m/s) both far exceed the pan's 0.060 m/s cut, so panning the raw heap keeps 98% of the tin at unchanged 45% grade. Now: deposit `Origin` (HARDROCK/PLACER); a placer is river-sorted, ore free in the SAND. Wash lifts tin 45%→76%; the same wash at the hard-rock copper hill wins ~2%.

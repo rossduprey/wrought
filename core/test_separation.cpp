@@ -1833,6 +1833,37 @@ int main() {
               && cu_wash < 0.10,             // hard rock: the wash wins almost nothing
               "free is not won: a wash concentrates the placer tin (grade climbs, no stone) but barely touches the locked copper");
 
+        // (i) THE PICK GATE: the deep rock is a WALL, not just more mass. Weathering
+        // left the oxide cap friable and the sulfide root fresh and hard, so a bare
+        // hand (knap's flake in the fist, haft.h) wins the CAP and skips the ROOT,
+        // while even a crude first pick -- a heavy point on a lashed SAPLING haft, the
+        // only pick before the axe (haft.h) -- wins the whole column. This makes "the
+        // gossans were worked before the deep sulfides" mechanical, and gates roast-
+        // grade copper behind the entire tool staircase. Read against real haft
+        // energies, not a fresh number: the tool bootstrap's output is the dig's input.
+        StoneEdge flake; flake.mass = 0.20; flake.edge_angle = STONE_EDGE_FLOOR; flake.usable = true;
+        StoneEdge point; point.mass = 1.00; point.edge_angle = 60.0;             point.usable = true;
+        const double hand_e = hand_bite(flake);                                          // fist: tiny lever
+        const double pick_e = haft(point, 0.6, SAPLING, BIND_LASHED, HEAD_POINT).bite(); // first crude pick
+        const Substance hand_col = dig_column(cu_center, 1.0, hand_e);
+        const Substance pick_col = dig_column(cu_center, 1.0, pick_e);
+        check(hand_col.grade(CUPRITE) > 0.0 && hand_col.grade(CHALCOCITE) < 1e-12    // hand: cap only
+              && pick_col.grade(CUPRITE) > 0.0 && pick_col.grade(CHALCOCITE) > 0.0   // pick: cap AND root
+              && hand_e < rock_competence(HARDROCK, DEEP)                            // the wall the hand can't clear
+              && pick_e >= rock_competence(HARDROCK, DEEP),                          // the pick clears it
+              "the pick gate: a bare hand wins the weathered cap and skips the fresh sulfide root; even a crude first pick wins the whole column");
+
+        // A placer takes no pick at all -- the river already broke it, so a bare hand
+        // wins the tin creek exactly as a pick would (competence 0 all the way down).
+        const Substance hand_creek = dig_column(tin_center, 1.0, hand_e);
+        check(std::fabs(hand_creek.grade(CASSITERITE) - at_sn.grade(CASSITERITE)) < 1e-12
+              && hand_creek.grade(CASSITERITE) > 0.0,
+              "a placer needs no pick: the river already broke it, so a bare hand wins the tin creek whole");
+
+        std::printf("        (the pick gate: hand blow %.3f wins the cap, skips the deep rock %.2f; "
+                    "a first sapling pick %.3f clears it -- roast-grade copper sits behind the tool staircase)\n",
+                    hand_e, rock_competence(HARDROCK, DEEP), pick_e);
+
         const double sep = std::sqrt(300.0 * 300.0 + 120.0 * 120.0);
         const double cap_face = free_fraction(sample(cu_center, SURFACE, 1.0), CUPRITE);
         std::printf("        (copper body: surface %.0f%% cuprite, deep %.0f%% chalcocite; full column "

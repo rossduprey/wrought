@@ -244,6 +244,70 @@ inline int liberation_bin(int mineral) {
     }
 }
 
+// ---------------------------------------------------------------------------
+// THE PICK GATE -- the wall the whole tool staircase was climbed to get under.
+//
+// Until here a tool only set how MUCH rock a bite won, never whether it could win it
+// at all (sample()'s `mass`, dig.cpp's PICK_BITE). That was half the truth. The other
+// half is why the easy gossans were worked for an age before the deep sulfides:
+// WEATHERING. A weathered oxide CAP is rotten, friable ground a bare hand can scratch;
+// the primary sulfide ROOT below is fresh, competent rock a hand skips off. So depth
+// is not only a change of MINERAL (THREE THINGS #1) -- it is a rising WALL, and only a
+// concentrated blow gets under the deep rock. That blow is haft.h's HEAD_POINT pick:
+// knap's floored edge put on haft's lever, delivering FORCE, not keenness (haft.h). The
+// tool bootstrap -- gather -> knap -> haft -> the pick -- exists to get back UNDER the
+// ground the chain started on, and the primary ore is its reward.
+//
+// A PLACER needs no pick. Alluvium is loose rock a river already broke and sorted, so
+// there is nothing to WIN from the face; a bare hand takes the tin creek whole. This is
+// the same asymmetry the breaker shows (a wash wins the placer, the hard rock waits for
+// the crush) -- now at the face, before the pan, instead of after it.
+//
+// rock_competence is AUTHORED (issue #39) on the SAME arbitrary energy scale as
+// haft.h's swing_energy, so a tool's bite() compares straight to it -- a named bridge
+// (like bin_diameter's UNVERIFIED point), not a measurement. geology.h does NOT include
+// haft.h: the ground has no notion of tools. The gate takes a raw `blow_energy`, and
+// the caller (a slice, a test) supplies it from hand_bite()/Hafted::bite(). The numbers
+// are stand-ins; the finding is the ORDERINGS -- a bare hand wins the cap and the placer
+// and skips the root; even a crude sapling pick wins every tier -- asserted against real
+// haft energies in test_separation.cpp.
+inline constexpr double COMPETENCE_SURFACE = 0.001; // weathered, friable cap: a hand takes it
+inline constexpr double COMPETENCE_MIDDLE  = 0.020; // leached, part-weathered: pick ground
+inline constexpr double COMPETENCE_DEEP    = 0.100; // fresh unweathered rock: pick only
+inline constexpr double COMPETENCE_PLACER  = 0.000; // loose alluvium, already broken: no rock to win
+
+// How hard the rock is to WIN from the face at (origin, tier). Weathering fades with
+// depth, so a hard-rock column stiffens SURFACE < MIDDLE < DEEP; a placer is loose all
+// the way down.
+inline double rock_competence(Origin origin, int tier) {
+    if (origin == PLACER) return COMPETENCE_PLACER;
+    switch (tier) {
+        case SURFACE: return COMPETENCE_SURFACE;
+        case MIDDLE:  return COMPETENCE_MIDDLE;
+        default:      return COMPETENCE_DEEP;
+    }
+}
+
+// Which Origin governs the rock at (at, tier): the body under this spot if one covers
+// it, else HARDROCK country rock (which is fresh, competent rock at depth too). Bodies
+// are placed far apart, so at most one covers a spot.
+inline Origin origin_at(Place at, int tier) {
+    for (const Deposit& d : DEPOSITS) {
+        if (d.tier_mineral[tier] == BARREN) continue;
+        const double dx = at.x - d.cx, dy = at.y - d.cy;
+        if (std::sqrt(dx * dx + dy * dy) < d.radius) return d.origin;
+    }
+    return HARDROCK;
+}
+
+// Does a blow of this energy WIN rock of this competence, or skip off it? A hard
+// threshold, like the staircase's other authored gates (fuel tiers, knap's fracture,
+// the haft joint): below the wall the point skips and wins NOTHING; at or above it the
+// bite comes up. No soft ramp -- the finding is binary: can you get under this rock.
+inline bool wins_rock(double blow_energy, double competence) {
+    return blow_energy >= competence;
+}
+
 // A bite of ground: the makeup at (`at`, `tier`), rendered as `mass` kg of broken
 // rock. `mass` is the tool's bite -- bare hands take a little to read the panel, a
 // pick wins perhaps ten times as much of the very same makeup. (The shovel is a
@@ -332,6 +396,29 @@ inline Substance sample(Place at, int tier, double mass) {
 inline Substance dig_column(Place at, double mass) {
     Substance pile;
     for (int t = 0; t < N_TIER; ++t) pile.add(sample(at, t, mass));
+    return pile;
+}
+
+// What a TOOL of the given `blow_energy` can take out of one tier. sample() is what the
+// ground HOLDS; this is what the tool can WIN of it. If the blow cannot get under the
+// rock (wins_rock false) the point skips off and nothing comes up. Otherwise the full
+// bite. The panel still reads the true grade of what DID come up -- the tool changed
+// REACH, not makeup (sample() is unchanged; a hand and a pick that BOTH win a tier win
+// the very same makeup, the old finding, still true).
+inline Substance win_bite(Place at, int tier, double mass, double blow_energy) {
+    if (!wins_rock(blow_energy, rock_competence(origin_at(at, tier), tier)))
+        return Substance{};                       // skipped off the rock -- nothing won
+    return sample(at, tier, mass);
+}
+
+// A full-depth dig with a tool, tier by tier gated on its blow_energy. A bare hand at
+// the copper hill therefore comes up with the weathered oxide CAP and no deep sulfide
+// at all -- the root stays in the ground until a pick reaches it; the same column with
+// a pick brings oxide AND sulfide, the mixed haul (dig_column above, which is the
+// unlimited-reach geological truth this gates). `mass` is the bite per tier.
+inline Substance dig_column(Place at, double mass, double blow_energy) {
+    Substance pile;
+    for (int t = 0; t < N_TIER; ++t) pile.add(win_bite(at, t, mass, blow_energy));
     return pile;
 }
 

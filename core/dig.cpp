@@ -64,6 +64,7 @@
 #include <unistd.h>
 
 #include "geology.h"
+#include "haft.h"   // the pick is the staircase's product: its bite() is what wins the deep rock
 
 using namespace wrought;
 
@@ -74,12 +75,16 @@ using namespace wrought;
 // rates that set how fast the work goes and NOTHING a test or a finding reads.
 // Depth is measured in tiers (1.0 == one DepthTier crossed), so a strike advances
 // the pit by a fraction of a tier and bites some mass of that tier's rock into the
-// spoil pile. The pick is the classic Era-0-into-1 rung: it multiplies what you
-// win from the ground (~10x) AND drives the pit down faster -- which is exactly why
-// a pick with no cart just buries you in rock you cannot carry (DESIGN.md). (A pick
-// WINS rock from the face; the shovel is the loader downstream in the carry loop.)
-// The bite mass is passed straight to geology.sample() as its `mass` argument, so
-// the pick changes how MUCH rock of a given makeup you take, never the makeup.
+// spoil pile. The pick is the classic Era-0-into-1 rung, and it does TWO things.
+// One is rate: it multiplies what you win (~10x) AND drives the pit down faster --
+// which is why a pick with no cart just buries you in rock you cannot carry
+// (DESIGN.md). The other -- and this is the finding, geology.h's rock_competence --
+// is REACH: the weathered cap is soft enough for bare hands, but the fresh sulfide
+// root below is competent rock the hand skips off. Only the pick's concentrated blow
+// (its haft.h bite()) gets under it. So the bare hand wins the cap and stalls; the
+// deep ore is gated behind the tool. On a tier BOTH win, the makeup is identical
+// (sample() is tool-blind) -- the tool changed reach and rate, never the makeup.
+// (A pick WINS rock from the face; the shovel is the loader downstream in carry.)
 static constexpr double HAND_STEP = 0.12;  // tiers of depth per bare-hand strike. AUTHORED.
 static constexpr double HAND_BITE = 0.05;  // kg of rock per bare-hand strike. AUTHORED.
 static constexpr double PICK_STEP = 0.50;  // tiers per pick strike (~4x deeper). AUTHORED.
@@ -305,6 +310,9 @@ int main() {
         "   down through the layers -- and the layers are not the same. What is near\n"
         "   the top is not what is at the bottom. How deep to go is the only thing you\n"
         "   decide, and nobody is going to tell you what it is worth.\n\n"
+        "   Your two hands only take the soft, weathered ground near the top. The fresh\n"
+        "   rock deeper down throws them off -- that is what the pick you made is for.\n"
+        "   Press [t] to switch between them.\n\n"
         "   Everything you dig comes up as rock. You cannot separate rock. That is a\n"
         "   job for the breaking station, and this is not it.\n\n"
         "   [press any key]\n");
@@ -320,6 +328,15 @@ int main() {
     bool pick = false;
     Substance pile;
     Assay assay;
+
+    // The two tools, wired to the staircase that made them (haft.h): a struck flake
+    // held in the fist, and the crude first pick -- a heavy stone point lashed to a
+    // sapling, the only pick there is before the axe. Their BLOW energy is what
+    // decides which rock they can win (geology.h rock_competence).
+    StoneEdge flake; flake.mass = 0.20; flake.edge_angle = STONE_EDGE_FLOOR; flake.usable = true;
+    StoneEdge point; point.mass = 1.00; point.edge_angle = 60.0;             point.usable = true;
+    const double HAND_BLOW = hand_bite(flake);
+    const double PICK_BLOW = haft(point, 0.6, SAPLING, BIND_LASHED, HEAD_POINT).bite();
 
     const char* ambient = AMBIENT[0];
     double ambient_t = 0;
@@ -339,13 +356,23 @@ int main() {
             else if (c == ' ') {
                 const double step = pick ? PICK_STEP : HAND_STEP;
                 const double bite = pick ? PICK_BITE : HAND_BITE;
+                const double blow = pick ? PICK_BLOW : HAND_BLOW;
+                const int here = tier_at(depth);
                 if (depth >= MAX_DEPTH - 1e-9) {
                     nag = "Bedrock. The point skips off it. Move, or take what you have.";
                     nag_t = t + 3;
+                } else if (!wins_rock(blow, rock_competence(origin_at(at, here), here))) {
+                    // The tool cannot get under this rock: it skips off, wins nothing,
+                    // and the pit does not advance. This is the wall the pick is for --
+                    // the weathered cap yields to hands, the fresh rock below does not.
+                    nag = pick
+                        ? "Even the pick only rings off this rock. Nothing here to win."
+                        : "Your hands scrabble at the fresh rock and win nothing. This wants a pick.";
+                    nag_t = t + 4;
                 } else {
-                    const int before = tier_at(depth);
+                    const int before = here;
                     // Take this strike's bite from the tier the pit edge is in.
-                    pile.add(sample(at, tier_at(depth), bite));
+                    pile.add(sample(at, here, bite));
                     depth = std::fmin(MAX_DEPTH, depth + step);
                     assay_update(assay, pile);
                     t += pick ? 4.0 : 1.5;   // a pick-stroke is slower than a scratch
