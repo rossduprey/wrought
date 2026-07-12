@@ -1,0 +1,13 @@
+{
+	"FileVersion": 3,
+	"EngineAssociation": "",
+	"Category": "",
+	"Description": "wrought — the header-only fabrication sim, wrapped as an Unreal project so it can cook a Linux dedicated server. The whole game lives in the WroughtSim module + core/ headers; see ue/README.md.",
+	"Modules": [
+		{
+			"Name": "WroughtSim",
+			"Type": "Runtime",
+			"LoadingPhase": "Default"
+		}
+	]
+}

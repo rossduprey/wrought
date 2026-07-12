@@ -17,10 +17,10 @@ public class WroughtSim : ModuleRules
 
         // Where the wrought sim headers live. Prefer an explicit checkout path via the
         // WROUGHT_CORE environment variable; otherwise assume this module sits at
-        // <wrought>/ue/WroughtSim/ and reach back up to <wrought>/core/.
+        // <wrought>/ue/Source/WroughtSim/ and reach back up to <wrought>/core/.
         string CoreDir = System.Environment.GetEnvironmentVariable("WROUGHT_CORE");
         if (string.IsNullOrEmpty(CoreDir))
-            CoreDir = Path.Combine(ModuleDirectory, "..", "..", "core");
+            CoreDir = Path.Combine(ModuleDirectory, "..", "..", "..", "core");
         PrivateIncludePaths.Add(Path.GetFullPath(CoreDir));
     }
 }
