@@ -6,7 +6,7 @@ What is built and what is open. Updated per session. Why the sim is shaped this 
 
 - **Core (`core/`, header-only):** phase table, substance, settling, separation (Tromp), magnetic, smelt (bloomery + copper/tin furnace + roast), forge (consolidate + shape + cast + alloy), levigate (+ flocculate), fire, geology (spatial field; the pick gate — the deep rock is a competence wall only a concentrated blow gets under), fuel (wood → pyrolysis → charcoal; the two-gate finding; fire tiers), firekit (the ignition ladder + the smolder kit; the spark is a made tool, not a free match), char (the charcoal-pit transform; the seal is the gate), knap (stone → edge; fracture is the gate; the edge's irreducible floor), haft (edge + stick → the first tool; the haft is force, the joint is the ceiling), split (felled log → billets; the wedge not the edge — the grain splits the log), season (green billet → air-dry stock; the calendar, not the tool; drying time grows with thickness²), dress (seasoned billet → the timber haft; the adze trues the seat — one edge hafted twice, a wedge and a calendar between).
 - **Chain:** dig → carry → break → pan → furnace, end to end. Three metals (iron, copper, tin) + one alloy (bronze); both faces of the sulfur problem (red-short in iron, roast in copper).
-- **Playable slices (11 TUs):** pan, dig, breaker, furnace, carry, char, gather, knap, haft. `ratchet` is an instrument, not a slice.
+- **Playable slices (12 TUs):** pan, dig, breaker, furnace, carry, char, gather, firekit, knap, haft. `ratchet` is an instrument, not a slice.
 
 ## Settled findings
 

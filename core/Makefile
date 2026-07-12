@@ -1,7 +1,7 @@
 CXX ?= c++
 CXXFLAGS ?= -std=c++17 -O2 -Wall -Wextra -Wpedantic
 
-HEADERS = separate.h settling.h substance.h phase_table.h levigate.h fire.h magnetic.h smelt.h forge.h geology.h fuel.h char.h knap.h haft.h split.h season.h dress.h
+HEADERS = separate.h settling.h substance.h phase_table.h levigate.h fire.h magnetic.h smelt.h forge.h geology.h fuel.h firekit.h char.h knap.h haft.h split.h season.h dress.h
 
 test_separation: test_separation.cpp $(HEADERS)
 	$(CXX) $(CXXFLAGS) -o $@ test_separation.cpp
@@ -27,6 +27,9 @@ char_game: char.cpp $(HEADERS)
 gather_game: gather.cpp $(HEADERS)
 	$(CXX) $(CXXFLAGS) -o $@ gather.cpp
 
+firekit_game: firekit.cpp $(HEADERS)
+	$(CXX) $(CXXFLAGS) -o $@ firekit.cpp
+
 knap_game: knap.cpp $(HEADERS)
 	$(CXX) $(CXXFLAGS) -o $@ knap.cpp
 
@@ -36,7 +39,7 @@ haft_game: haft.cpp $(HEADERS)
 ratchet: ratchet.cpp $(HEADERS)
 	$(CXX) $(CXXFLAGS) -o $@ ratchet.cpp
 
-.PHONY: test pan dig breaker furnace carry char gather knap haft ratchet-run clean
+.PHONY: test pan dig breaker furnace carry char gather firekit knap haft ratchet-run clean
 test: test_separation
 	./test_separation
 
@@ -102,10 +105,19 @@ haft: haft_game
 gather: gather_game
 	./gather_game
 
+# Make the fire. gather won you tinder and sticks; char lit its pile with a brand that
+# came from nowhere. This is where the brand comes from: carve the smolder set (the
+# first tool a person makes -- dry dead wood, a green spindle never smokes), build the
+# ladder bottom-up, and STRIKE. No spark, no fire; tinder alone only flares; and the
+# top rung, the smelt-grade timber fire, you cannot even lay -- it waits on the axe.
+# The spark-is-a-made-tool and the ignition-ladder findings, made a gesture.
+firekit: firekit_game
+	./firekit_game
+
 # Walk Era 0 into Era 1 and watch the ratchet fail to turn. Not a test: a
 # measurement, and it is allowed to come out badly. It did.
 ratchet-run: ratchet
 	./ratchet
 
 clean:
-	rm -f test_separation pan_game dig_game breaker_game furnace_game carry_game char_game gather_game knap_game haft_game ratchet
+	rm -f test_separation pan_game dig_game breaker_game furnace_game carry_game char_game gather_game firekit_game knap_game haft_game ratchet
