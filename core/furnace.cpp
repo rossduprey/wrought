@@ -69,6 +69,7 @@
 #include "geology.h"
 #include "separate.h"
 #include "smelt.h"
+#include "char.h"
 
 using namespace wrought;
 
@@ -88,11 +89,24 @@ static constexpr double HEAT_FLOOR   = 500.0;   // K, embers never quite die whi
 // A grain has to weigh something before the panel admits it exists.
 static constexpr double SPECK = 1e-6;
 
-// Charcoal for the reducing fire. Passed to smelt_copper as the reductant; kept
-// ample on purpose, so FUEL is never the binding constraint -- the finding is
-// about atmosphere and sequence, not about running out of carbon. (smelt.h's
-// carbon gate is real and tested; here we simply feed it enough to clear it.)
-static Substance charcoal_bed() { Substance c; c.freegrain[CARBON][SAND] = 2.0; return c; }
+// The reductant for the reducing fire -- now MADE, not conjured. This closes the
+// loop the tool-bootstrap named: the charcoal every furnace burns is a pit of wood
+// charred down (char.h), and that wood was gathered by hand (fuel.h's Wood, the
+// stock gather.cpp wins). The old charcoal_bed() spawned a flat 2 kg of carbon and
+// said so out loud -- "kept ample on purpose" -- and that scaffold hid the very
+// thing this file was built to teach at the end. Here the bed comes off a SEALED
+// pit of hand-pulled dead sticks: no axe, no felled timber in it. It is still not
+// the binding constraint, but now for an HONEST reason rather than a fiat one -- a
+// copper reduction sips only a fraction of the carbon even so small a pit yields
+// (CARBON_PER_CU is grams per kg of copper, not kilos). The reductant gate is
+// cheap; the fire's real fuel cost is HEAT -- the bellows here, and the bloomery's
+// blast for iron -- not the carbon in the charge. The tap says so.
+static constexpr double PIT_STICKS   = 3.0;  // kg hand-pulled sticks banked in the pit. AUTHORED pacing.
+static constexpr double PIT_MOISTURE = 0.15; // as gather.cpp wins it, green off the tree. AUTHORED pacing.
+static Substance pit_charcoal() {
+    Wood w; w.sticks = PIT_STICKS; w.moisture = PIT_MOISTURE;
+    return char_pit(w, PIT_SEALED);
+}
 
 static bool is_copper_ore(int p) { return p == CUPRITE || p == CHALCOCITE; }
 
@@ -314,6 +328,16 @@ static void report_pour(const MeltResult& r, double cu_feed, double locked_su,
     else
         std::printf("   You ran one fire where the ore wanted two. The oxide gave up its\n"
                     "   copper; the sulfide never would, not to a fire that only reduces.\n\n");
+
+    // The loop-close. The charcoal that reduced the ore was not laid beside it by
+    // fiat; it was made, and cheaply -- which is the last thing this fire teaches.
+    std::printf("   And the charcoal you banked to reduce it was not free. It was a pit\n"
+                "   of dead sticks, pulled from a standing tree by hand and charred down --\n"
+                "   no axe, no felled timber in it -- and it gave carbon to spare. A copper\n"
+                "   reduction sips only a fraction of what so small a pit yields; the fire's\n"
+                "   real cost was the HEAT you pumped, not the carbon in the charge. The\n"
+                "   reductant gate is cheap. The fuel wall bites elsewhere -- at the bloom,\n"
+                "   where iron's blast eats charcoal by the basketful.\n\n");
 }
 
 // ---------------------------------------------------------------------------
@@ -390,7 +414,7 @@ int main() {
             else if (c == 'f') {
                 if (reducing) {
                     // The smelt: terminal. It pours what it can and the charge is spent.
-                    pour = smelt_copper(charge, charcoal_bed(), heat);
+                    pour = smelt_copper(charge, pit_charcoal(), heat);
                     if (!pour.lit) {
                         nag = "The fire is too cool to catch -- the ore just sits in it. "
                               "Bring it up to orange at least.";
