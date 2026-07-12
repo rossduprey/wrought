@@ -26,9 +26,11 @@
 // locked behind the very axe you are building (fuel.h, gather.cpp). So your first haft
 // can only be a hand-cut SAPLING: springy, splitty, a joint that will never fully seat.
 // The first axe is crude by necessity -- and it is still just enough to bring down one
-// trunk, and that trunk is the timber every tool after is cut from. The bootstrap turns
-// exactly once, and this slice is the turn: you swing a sapling axe, the tree comes down,
-// and the wood you could never reach is suddenly at your feet.
+// trunk. But a felled trunk is a green log, not a haft: the axe wins the wood, and the
+// ADZE -- the same edge hafted the other way (dress.h) -- pares that log into the timber
+// every tool after is cut from. So the bootstrap does not turn on one tool but on one
+// EDGE hafted twice, and this slice is both turns: swing a sapling axe to fell the tree,
+// then set the same head as an adze and dress the log into the haft you could never reach.
 //
 // -- The gesture. ----------------------------------------------------------
 //
@@ -53,6 +55,7 @@
 #include <unistd.h>
 
 #include "haft.h"
+#include "dress.h"
 
 using namespace wrought;
 
@@ -166,8 +169,10 @@ static void draw_panel(double bind_work, ToolKind kind, bool have_timber,
     line("%s", "");
 
     // The trunk -- the wall gather could not cross, here to be swung at.
-    if (felled)
-        line("  the tree  |%s| DOWN -- and the timber is yours", bar16(0.0, '#'));
+    if (have_timber)
+        line("  the tree  |%s| DOWN and dressed -- the timber is yours", bar16(0.0, '#'));
+    else if (felled)
+        line("  the tree  |%s| DOWN -- a raw log; dress it with the adze [3]+[t]", bar16(0.0, '#'));
     else
         line("  the tree  |%s| standing -- swing to fell it", bar16(tree_left / TREE_FULL, '#'));
     line("%s", "");
@@ -196,7 +201,7 @@ static void draw(double bind_work, ToolKind kind, bool have_timber, double tree_
     std::printf("   %s\n\n", nag ? nag : "");
     std::printf("   [l] work the joint%s   set head:  [1] axe  [2] pick  [3] adze\n",
                 binding ? "  (binding...)" : "");
-    std::printf("   [w] swing at the tree   [t] cut a timber haft   [r] keep it and go   [q] walk away\n");
+    std::printf("   [w] swing at the tree   [t] dress a haft from the log   [r] keep it and go   [q] walk away\n");
     draw_panel(bind_work, kind, have_timber, tree_left, felled, last_swing);
     std::printf("\033[24;1H");
     std::fflush(stdout);
@@ -204,19 +209,30 @@ static void draw(double bind_work, ToolKind kind, bool have_timber, double tree_
 
 // The reckoning: what you built, whether the lever delivered, and the two walls the
 // scene teaches -- leaning on haft.h's gates, not on numbers restated here.
-static void report_haft(bool felled, bool ever_flew, ToolKind kind, double best_bite) {
+static void report_haft(bool felled, bool have_timber, bool ever_flew, ToolKind kind, double best_bite) {
     std::printf("   You lower the tool and take stock of what you made.\n\n");
 
-    if (felled) {
-        std::printf("   The trunk came down. A stone edge that only scraped in your fist, swung on\n"
-                    "   the end of a stick, felled a tree -- and the edge never got keener to do it.\n"
-                    "   That is the whole gift of the haft: not a sharper edge, but the FORCE a\n"
-                    "   lever puts behind the one you had. Gather's wall -- hands never win timber --\n"
-                    "   is the wall this tool just walked through.\n\n");
-        std::printf("   And now the wood you could never reach is at your feet. The first axe rode a\n"
-                    "   green sapling because timber was locked behind it; the trunk it felled is the\n"
-                    "   seasoned haft stock every tool after is cut from. The bootstrap has turned:\n"
-                    "   hands -> stone edge -> sapling axe -> the felled trunk -> a real haft.\n\n");
+    if (felled && !have_timber) {
+        std::printf("   The trunk came down -- a stone edge that only scraped in your fist, swung on the\n"
+                    "   end of a stick, felled a tree, and the edge never got keener to do it. That is\n"
+                    "   the haft's gift: not a sharper edge but the FORCE a lever puts behind the one\n"
+                    "   you had. Gather's wall -- hands never win timber -- is the wall this axe walked\n"
+                    "   through.\n\n");
+        std::printf("   But a felled trunk is a green log, not a haft, and the axe that felled it cannot\n"
+                    "   pare it -- its edge crosses the grain a haft must follow. You stopped one step\n"
+                    "   short: the SAME edge, hafted the other way as an adze, is what dresses the log\n"
+                    "   into the stock every tool after rides. Knap once, haft twice.\n\n");
+        return;
+    }
+
+    if (felled) {   // felled AND dressed -- both turns of the bootstrap
+        std::printf("   The trunk came down, and then you dressed it. First the axe: a floored edge on a\n"
+                    "   sapling, swung across the grain with the FORCE a lever lends, felling the tree\n"
+                    "   gather's bare hands could not touch. Then the adze: the same edge hafted in line,\n"
+                    "   paring the fallen log true ALONG its grain -- no force needed, only the edge.\n\n");
+        std::printf("   Two verbs, one stone. The bootstrap has turned: hands -> stone edge -> sapling\n"
+                    "   axe -> the felled trunk -> the adze -> a seasoned timber haft, the stock every\n"
+                    "   tool after is cut from -- and the edge never got keener at any step.\n\n");
         return;
     }
 
@@ -260,7 +276,8 @@ int main() {
         "   is barely on -- swing and it flies off, the edge undelivered. Seat it, choose\n"
         "   an axe, and swing at the trunk. A lever's blow grows with the square of its\n"
         "   length, so the tree yields to the FORCE the haft puts behind your floored edge,\n"
-        "   not to any sharpness. Bring it down, and the wood you could not reach is yours.\n\n"
+        "   not to any sharpness. Bring it down -- then set the same edge as an ADZE and\n"
+        "   dress the fallen log along its grain into the haft you could never reach.\n\n"
         "   [press any key]\n");
     std::fflush(stdout);
     raw_tty();
@@ -315,10 +332,10 @@ int main() {
             tree_left -= bite * CHOP_SCALE;
             if (bind == BIND_LASHED) bind_work -= LASH_LOOSEN;   // an unseated joint works loose under load
             if (tree_left <= SPECK) {
-                tree_left = 0.0; felled = true; have_timber = true;
-                last_swing = "the trunk cracks, leans, and comes down -- and the timber is yours";
-                nag = "It is DOWN. A sapling axe felled it -- and now you have timber, the haft every tool after wants.";
-                nag_t = t + 9;
+                tree_left = 0.0; felled = true;
+                last_swing = "the trunk cracks, leans, and comes down -- a green log at your feet, not yet a haft";
+                nag = "It is DOWN -- but a felled trunk is a raw log. Set the head as an ADZE [3], seat it, then [t] to dress a haft.";
+                nag_t = t + 10;
             } else {
                 last_swing = bind == BIND_LASHED
                     ? "the edge bites deep -- but you feel the lashing give a little with the blow"
@@ -342,14 +359,25 @@ int main() {
             else if (c == '3') { kind = ADZE; helve = EDGE_INLINE; binding = false; }
             else if (c == 'w') { swing(); }
             else if (c == 't') {
-                if (have_timber) {   // the bootstrap payoff: re-haft on the wood you just won
-                    // A fresh timber haft is a fresh joint -- you rebind, but the ceiling is higher now.
+                if (have_timber) {          // already dressed -- re-haft on the timber you won
                     bind_work = 0.0;
-                    nag = "You split a timber haft from the felled trunk and start the joint fresh -- it will seat far tighter.";
+                    nag = "You split a fresh timber haft from the trunk and start the joint clean -- it seats far tighter than the sapling.";
                     nag_t = t + 7;
-                } else {             // the locked beat, like gather's [f]
-                    nag = "There is no timber to cut a haft from -- it is still standing. That is the tree you are trying to fell.";
+                } else if (!felled) {       // the locked beat, like gather's [f] -- nothing felled to dress
+                    nag = "There is no trunk to dress -- it is still standing. That is the tree you are trying to fell with the axe.";
                     nag_t = t + 6;
+                } else {                    // a log on the ground: the adze's verb, not the axe's (dress.h)
+                    const Hafted cur = haft(head, SAPLING_LEN, SAPLING, bind_of(bind_work), helve);
+                    if (can_dress(cur)) {   // a sound adze pares the log along the grain -> timber
+                        have_timber = true;
+                        bind_work = 0.0;    // a fresh timber haft is a fresh joint -- but the ceiling is higher now
+                        last_swing = "the adze skims the log along its grain, paring it flat and true -- a haft, at last";
+                        nag = "Dressed. The same edge that felled the trunk, hafted the other way, made the haft -- knap once, haft twice. Now re-seat it.";
+                        nag_t = t + 10;
+                    } else {
+                        nag = "The trunk is down but it is a raw green log. The axe that felled it cannot pare it -- set the head as an ADZE [3], seat it, then [t].";
+                        nag_t = t + 8;
+                    }
                 }
             }
         }
@@ -378,7 +406,7 @@ int main() {
         return 0;
     }
 
-    report_haft(felled, ever_flew, kind, best_bite);
+    report_haft(felled, have_timber, ever_flew, kind, best_bite);
     std::printf("   It cost you %d minutes and %d seconds at the tree.\n\n",
                 (int)t / 60, (int)t % 60);
     return 0;

@@ -35,6 +35,7 @@
 #include "char.h"
 #include "knap.h"
 #include "haft.h"
+#include "dress.h"
 
 using namespace wrought;
 
@@ -2038,6 +2039,52 @@ int main() {
               && haft(head, 0.7, TIMBER, BIND_SEATED, HEAD_POINT).kind == PICK
               && haft(head, 0.7, TIMBER, BIND_SEATED, EDGE_INLINE).kind == ADZE,
               "haft: the head's geometry decides the tool -- axe fells, pick wins rock, adze dresses wood");
+    }
+
+    // ---- Dressing: the axe wins the trunk, the adze makes the haft ----------
+    // The rung that closes the loop, dress.h. haft.h fells the tree and then hands
+    // you finished TIMBER for free -- but a felled trunk is a green log, not a haft.
+    // Dressing is the second verb: the SAME knapped edge hafted the OTHER way (an adze,
+    // EDGE_INLINE) pares the log true along its grain. Two findings: the axe that
+    // felled the trunk cannot dress it (geometry, not force), and dressing needs no
+    // fell-wall -- a crude sapling adze wins the haft, because the edge dresses where
+    // the lever fells.
+    {
+        const StoneEdge head { 0.40, STONE_EDGE_FLOOR, true };   // knap's floored edge, carried in
+        const Trunk trunk { 12.0 };                              // the green log the sapling axe just felled
+
+        // The one edge, hafted three ways -- all crude, all on the sapling you start with.
+        const Hafted sap_axe  = haft(head, 0.55, SAPLING, BIND_SEATED, EDGE_ACROSS);
+        const Hafted sap_adze = haft(head, 0.55, SAPLING, BIND_SEATED, EDGE_INLINE);
+        const Hafted sap_pick = haft(head, 0.55, SAPLING, BIND_SEATED, HEAD_POINT);
+
+        // Finding 1, geometry not force: only the adze dresses. The axe that felled the
+        // trunk cannot pare it (its edge crosses the grain), nor can a pick, nor a loose
+        // head -- and the adze wins timber where every other helve of the same head leaves
+        // you on the sapling. The bootstrap turns on the same edge hafted twice.
+        const Hafted loose_adze = haft(head, 0.55, SAPLING, BIND_NONE, EDGE_INLINE);
+        check(dress(trunk, sap_adze, ALONG_GRAIN) == TIMBER
+              && dress(trunk, sap_axe,  ALONG_GRAIN) == SAPLING
+              && dress(trunk, sap_pick, ALONG_GRAIN) == SAPLING
+              && dress(trunk, loose_adze, ALONG_GRAIN) == SAPLING,
+              "dress: only a sound adze makes a haft -- the axe that felled the trunk cannot dress it");
+
+        // Finding 2, the grain: even the right tool wins nothing across the grain -- a
+        // crosscut billet is short-grained, a stick that snaps, no better than a sapling.
+        check(dress(trunk, sap_adze, ACROSS_GRAIN) == SAPLING,
+              "dress: the billet must be riven along the grain -- crosscut it is a stick that snaps");
+
+        // Finding 3, the edge dresses where the lever fells: dressing needs no fell-wall,
+        // so the crude SAPLING adze wins timber with no timber of its own -- which is the
+        // only reason the first haft can exist. And the timber it makes seats a joint the
+        // sapling never could (haft.h's stock is the ceiling), closing the bootstrap: the
+        // dressed haft's axe out-bites the sapling axe that felled the very trunk it came
+        // from, with an edge that never got keener at any step.
+        const HaftStock won = dress(trunk, sap_adze, ALONG_GRAIN);
+        const Hafted dressed_axe = haft(head, 0.70, won, BIND_SEATED, EDGE_ACROSS);
+        check(won == TIMBER && !can_dress(sap_axe)
+              && dressed_axe.joint > sap_axe.joint && dressed_axe.bite() > sap_axe.bite(),
+              "dress: the sapling adze wins the timber that seats every tool after -- knap once, haft twice");
     }
 
     // ---- The picture -------------------------------------------------------
