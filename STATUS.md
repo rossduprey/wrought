@@ -4,7 +4,7 @@ What is built and what is open. Updated per session. Why the sim is shaped this 
 
 ## Built
 
-- **Core (`core/`, header-only):** phase table, substance, settling, separation (Tromp), magnetic, smelt (bloomery + copper/tin furnace + roast), forge (consolidate + shape + cast + alloy), levigate (+ flocculate), fire, geology (spatial field), fuel (wood → pyrolysis → charcoal; the two-gate finding; fire tiers), char (the charcoal-pit transform; the seal is the gate), knap (stone → edge; fracture is the gate; the edge's irreducible floor).
+- **Core (`core/`, header-only):** phase table, substance, settling, separation (Tromp), magnetic, smelt (bloomery + copper/tin furnace + roast), forge (consolidate + shape + cast + alloy), levigate (+ flocculate), fire, geology (spatial field), fuel (wood → pyrolysis → charcoal; the two-gate finding; fire tiers), char (the charcoal-pit transform; the seal is the gate), knap (stone → edge; fracture is the gate; the edge's irreducible floor), haft (edge + stick → the first tool; the haft is force, the joint is the ceiling).
 - **Chain:** dig → carry → break → pan → furnace, end to end. Three metals (iron, copper, tin) + one alloy (bronze); both faces of the sulfur problem (red-short in iron, roast in copper).
 - **Playable slices (10 TUs):** pan, dig, breaker, furnace, carry, char, gather, knap. `ratchet` is an instrument, not a slice.
 
@@ -32,10 +32,11 @@ One line each; full statements in `DESIGN.md`, reversals in `CORRECTIONS.md`.
 - Gathering by hand wins tinder and sticks, never timber — the bulk fuel and every haft are locked behind the axe (hands are tool #1, the worst point on the curve).
 - The reductant a copper smelt needs is tiny — a small pit of hand-gathered sticks covers it many times over; charcoal binds the fire's heat (and the bloom's blast), not the copper reduction. The furnace burns made charcoal now, not a free bed.
 - A stone edge is gated by fracture, not hardness — the tough stone underfoot is a hammerstone; only a conchoidal core takes an edge, and even a clean flake is only as keen as the stone floor, a wall the next material (metal), not effort, gets under. Knapping authors nothing: the edge is subtracted, mass conserved.
+- Hafting is force, not sharpness — it puts knap's floored edge on a lever, and a hafted axe fells the timber a bare hand and bare edge cannot, with an edge that never got keener. The joint (bind × stock) is the weakest link and the ceiling; the first axe must ride a sapling haft (timber is locked behind it), so the bootstrap turns exactly once: hands → stone edge → sapling axe → felled trunk → real haft.
 
 ## Open
 
-- **Citation chores** (authored/unverified numbers): #1, #2, #5, #7, #12, #16, #17, #18, #20, #21, #22, #23, #24, #25, #26, #27, #29, #30 (char yield), #31 (fire-tier peaks), #32 (tinder/moisture gates), #33 (pit seal retention), #34 (flake fraction), #35 (stone-edge floor angle).
-- **Unbuilt rungs** (the fuel/tool staircase): knapping — built (`knap.h` + the `knap` slice); hafting (edge + head → pick/axe) — model and verb both pending.
+- **Citation chores** (authored/unverified numbers): #1, #2, #5, #7, #12, #16, #17, #18, #20, #21, #22, #23, #24, #25, #26, #27, #29, #30 (char yield), #31 (fire-tier peaks), #32 (tinder/moisture gates), #33 (pit seal retention), #34 (flake fraction), #35 (stone-edge floor angle), #36 (bind hold), #37 (haft-stock hold), #38 (hand reach / fell energy).
+- **Unbuilt rungs** (the fuel/tool staircase): knapping — built (`knap.h` + the `knap` slice); hafting — model built (`haft.h`), the `haft` verb/slice pending.
 - **#28:** authored valley layout (deposit centers, radii, peak grades capped 0.5, `N_TIER`, linear falloff) — placeholders; tests assert only field shape.
 - **Design questions Ross owns:** three-clause test as an owned DESIGN.md section; "teach the tool, never the wisdom" as a stated rule; §2b two-actor experiment; the re-panning verb; is `pick` a tax or a decision; how a panner's tilt becomes a gesture.

@@ -1,7 +1,7 @@
 CXX ?= c++
 CXXFLAGS ?= -std=c++17 -O2 -Wall -Wextra -Wpedantic
 
-HEADERS = separate.h settling.h substance.h phase_table.h levigate.h fire.h magnetic.h smelt.h forge.h geology.h fuel.h char.h knap.h
+HEADERS = separate.h settling.h substance.h phase_table.h levigate.h fire.h magnetic.h smelt.h forge.h geology.h fuel.h char.h knap.h haft.h
 
 test_separation: test_separation.cpp $(HEADERS)
 	$(CXX) $(CXXFLAGS) -o $@ test_separation.cpp

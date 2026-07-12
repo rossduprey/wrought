@@ -34,6 +34,7 @@
 #include "fuel.h"
 #include "char.h"
 #include "knap.h"
+#include "haft.h"
 
 using namespace wrought;
 
@@ -1952,6 +1953,60 @@ int main() {
         check(conserves(core, good) && conserves(core, steep) && conserves(core, hard)
               && conserves(cobble, soft),
               "knap: the edge is subtracted, never added -- flake + core + debris conserves");
+    }
+
+    // ---- Hafting: the haft is force, and the joint is the ceiling ----------
+    // The rung above knap -- edge + stick -> the first tool, haft.h. Hafting does
+    // not sharpen the edge (knap floored that); it puts the edge on a lever. Two
+    // findings: the haft multiplies force (a hafted axe fells what the bare hand
+    // and bare edge cannot), and the joint is the weakest link (a failed coupling
+    // delivers nothing however keen the head or long the haft).
+    {
+        const StoneEdge head { 0.40, STONE_EDGE_FLOOR, true };   // a worked stone bit, knap's floored edge
+        const StoneEdge dud  { 0.40, 0.0,              false };  // a hinged flake -- no edge
+
+        // The bootstrap tools: the crude first axe (sapling, lashed) and the axe after
+        // (timber, seated), plus the same head in the bare fist.
+        const Hafted first  = haft(head, 0.55, SAPLING, BIND_LASHED, EDGE_ACROSS);
+        const Hafted proper = haft(head, 0.70, TIMBER,  BIND_SEATED, EDGE_ACROSS);
+
+        // Finding 1, the lever: the haft, not the edge, is what fells timber. The bare
+        // hand cannot clear the fell floor (gather's wall); even the crude sapling axe
+        // can, and the timber axe far more -- and the edge never got keener to do it.
+        check(hand_bite(head) < FELL_ENERGY,
+              "haft: a bare edge in the fist cannot fell -- the hand is a lever of no length (gather's wall)");
+        check(first.fells() && first.bite() > hand_bite(head),
+              "haft: the crude first axe -- a floored edge on a sapling -- fells what the bare hand could not");
+        check(proper.bite() > first.bite(),
+              "haft: force scales with the lever -- a longer, stiffer timber haft hits far harder");
+
+        // Finding 2, the joint is the ceiling: a keen head on a long haft delivers
+        // NOTHING through a coupling that lets it walk off. The tool is its worst link.
+        const Hafted loose = haft(head, 0.70, TIMBER, BIND_NONE, EDGE_ACROSS);
+        check(!loose.sound && loose.bite() == 0.0,
+              "haft: no joint, no tool -- a perfect head on a long haft delivers nothing if the head walks off");
+        // The weakest link, precisely: with the best bind the STOCK becomes the ceiling,
+        // so the sapling axe is worse than the timber axe because the WOOD changed, not
+        // the binding -- which is exactly why the first axe must wait on the first fell.
+        const Hafted seat_sap = haft(head, 0.70, SAPLING, BIND_SEATED, EDGE_ACROSS);
+        const Hafted seat_tim = haft(head, 0.70, TIMBER,  BIND_SEATED, EDGE_ACROSS);
+        check(seat_sap.joint < seat_tim.joint && seat_sap.joint == joint_strength(BIND_SEATED, SAPLING),
+              "haft: with the bind maxed the haft stock is the ceiling -- the sapling axe waits on timber");
+
+        // The staircase carries knap's floor untouched: hafting adds force, not keenness.
+        check(first.edge_angle == STONE_EDGE_FLOOR && proper.edge_angle == STONE_EDGE_FLOOR,
+              "haft: the edge stays at knap's floor -- hafting multiplies force, never sharpness");
+
+        // knap's gate carried forward: a dud flake hafts into a club, not a tool.
+        const Hafted club = haft(dud, 0.70, TIMBER, BIND_SEATED, EDGE_ACROSS);
+        check(!club.sound,
+              "haft: no usable edge, no tool -- a hinged flake on a fine haft is only a club");
+
+        // Head geometry names the tool -- same mechanics, different work.
+        check(haft(head, 0.7, TIMBER, BIND_SEATED, EDGE_ACROSS).kind == AXE
+              && haft(head, 0.7, TIMBER, BIND_SEATED, HEAD_POINT).kind == PICK
+              && haft(head, 0.7, TIMBER, BIND_SEATED, EDGE_INLINE).kind == ADZE,
+              "haft: the head's geometry decides the tool -- axe fells, pick wins rock, adze dresses wood");
     }
 
     // ---- The picture -------------------------------------------------------
