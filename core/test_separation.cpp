@@ -32,6 +32,7 @@
 #include "forge.h"
 #include "geology.h"
 #include "fuel.h"
+#include "firekit.h"
 #include "char.h"
 #include "knap.h"
 #include "haft.h"
@@ -1947,6 +1948,51 @@ int main() {
         // What survives is still the reductant a smelt reads: free CARBON.
         check(sealed.freegrain[CARBON][GRAVEL] > 0.0,
               "char pit: the drawn char is free CARBON -- exactly what smelt.h reduces with");
+    }
+
+    // ---- The fire kit: the ignition ladder, and the spark is a tool --------
+    // firekit.h corrects fuel.h's free spark: a loaded station is inert until the
+    // player strikes it with a smolder kit, and the fire is only ever as high as the
+    // tallest unbroken run of rungs from the bottom. Structural -- the block asserts
+    // ORDERINGS and possession, never a magnitude.
+    {
+        Wood dry;   dry.sticks = 0.5;   dry.moisture = 0.15;   // dead, dry: as gather wins it
+        Wood green; green.sticks = 0.5; green.moisture = 0.60; // still sappy
+
+        // The smolder kit is made from dry dead wood; a green stick takes no ember.
+        check(make_smolder(dry).made,   "smolder kit: a dry dead stick carves a friction set");
+        check(!make_smolder(green).made, "smolder kit: a green stick takes no ember -- no kit");
+        const SmolderKit tool = make_smolder(dry);
+
+        // The ladder is strict and bottom-up: a gap stops the climb, so a rung with
+        // nothing beneath it to light it catches nothing.
+        FireKit only_timber; only_timber.timber = 5.0; only_timber.moisture = 0.15;
+        FireKit only_sticks; only_sticks.sticks = 3.0; only_sticks.moisture = 0.15;
+        FireKit tinder;  tinder.tinder  = 0.3; tinder.moisture  = 0.15;
+        FireKit sticks;  sticks.tinder  = 0.3; sticks.sticks  = 3.0; sticks.moisture = 0.15;
+        FireKit timber;  timber.tinder  = 0.3; timber.sticks  = 3.0; timber.timber = 5.0; timber.moisture = 0.15;
+        check(fire_tier(only_timber) == NO_FIRE && fire_tier(only_sticks) == NO_FIRE,
+              "ladder: fuel with no tinder under it catches nothing -- no spark takes a log");
+        check(fire_tier(tinder) < fire_tier(sticks) && fire_tier(sticks) < fire_tier(timber),
+              "ladder: each rung strictly outranks the one below -- an ordering, no magnitude");
+        check(fire_tier(tinder) == TINDER_FLARE && fire_tier(timber) == TIMBER_FIRE,
+              "ladder: tinder alone is a flare; the axe's timber is the top, bulk rung");
+
+        // Ignition: the spark is the tool, and possession is the gate. A loaded
+        // station with no kit is inert however dry the tinder.
+        const SmolderKit none;
+        check(!ignite(timber, none).lit, "ignite: a loaded station with no smolder kit is inert -- where is the spark?");
+        check(ignite(timber, tool).lit && ignite(timber, tool).tier == TIMBER_FIRE,
+              "ignite: with the kit, the fire catches to the ladder's top rung");
+        // Wet tinder is the other honest failure -- tool present, still no catch.
+        FireKit wet = timber; wet.moisture = 0.60;
+        check(!ignite(wet, tool).lit, "ignite: wet tinder takes no spark even with the kit in hand");
+
+        // The tool does not wear: possession persists across fires. And the kit's
+        // haul mass is exactly its rungs -- the mass the carry slice caps.
+        check(tool.made, "smolder kit: the tool does not wear -- possession persists across fires");
+        check(std::fabs(kit_mass(timber) - (0.3 + 3.0 + 5.0)) < 1e-12,
+              "fire kit: its haul mass is exactly its rungs summed -- nothing created assembling it");
     }
 
     // ---- Knapping: fracture is the gate, and the edge has a floor ----------
