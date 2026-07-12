@@ -30,10 +30,13 @@ gather_game: gather.cpp $(HEADERS)
 knap_game: knap.cpp $(HEADERS)
 	$(CXX) $(CXXFLAGS) -o $@ knap.cpp
 
+haft_game: haft.cpp $(HEADERS)
+	$(CXX) $(CXXFLAGS) -o $@ haft.cpp
+
 ratchet: ratchet.cpp $(HEADERS)
 	$(CXX) $(CXXFLAGS) -o $@ ratchet.cpp
 
-.PHONY: test pan dig breaker furnace carry char gather knap ratchet-run clean
+.PHONY: test pan dig breaker furnace carry char gather knap haft ratchet-run clean
 test: test_separation
 	./test_separation
 
@@ -81,6 +84,16 @@ char: char_game
 knap: knap_game
 	./knap_game
 
+# Haft the knapped edge to a stick and make the first real tool -- the one that fells
+# the tree the whole staircase leans on. You do not sharpen the floored edge; you put
+# it on a lever, where the same edge does what your fist never could. Work the joint
+# until it seats (rush it and the head flies off, the edge delivered to nothing), set
+# it as an axe, and swing: the tree yields to the FORCE the haft puts behind the edge,
+# not to sharpness. Bring it down and the timber you could not reach is yours -- the
+# bootstrap turns. The haft-is-force and joint-is-the-ceiling findings, made a gesture.
+haft: haft_game
+	./haft_game
+
 # Gather the wood by hand -- and meet the wall the whole staircase leans on. You rake
 # tinder and pull dead sticks, but the timber, the bulk of every trunk and the only
 # stock a haft is cut from, stays standing: felling it wants an axe that wants a stone
@@ -95,4 +108,4 @@ ratchet-run: ratchet
 	./ratchet
 
 clean:
-	rm -f test_separation pan_game dig_game breaker_game furnace_game carry_game char_game gather_game knap_game ratchet
+	rm -f test_separation pan_game dig_game breaker_game furnace_game carry_game char_game gather_game knap_game haft_game ratchet
