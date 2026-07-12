@@ -51,6 +51,23 @@ is proven for real, not asserted.
    - Either tool at the tin creek: every tier reads cassiterite, comes up **free** (no
      locked mass) — the placer needs no pick and no breaker.
 
+## The smoke-test headless (unattended, no GUI)
+
+`WroughtSim/Private/WroughtSeamTest.cpp` is a C++ automation spec that asserts the
+same six findings against the **live subsystem** — no clicking. It opens a game world,
+grabs `UWroughtSimSubsystem`, feeds it synthetic world coordinates for the copper hill
+and tin creek, and checks: hand wins the cuprite cap, hand skips the deep root, pick
+wins the chalcocite root **locked**, placer comes up cassiterite **free**. Run it with
+the command-line editor (`-nullrhi` = no GPU, so it runs on a headless box or VM):
+
+```
+UnrealEditor-Cmd /path/YourProject.uproject \
+  -ExecCmds="Automation RunTests Wrought.Seam" -unattended -nop4 -nullrhi -stdout
+```
+
+If this passes unattended, the portable-field thesis is proven end to end
+(sim → subsystem → panel), and it's the loop a headless UE box makes worth standing up.
+
 ## Verifying without Unreal
 
 The sim-side logic of every call the adapter makes is checked host-free — compile any
