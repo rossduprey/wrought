@@ -6,7 +6,7 @@ What is built and what is open. Updated per session. Why the sim is shaped this 
 
 - **Core (`core/`, header-only):** phase table, substance, settling, separation (Tromp), magnetic, smelt (bloomery + copper/tin furnace + roast), forge (consolidate + shape + cast + alloy), levigate (+ flocculate), fire, geology (spatial field), fuel (wood → pyrolysis → charcoal; the two-gate finding; fire tiers), char (the charcoal-pit transform; the seal is the gate), knap (stone → edge; fracture is the gate; the edge's irreducible floor).
 - **Chain:** dig → carry → break → pan → furnace, end to end. Three metals (iron, copper, tin) + one alloy (bronze); both faces of the sulfur problem (red-short in iron, roast in copper).
-- **Playable slices (9 TUs):** pan, dig, breaker, furnace, carry, char, gather. `ratchet` is an instrument, not a slice.
+- **Playable slices (10 TUs):** pan, dig, breaker, furnace, carry, char, gather, knap. `ratchet` is an instrument, not a slice.
 
 ## Settled findings
 
@@ -36,6 +36,6 @@ One line each; full statements in `DESIGN.md`, reversals in `CORRECTIONS.md`.
 ## Open
 
 - **Citation chores** (authored/unverified numbers): #1, #2, #5, #7, #12, #16, #17, #18, #20, #21, #22, #23, #24, #25, #26, #27, #29, #30 (char yield), #31 (fire-tier peaks), #32 (tinder/moisture gates), #33 (pit seal retention), #34 (flake fraction), #35 (stone-edge floor angle).
-- **Unbuilt rungs** (the fuel/tool staircase, stations/verbs pending): knapping — model built (`knap.h`), the `knap` verb/slice pending; hafting (edge + head → pick/axe) — model and verb both pending.
+- **Unbuilt rungs** (the fuel/tool staircase): knapping — built (`knap.h` + the `knap` slice); hafting (edge + head → pick/axe) — model and verb both pending.
 - **#28:** authored valley layout (deposit centers, radii, peak grades capped 0.5, `N_TIER`, linear falloff) — placeholders; tests assert only field shape.
 - **Design questions Ross owns:** three-clause test as an owned DESIGN.md section; "teach the tool, never the wisdom" as a stated rule; §2b two-actor experiment; the re-panning verb; is `pick` a tax or a decision; how a panner's tilt becomes a gesture.

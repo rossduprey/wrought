@@ -8,6 +8,7 @@ core/furnace_game
 core/carry_game
 core/char_game
 core/gather_game
+core/knap_game
 core/ratchet
 Binaries/
 Intermediate/

@@ -27,10 +27,13 @@ char_game: char.cpp $(HEADERS)
 gather_game: gather.cpp $(HEADERS)
 	$(CXX) $(CXXFLAGS) -o $@ gather.cpp
 
+knap_game: knap.cpp $(HEADERS)
+	$(CXX) $(CXXFLAGS) -o $@ knap.cpp
+
 ratchet: ratchet.cpp $(HEADERS)
 	$(CXX) $(CXXFLAGS) -o $@ ratchet.cpp
 
-.PHONY: test pan dig breaker furnace carry char gather ratchet-run clean
+.PHONY: test pan dig breaker furnace carry char gather knap ratchet-run clean
 test: test_separation
 	./test_separation
 
@@ -69,6 +72,15 @@ carry: carry_game
 char: char_game
 	./char_game
 
+# Knap a stone into an edge -- the first tool the hands can make, and the rung below
+# every pick a dig assumes. The tough cobble gather let you pocket is only the hammer;
+# the stone that takes an edge is a brittle flint you must hunt for in the streambed,
+# and even a clean flake tops out at the stone's floor -- keen enough to cut a haft,
+# never a razor, the wall only metal gets under. Fracture-not-hardness and the edge's
+# irreducible floor, made a gesture: you strike, and the stone teaches you.
+knap: knap_game
+	./knap_game
+
 # Gather the wood by hand -- and meet the wall the whole staircase leans on. You rake
 # tinder and pull dead sticks, but the timber, the bulk of every trunk and the only
 # stock a haft is cut from, stays standing: felling it wants an axe that wants a stone
@@ -83,4 +95,4 @@ ratchet-run: ratchet
 	./ratchet
 
 clean:
-	rm -f test_separation pan_game dig_game breaker_game furnace_game carry_game char_game gather_game ratchet
+	rm -f test_separation pan_game dig_game breaker_game furnace_game carry_game char_game gather_game knap_game ratchet
