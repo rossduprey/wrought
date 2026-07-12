@@ -46,6 +46,14 @@ Read in order; each file knows only the ones above it.
 - **Grade and recovery are always reported together.** State is the composition vector, never a score.
 - **Teach the tool, never the wisdom.** An interface may explain input→action; it may not state the strategy that emerges. If the player can be told the answer, the sim was decoration.
 
+## Editing documents
+
+These are technical documents. Terse, load-bearing prose — not story hour.
+
+- **Edit the changed span, nothing else.** Never delete a paragraph and retype it with the same words back to alter one clause. Match the smallest unique string and replace only what changed. Re-typing unchanged text is wasted tokens and wasted work time.
+- **Additions are precise and focused.** Each new sentence must carry a fact the reader does not already have. Say it once. Do not restate the surrounding text in new words, do not pad with framing, do not narrate what the change does.
+- **Cut, don't accrete.** If an edit can be shorter and still complete, make it shorter. A finding that needs three clauses gets three, not a paragraph.
+
 ## How the work goes
 
 1. Probe in the scratchpad (throwaway `.cpp` that links the headers and prints a table). Steal the finding; do not commit the probe.
