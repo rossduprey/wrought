@@ -33,6 +33,7 @@
 #include "geology.h"
 #include "fuel.h"
 #include "char.h"
+#include "knap.h"
 
 using namespace wrought;
 
@@ -1911,6 +1912,46 @@ int main() {
         // What survives is still the reductant a smelt reads: free CARBON.
         check(sealed.freegrain[CARBON][GRAVEL] > 0.0,
               "char pit: the drawn char is free CARBON -- exactly what smelt.h reduces with");
+    }
+
+    // ---- Knapping: fracture is the gate, and the edge has a floor ----------
+    // The first tool the hands can make -- stone to edge, knap.h. The stone you
+    // pick up is the wrong stone (gather's loose cobble is a hammerstone); an edge
+    // wants a conchoidal core, and even a clean flake is only as keen as the stone
+    // floor, a wall the next material -- not effort -- gets under.
+    {
+        const Stone core   { 1.0, CONCHOIDAL };   // a flint nodule: breaks the right way
+        const Stone cobble { 1.0, GRANULAR   };   // gather's loose stone: a hammerstone
+
+        // Gate 1, material: the conchoidal core struck with the granular hammer gives
+        // an edge; every wrong pairing gives only grit. Fracture, not hardness.
+        const KnapResult good = knap(core,   cobble, STRIKE_ACUTE);
+        const KnapResult soft = knap(cobble, cobble, STRIKE_ACUTE);   // granular core: powders
+        const KnapResult self = knap(core,   core,   STRIKE_ACUTE);   // brittle hammer: shatters
+        check(good.flake.usable && !soft.flake.usable && !self.flake.usable,
+              "knap: only a conchoidal core under a tough hammer takes an edge -- fracture is the gate");
+
+        // Gate 2, the blow: the same right stones give an edge, a dud, or a ruin.
+        const KnapResult steep = knap(core, cobble, STRIKE_STEEP);
+        const KnapResult hard  = knap(core, cobble, STRIKE_HARD);
+        check(!steep.flake.usable && steep.debris == 0.0 && steep.flake.mass > 0.0,
+              "knap: a steep blow hinges a flake off short -- mass leaves, no edge");
+        check(!hard.flake.usable && hard.debris > 0.0 && hard.flake.mass == 0.0,
+              "knap: an overpowered blow shatters the core -- mass to debris, no flake");
+
+        // The staircase floor: a stone edge is only ever so keen. The number is a
+        // stand-in; that it is a floor no strike beats is the finding.
+        check(good.flake.usable && good.flake.edge_angle == STONE_EDGE_FLOOR,
+              "knap: a clean stone edge lands at its floor angle -- the wall metal, not effort, gets under");
+
+        // Authors nothing: every blow only conserves mass -- flake + core + debris
+        // equals the stone you struck, on every outcome.
+        auto conserves = [](const Stone& c0, const KnapResult& r) {
+            return std::fabs((r.flake.mass + r.core.mass + r.debris) - c0.mass) < 1e-12;
+        };
+        check(conserves(core, good) && conserves(core, steep) && conserves(core, hard)
+              && conserves(cobble, soft),
+              "knap: the edge is subtracted, never added -- flake + core + debris conserves");
     }
 
     // ---- The picture -------------------------------------------------------
