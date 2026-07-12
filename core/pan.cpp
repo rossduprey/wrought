@@ -73,6 +73,25 @@
 //   object... as i pan, the percentages of the minerals should change right in
 //   front of me.")
 //
+// -- The fourth version: the tailings tub. ----------------------------------
+//
+// The wash threw everything over the lip into the void, and the void does not
+// give it back. But a panner does not pour tailings into the river; he pours
+// them into a tub at his knee, because a hard wash throws ore and the sand in
+// that tub can be washed again. Only the mud escapes him — slimes stay in
+// suspension and go downstream, and no tub catches them. That is the same mud
+// line the pan itself cannot cross (levigation's job, not the pan's), so the
+// verb authors no number: what leaves splits on the existing Wentworth boundary
+// — sand and gravel settle into the tub as re-pannable tailings, the mud is
+// gone.
+//
+// [r] tips the tub back into the pan. This is the second half of "when do I
+// stop": over-wash and the tub glitters, and you may re-pan it — recover the
+// ore, but re-mix the gangue you had just rejected, and spend the minutes — or
+// leave it. The finest ore, ground to slime and washed downstream, never comes
+// back; the grade/recovery law keeps its teeth. This is the re-panning verb the
+// design carried open. The panner's skill was never the wrist. It is this.
+//
 // Build: make pan   (needs a terminal; it reads single keypresses)
 
 #include <cstdio>
@@ -402,6 +421,7 @@ struct Plume { double mass, black, fines; };
 static void draw(const Substance& pan, const Substance& origin, const Assay& assay,
                  const char* arrow, double cut, double t,
                  const Plume plume[], int plume_n, int plume_head,
+                 double tub_mass, double tub_bf,
                  const char* ambient, const char* nag) {
     std::printf("\033[H\033[J");
 
@@ -450,9 +470,12 @@ static void draw(const Substance& pan, const Substance& origin, const Assay& ass
     std::printf("   the pan:   %s\n", colour_word(bf));
     std::printf("   the weight:%s%.0f g\n", " ", m * 1000.0);
     if (gr > 0.10) std::printf("   there are stones in it.\n");
+    if (tub_mass * 1000.0 > 0.5)
+        std::printf("   the tub:    %.0f g of tailings%s\n", tub_mass * 1000.0,
+                    tub_bf > 0.08 ? ", and it glitters" : "");
 
     std::printf("\n   %s\n", nag ? nag : "");
-    std::printf("\n   [space] swirl   [p] pick a stone   [k] keep it   [n] new pan   [q] quit\n");
+    std::printf("\n   [space] swirl  [p] pick a stone  [r] re-pan the tub  [k] keep it  [n] new pan  [q] quit\n");
 
     draw_assay(pan, origin, assay, arrow);
     std::printf("\033[23;1H");
@@ -481,7 +504,7 @@ int main() {
     raw_tty();
     while (poll_key() < 0) nap(0.02);
 
-    Substance pan = river_sand(), origin = pan, kept;
+    Substance pan = river_sand(), origin = pan, kept, tailings;
     double cut = 0.0, t = 0.0;
     int deposit = 0;
 
@@ -515,10 +538,22 @@ int main() {
         for (int c; (c = poll_key()) >= 0; ) {
             if (c == ' ')       { cut = std::fmin(MAX_CUT, cut + STROKE); ++strokes; }
             else if (c == 'q')  { running = false; quit = true; }
+            else if (c == 'r') {
+                // Re-pan the tub. The sand you drove over the lip comes back to
+                // the pan; the mud you lost is not in the tub to begin with.
+                if (tailings.total_mass() < 1e-6) { nag = "The tub is empty. Nothing to re-pan."; nag_t = t + 3; }
+                else {
+                    pan.add(tailings);
+                    tailings = Substance();
+                    cut = 0;
+                    nag = "You tip the tub back into the pan. The mud you lost stays lost.";
+                    nag_t = t + 4;
+                }
+            }
             else if (c == 'n')  {
                 deposit = (deposit + 1) % 3;
                 pan = deposit == 0 ? river_sand() : deposit == 1 ? black_sand_bar() : weathered_outcrop();
-                origin = pan; cut = 0;
+                origin = pan; cut = 0; tailings = Substance();
                 assay = assay_of(origin);
                 for (int p = 0; p < N_PHASE; ++p) { arrow[p] = ' '; grade_was[p] = origin.grade(p); }
                 nag = deposit == 0 ? "You scoop up river sand."
@@ -546,6 +581,15 @@ int main() {
         // ---- the world -----------------------------------------------------
         Substance lost;
         wash_tick(pan, cut, lost);
+        // What went over the lip lands in the tub if it is big enough to settle
+        // there (sand and gravel); the mud stays in suspension and is gone. The
+        // split is the pan's own mud line -- no number of its own.
+        for (int p = 0; p < N_PHASE; ++p)
+            for (int s = 0; s < N_SIZE; ++s)
+                if (s != CLAY && s != SILT) {
+                    tailings.freegrain[p][s] += lost.freegrain[p][s];
+                    tailings.composite[p][s] += lost.composite[p][s];
+                }
         cut *= std::exp(-DT / DRAG_TAU);
         t += DT;
 
@@ -573,6 +617,13 @@ int main() {
             nag_t = t + 4;
         }
 
+        // The tub has caught enough dark sand to be worth another wash. Said once
+        // in a while, not every tick -- an arrow that flickers is one nobody reads.
+        if (tailings.total_mass() > 5e-4 && black_frac(tailings) > 0.15 && t > nag_t) {
+            nag = "The tub at your knee has gone dark. You can [r] wash it again.";
+            nag_t = t + 8;
+        }
+
         if (t >= arrow_t) {
             for (int p = 0; p < N_PHASE; ++p) {
                 const double g = pan.grade(p), d = g - grade_was[p];
@@ -586,6 +637,7 @@ int main() {
         if (t > nag_t) nag.clear();
 
         draw(pan, origin, assay, arrow, cut, t, plume, 3, plume_head,
+             tailings.total_mass(), black_frac(tailings),
              ambient, nag.empty() ? nullptr : nag.c_str());
         nap(DT);
     }
@@ -612,6 +664,10 @@ int main() {
     std::printf("   The rest is pale sand — %.0f g — and the fire will not remove it.\n", (m - blk - py) * 1000.0);
     if (bin_mass(kept, GRAVEL) / m > 0.20)
         std::printf("   It is heavy for what it is. Most of it is stone you never picked out.\n");
+    if (black_mass(tailings) * 1000.0 > 0.5)
+        std::printf("   You leave a tub of tailings in the shallows. It still glitters;\n"
+                    "   there was %.0f g of black sand in it you could have washed again.\n",
+                    black_mass(tailings) * 1000.0);
     std::printf("\n   Grade is what you kept. Recovery is what you did not lose.\n");
     std::printf("   You cannot have both. Nobody can.\n\n");
     std::printf("   It cost you %d minutes and %d seconds at the river.\n\n", (int)t / 60, (int)t % 60);
