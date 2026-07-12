@@ -5,7 +5,7 @@ subdomain: simulation
 type: plan
 tags: [unreal-engine, simulation, fabrication, process-fidelity, mineral-processing, separation, dedicated-server, pixel-streaming, gpu, macos, agents]
 created: 2026-07-08
-updated: 2026-07-11
+updated: 2026-07-12
 ---
 
 # Unreal Engine Fabrication Simulation — Build Plan
@@ -378,6 +378,8 @@ Each process carries an `attention_profile`: the moments a real craftsman had to
 3. **Good processes are already the right length at 1:1.** A pan is 3–5 min; a forging heat is 30 s. Reality separated the interesting from the tedious for us; we just do not un-sort it.
 
 No number here is balanced — the compression factor is read off the process, like the grade/recovery curve is read off the physics.
+
+**Corollary — labour squashes; fuel is provisioned, not nursed.** *(Ross, 2026-07-12.)* The computer is a time machine, and what it erases is **labour** — feeding a fire, working a bellows: real hours, zero decisions. Even games that keep the player labouring keep it for the *method*, never the duration. **Hard rule: fuel is a provisioning gate, never a real-time tending loop** — its cost is settled *before* the fire is lit (did you gather and char enough), never a bar draining while you watch. A bloomery short of charcoal stalls **cold at the charge**, not mid-tend. (Hence `furnace.cpp` takes charcoal as a made batch and pours in one call.)
 
 ### 2b. Open concern — compression vs the second actor (unmeasured)
 
