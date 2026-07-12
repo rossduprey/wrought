@@ -69,6 +69,5 @@ Carried in conversation, not resolved:
 - Three-clause test as a `DESIGN.md` section Ross owns, like §2a?
 - "Teach the tool, never the wisdom" as a stated rule, not just a habit?
 - §2b: two actors, two processes, one clock — find what breaks.
-- Is `pick` a tax or a decision? If a tax, it should not be a verb.
 
 When two fixes both look right and trade off, say so and let Ross choose.
