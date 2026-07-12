@@ -332,7 +332,7 @@ separate(input: Substance, params: Params) -> (concentrate, tailings)
     # invariant: per-phase mass conserved
 ```
 
-- **By hand:** live input drives `params` (agitation, tilt, duration); skill modulates and adds noise.
+- **By hand:** the player's decisions drive `params` — wash rate, passes, when to stop, re-pan or dump the tailings — and the settling cut grades them. The panner's tilt is assumed (a motor gesture earned off-screen), not a live knob: modelling the wrist teaches nothing the ceiling does not, and a real-time tilt is a tax, not a decision. Failure lives in the choice — over-wash and ore goes over the lip, stop early and it never stratifies — not in dexterity.
 - **By machine:** `params` is a saved vector applied on a timer at fixed throughput, no operator.
 
 > A machine is a saved parameter set with a throughput rate and no operator.
