@@ -82,16 +82,19 @@ UnrealEditor-Cmd /path/YourProject.uproject \
 If this passes unattended, the portable-field thesis is proven end to end
 (sim → subsystem → panel), and it's the loop a headless UE box makes worth standing up.
 
-## Dedicated server (the wrought pod)
+## Dedicated server
 
-wrought's home on the LAN is a dedicated-server pod — a sibling to the `hearth` web home,
-the same way other game servers run as game-server pods. But a UE dedicated server is
-a **cooked binary, not source**, so the pod can only run once that binary exists as a
-Harbor image. There is no generic "UE server" image to pull — the image *is* cooked
-wrought content. Two gates stand between this repo and a running pod:
+wrought is meant to run as a **dedicated server** players connect to. `ue/` is a real UE
+project so it can cook one: `WroughtServer.Target.cs` is the server target, `AWroughtGameMode`
+is the authoritative host, and `WroughtPlayerController` is the networked seam (crosshair
+hit up to the server, assay back). The sim only ever runs on the server.
 
-1. **A build box with the engine** (NOT the k3s cluster node — the engine is ~100GB and
-   the nodes are for running right-sized pods, not hosting UE). There, cook the server:
+A UE dedicated server is a **cooked binary, not source** — there's no generic "UE server"
+image to pull; the image *is* your cooked content. Two gates stand between this repo and a
+running server:
+
+1. **A machine with the engine installed** to cook the Linux server (the engine is ~100GB;
+   a cook is not something a lightweight host or container node should do). Cook with:
 
    ```
    RunUAT BuildCookRun -project=<path>/Wrought.uproject \
@@ -99,18 +102,14 @@ wrought content. Two gates stand between this repo and a running pod:
      -server -noclient -cook -stage -pak -archive -archivedirectory=<out>
    ```
 
-   then wrap the archived `WroughtServer/` in a container and push it to
-   `<registry>/wrought-server:latest`.
+2. **A boot map.** A cook needs at least one map, and a `.umap` is editor-authored binary —
+   it can't be hand-written. Open the project once in UnrealEditor, make a near-empty level
+   whose GameMode is `AWroughtGameMode`, and save it as `Content/Maps/Hearth` — the name
+   `Config/DefaultEngine.ini` already points the server at.
 
-2. **A boot map.** A cook needs at least one map to cook, and a `.umap` is editor-authored
-   binary — it can't be hand-written here. Open the project once in UnrealEditor, make a
-   near-empty level whose GameMode is `AWroughtGameMode`, set it as the server default map,
-   save it. That one editor step is the only content the minimal server needs.
-
-Once the image is in Harbor: append `deploy/wrought.catalog.yaml` to the live catalog in
-`<private-infra-repo>` and `the deploy tool`. The pod comes up on node-b at
-`<service-host>`. **Until then the pod is deliberately not deployed** — an imageless pod that
-ImagePullBackOffs is not a service.
+`deploy/` has the Dockerfile and the full cook → containerize → run recipe
+(`deploy/README.md`). Keep any private registry/host/cluster specifics in that
+environment's own config, not in this repo.
 
 ## Verifying without Unreal
 
