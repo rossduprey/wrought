@@ -11,7 +11,7 @@ public class WroughtSim : ModuleRules
     public WroughtSim(ReadOnlyTargetRules Target) : base(Target)
     {
         PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
-        CppStandard = CppStandardVersion.Cpp17;   // core/ is C++17; do not silently upgrade it
+        CppStandard = CppStandardVersion.Cpp20;   // core/ is C++17 but UE5.8 dropped Cpp17; C++20 is a superset and compiles it clean
 
         PublicDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine" });
 
