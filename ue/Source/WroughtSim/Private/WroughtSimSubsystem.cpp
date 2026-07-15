@@ -5,9 +5,32 @@
 // knap.h -- these two umbrellas cover the whole seam.
 #include "geology.h"
 #include "haft.h"
+#include "levigate.h"   // decant(), HOLLOW, DecantResult -- the second separator
+
+// The basket's real contents: two Substance heaps, the sim's own type. Defined here
+// (not the header) so no wrought type crosses into the reflected surface. TPimplPtr in
+// the header holds one of these; the belt sees only the kg getters below.
+struct FWroughtBasket
+{
+    wrought::Substance dirt;   // raw dug stock, poured in bite by bite
+    wrought::Substance clay;   // levigated liquor, accumulated pass by pass
+};
 
 namespace
 {
+    // Pour one Substance into another, grain for grain. The basket accumulates; the
+    // sim has no operator+= because nothing in core/ needed one until the basket did.
+    void AddInto(wrought::Substance& dst, const wrought::Substance& src)
+    {
+        using namespace wrought;
+        for (int p = 0; p < N_PHASE; ++p)
+            for (int s = 0; s < N_SIZE; ++s)
+            {
+                dst.freegrain[p][s] += src.freegrain[p][s];
+                dst.composite[p][s] += src.composite[p][s];
+            }
+    }
+
     // Render one bite of ground for the panel. This is the only place sim types cross
     // into Unreal types. Free mass is what a pan takes at the face; locked mass is the
     // COMPOSITE_TARGET_FRACTION of composite grains -- the ore trapped behind the breaker.
@@ -58,6 +81,14 @@ FWroughtBite UWroughtSimSubsystem::BiteAt(FVector WorldLocation)
 
     const wrought::Substance s =
         wrought::win_bite(at, tier, BiteMassKg, BlowEnergy);
+
+    // Carry the REAL grain composition into the basket, not just its mass. This is the
+    // stock levigation will later separate; a scalar kg could not be decanted.
+    if (s.total_mass() > 0.0)
+    {
+        if (!Basket) Basket = MakePimpl<FWroughtBasket>();
+        AddInto(Basket->dirt, s);
+    }
     return Render(s, at);
 }
 
@@ -69,7 +100,49 @@ FWroughtBite UWroughtSimSubsystem::DigColumnAt(FVector WorldLocation)
     // The tool-gated overload: each tier is won only if the blow gets under its rock.
     const wrought::Substance s =
         wrought::dig_column(at, BiteMassKg, BlowEnergy);
+
+    if (s.total_mass() > 0.0)
+    {
+        if (!Basket) Basket = MakePimpl<FWroughtBasket>();
+        AddInto(Basket->dirt, s);
+    }
     return Render(s, at);
+}
+
+float UWroughtSimSubsystem::CarriedDirtKg() const
+{
+    return Basket ? static_cast<float>(Basket->dirt.total_mass()) : 0.f;
+}
+
+float UWroughtSimSubsystem::CarriedClayKg() const
+{
+    return Basket ? static_cast<float>(Basket->clay.total_mass()) : 0.f;
+}
+
+FWroughtDecant UWroughtSimSubsystem::Levigate(float Seconds)
+{
+    using namespace wrought;
+    FWroughtDecant out;
+    if (!Basket || Basket->dirt.total_mass() <= 0.0)
+        return out;   // nothing to pour
+
+    const double t = FMath::Max(0.f, Seconds);
+
+    // The core process, verbatim. Stir the basket's dirt into the authored HOLLOW, wait
+    // t, pour off the clear water. liquor is clay; sediment is what was too fast to stay
+    // up. The sim decides the cut; we only move the results between basket heaps.
+    const DecantResult r = decant(Basket->dirt, HOLLOW, t);
+
+    AddInto(Basket->clay, r.liquor);   // the clay you poured off joins the clay heap
+    Basket->dirt = r.sediment;         // the tailings stay as dirt, ready to re-decant
+
+    out.bDecanted       = true;
+    out.ClayKg          = static_cast<float>(r.liquor.total_mass());
+    out.ClayGrade       = static_cast<float>(r.liquor.grade(KAOLINITE));
+    out.TailingsKg      = static_cast<float>(r.sediment.total_mass());
+    out.ClayTotalKg     = static_cast<float>(Basket->clay.total_mass());
+    out.DirtRemainingKg = static_cast<float>(Basket->dirt.total_mass());
+    return out;
 }
 
 void UWroughtSimSubsystem::EquipBareHand()

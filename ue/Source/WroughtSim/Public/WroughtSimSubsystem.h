@@ -7,7 +7,14 @@
 
 #include "CoreMinimal.h"
 #include "Subsystems/WorldSubsystem.h"
+#include "Templates/PimplPtr.h"
 #include "WroughtSimSubsystem.generated.h"
+
+// The carried stock — the basket on the player's back. Its DEFINITION lives in the
+// .cpp because it holds real wrought::Substance grids, and this header stays pure
+// Unreal (no wrought type ever named here, so UHT never parses the namespace). This
+// is a plain Unreal-named PIMPL forward declaration, not a sim type.
+struct FWroughtBasket;
 
 // One phase's line on the assay panel: what came up, and in what state. FREE mass is
 // pan-ready at the face; LOCKED mass is still composite rock the breaker must crush
@@ -34,6 +41,22 @@ struct FWroughtBite
     UPROPERTY(BlueprintReadOnly, Category="Wrought") float TotalMassKg = 0.f;
     UPROPERTY(BlueprintReadOnly, Category="Wrought") FVector2D Place = FVector2D::ZeroVector; // meters
     UPROPERTY(BlueprintReadOnly, Category="Wrought") TArray<FWroughtPhaseReadout> Phases;
+};
+
+// The readout of one levigation pass, rendered for the belt. The clay you poured off
+// (liquor) and the tailings you left (sediment), plus the running basket totals. This
+// is the assay-row shape's cousin for a separation the player performs, not a bite.
+USTRUCT(BlueprintType)
+struct FWroughtDecant
+{
+    GENERATED_BODY()
+
+    UPROPERTY(BlueprintReadOnly, Category="Wrought") bool bDecanted = false;      // false when the basket held no dirt to pour
+    UPROPERTY(BlueprintReadOnly, Category="Wrought") float ClayKg = 0.f;          // liquor poured off THIS pass
+    UPROPERTY(BlueprintReadOnly, Category="Wrought") float ClayGrade = 0.f;       // kaolinite fraction of that liquor (0..1)
+    UPROPERTY(BlueprintReadOnly, Category="Wrought") float TailingsKg = 0.f;      // sediment left behind as dirt this pass
+    UPROPERTY(BlueprintReadOnly, Category="Wrought") float ClayTotalKg = 0.f;     // clay now in the basket (running)
+    UPROPERTY(BlueprintReadOnly, Category="Wrought") float DirtRemainingKg = 0.f; // dirt still in the basket (running)
 };
 
 // A WorldSubsystem so it is auto-instantiated per world and reachable from any
@@ -96,4 +119,29 @@ public:
 
     UFUNCTION(BlueprintCallable, Category="Wrought")
     void EquipSaplingPick();
+
+    // --- The basket. Carried stock is REAL Substance, held server-side. ---
+    // Every winning bite pours its full grain composition into the basket's dirt heap
+    // (BiteAt/DigColumnAt do this), not just a scalar mass. The belt only ever reads
+    // the kg getters; the grid stays in the sim, which is the only thing that can
+    // separate it.
+    UFUNCTION(BlueprintPure, Category="Wrought")
+    float CarriedDirtKg() const;
+
+    UFUNCTION(BlueprintPure, Category="Wrought")
+    float CarriedClayKg() const;
+
+    // Levigation — the second station. Stir the carried dirt into the authored HOLLOW
+    // vessel, wait `Seconds`, pour off the clear water above the sediment. The liquor
+    // IS clay: it accumulates in the basket's clay heap; the sediment stays as dirt.
+    // Patience buys grade, not recovery (levigate.h). Runs the core decant(); the sim
+    // is the process, this only hands it the basket and renders the result.
+    UFUNCTION(BlueprintCallable, Category="Wrought")
+    FWroughtDecant Levigate(float Seconds);
+
+private:
+    // The basket. Definition (two wrought::Substance heaps) is in the .cpp — see the
+    // forward declaration above. TPimplPtr gives an out-of-line deleter for the
+    // incomplete type, so the header never needs the sim's definition.
+    TPimplPtr<FWroughtBasket> Basket;
 };
