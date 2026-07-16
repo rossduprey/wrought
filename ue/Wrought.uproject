@@ -8,6 +8,11 @@
 			"Name": "WroughtSim",
 			"Type": "Runtime",
 			"LoadingPhase": "Default"
+		},
+		{
+			"Name": "WroughtLandscape",
+			"Type": "Editor",
+			"LoadingPhase": "Default"
 		}
 	]
 }

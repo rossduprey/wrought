@@ -11,5 +11,6 @@ public class WroughtEditorTarget : TargetRules
 		DefaultBuildSettings = BuildSettingsVersion.Latest;
 		IncludeOrderVersion = EngineIncludeOrderVersion.Latest;
 		ExtraModuleNames.Add("WroughtSim");
+		ExtraModuleNames.Add("WroughtLandscape");   // editor-only landscape authoring (headless valley sculpt)
 	}
 }
