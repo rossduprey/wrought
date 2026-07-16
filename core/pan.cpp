@@ -92,6 +92,14 @@
 // back; the grade/recovery law keeps its teeth. This is the re-panning verb the
 // design carried open. The panner's skill was never the wrist. It is this.
 //
+// -- The fifth version: the pan left the terminal. --------------------------
+//
+// Every number, every deposit, every nag and ambient line above now lives in
+// core/pan_game.h as a UI-free PanGame the UE client also drives (its feedback
+// text lands in the on-screen chat panel). This file is what it always was --
+// the terminal front-end -- but the model underneath it is shared, not copied,
+// so the pan has exactly one physics wherever it is played.
+//
 // Build: make pan   (needs a terminal; it reads single keypresses)
 
 #include <cstdio>
@@ -100,194 +108,13 @@
 #include <csignal>
 #include <ctime>
 #include <cstdarg>
-#include <initializer_list>
 #include <string>
 #include <termios.h>
 #include <unistd.h>
 
-#include "separate.h"
+#include "pan_game.h"
 
 using namespace wrought;
-
-// ---------------------------------------------------------------------------
-// The hand.
-//
-// A stroke of the wrist puts energy into the water; drag takes it out again. So
-// the cut is not a setting, it is a *state*, and holding it up costs continuous
-// effort — which is what swirling a pan is. Tap to swirl. Stop tapping and the
-// water goes still and nothing at all leaves the pan, because a cut below every
-// grain in the pan is the same call to separate() with a different number in it.
-// Desliming is not a verb. It is swirling gently, and you will find that out by
-// doing it.
-
-static constexpr double DT           = 0.05;   // s per tick
-static constexpr double STROKE       = 0.032;  // m/s of water per wrist stroke. AUTHORED.
-static constexpr double DRAG_TAU     = 0.90;   // s. the water settles this fast. AUTHORED.
-static constexpr double PASS_TAU     = 1.50;   // s for one separation "pass". AUTHORED.
-static constexpr double MAX_CUT      = 0.170;  // you cannot swirl harder than this
-static constexpr double PICK_SECONDS = 6.0;
-
-// A partition coefficient is a per-pass probability. Panning is continuous, so a
-// particle survives dt of washing with probability P^(dt/PASS_TAU). Integrate
-// that and you get, for free, the thing test_separation.cpp needed 256 discrete
-// passes to show: wash long enough and the pan starts throwing your magnetite
-// away in favour of the hematite, because it is very slightly faster.
-//
-// Note what PASS_TAU can and cannot do. Every particle's retention depends on the
-// elapsed time only through t/PASS_TAU, so the *path* the pan traces through
-// (grade, recovery) is completely independent of it. PASS_TAU sets how fast your
-// hands are. It cannot move the tradeoff by one part in a million. That is the
-// only kind of number this project is allowed to author freely, and it is worth
-// knowing which numbers those are.
-static Substance wash_tick(Substance& pan, double cut, Substance& out_lost) {
-    SeparatorParams sp = PAN;
-    // Still water carries nothing over the lip. As the cut goes to zero the
-    // partition goes to one for every particle, so this clamp must sit below the
-    // slowest grain in the table (charcoal fines, 5.8e-5 m/s) by a wide margin --
-    // not merely at some small number. Put it in the fines band by accident and
-    // the pan bleeds silt while the player sits perfectly still.
-    sp.cut_velocity = (cut < 1e-9) ? 1e-9 : cut;
-    const double e = DT / PASS_TAU;
-
-    // Only the skin is in the water. The rest is bed, and the bed is safe. The
-    // mixing scale is the cut itself: how hard you are swirling is how deep you
-    // are stirring. Nothing else about the pan's geometry enters the wash.
-    const Substance top = exposed(pan, cut, skin_mass());
-
-    Substance gone;
-    const double T = pan.temperature;
-    for (int p = 0; p < N_PHASE; ++p)
-        for (int s = 0; s < N_SIZE; ++s) {
-            const double rf = std::pow(partition(free_velocity(p, s, T), sp), e);
-            const double rc = std::pow(partition(composite_velocity(p, s, T), sp), e);
-            gone.freegrain[p][s] = top.freegrain[p][s] * (1.0 - rf);
-            gone.composite[p][s] = top.composite[p][s] * (1.0 - rc);
-            pan.freegrain[p][s] -= gone.freegrain[p][s];
-            pan.composite[p][s] -= gone.composite[p][s];
-        }
-    out_lost = gone;
-    return gone;
-}
-
-// ---------------------------------------------------------------------------
-// What the character can see. He has eyes and a pair of arms. Iron oxides are
-// black and heavy, quartz is pale. Everything below is something a person
-// crouching in a river could actually observe. The exact numbers exist, one
-// function call away, and he does not get them.
-
-static double black_mass(const Substance& s) {
-    return s.phase_mass(MAGNETITE) + s.phase_mass(HEMATITE) + s.phase_mass(ILMENITE);
-}
-static double bin_mass(const Substance& s, int bin) {
-    double m = 0.0;
-    for (int p = 0; p < N_PHASE; ++p) m += s.freegrain[p][bin] + s.composite[p][bin];
-    return m;
-}
-// What a panner calls mud. He cannot see the 3.9 um line and does not care where
-// it is; the pan cannot separate across it either. Only levigation can.
-static double mud_mass(const Substance& s) { return bin_mass(s, CLAY) + bin_mass(s, SILT); }
-static double black_frac(const Substance& s) {
-    const double m = s.total_mass();
-    return m > 1e-9 ? black_mass(s) / m : 0.0;
-}
-
-// Iron that is glued to quartz. It is in the pan, it will not come out, and no
-// amount of washing will change that -- only a rock will. This is the grade
-// ceiling, and it is the only number in the panel that argues for a verb the
-// player does not have yet.
-static double locked_black(const Substance& s) {
-    constexpr double f = COMPOSITE_TARGET_FRACTION;
-    double t = 0.0;
-    for (int p : {MAGNETITE, HEMATITE, ILMENITE})
-        for (int b = 0; b < N_SIZE; ++b) t += f * s.composite[p][b];
-    return t;
-}
-
-static const char* colour_word(double bf) {
-    if (bf < 0.02) return "pale";
-    if (bf < 0.08) return "grey";
-    if (bf < 0.20) return "grey, with a dark tail";
-    if (bf < 0.45) return "dark";
-    if (bf < 0.75) return "black under the pale";
-    return "black, and it glitters";
-}
-
-// ---------------------------------------------------------------------------
-// The ground.
-
-struct ScoopBuilder {
-    Substance s;
-    double demand[N_SIZE] {}, authored[N_SIZE] {};
-    void put(int p, const double m[N_SIZE], const double lib[N_SIZE]) {
-        constexpr double f = COMPOSITE_TARGET_FRACTION;
-        if (p == GANGUE) { for (int k = 0; k < N_SIZE; ++k) authored[k] += m[k]; return; }
-        for (int k = 0; k < N_SIZE; ++k) {
-            s.freegrain[p][k] += m[k] * lib[k];
-            s.composite[p][k] += m[k] * (1.0 - lib[k]) / f;
-            demand[k] += (1.0 - f) * s.composite[p][k];
-        }
-    }
-    Substance build() {
-        for (int k = 0; k < N_SIZE; ++k) s.freegrain[GANGUE][k] = std::fmax(0.0, authored[k] - demand[k]);
-        return s;
-    }
-};
-
-// Kaolinite is the one phase whose size is not free to be anything. A clay
-// mineral is a platelet a micron across; that is what makes it clay, and it is
-// why levigation exists. Every other phase is distributed across the bins by
-// what the river did to it. Quartz that happens to be clay-sized is the grit you
-// will never wash out of your pot.
-static const double CLAY_PSD[N_SIZE]  = {0.90, 0.10, 0.00, 0.00};
-
-static Substance river_sand() {
-    ScoopBuilder b;
-    auto row = [&](int p, double frac, double lf, double ls, double lg) {
-        const double m[N_SIZE] = {2.0*frac*0.03, 2.0*frac*0.12, 2.0*frac*0.75, 2.0*frac*0.10};
-        const double l[N_SIZE] = {lf, lf, ls, lg};
-        b.put(p, m, l);
-    };
-    auto clay_row = [&](int p, double frac) {
-        double m[N_SIZE]; const double l[N_SIZE] = {1.0, 1.0, 1.0, 1.0};
-        for (int k = 0; k < N_SIZE; ++k) m[k] = 2.0 * frac * CLAY_PSD[k];
-        b.put(p, m, l);
-    };
-    row(FELDSPAR,  0.100, 0.95, 0.90, 0.75);
-    clay_row(KAOLINITE, 0.040);
-    row(MAGNETITE, 0.080, 0.95, 0.88, 0.55);
-    row(HEMATITE,  0.010, 0.90, 0.80, 0.50);
-    row(GOETHITE,  0.020, 0.90, 0.80, 0.50);
-    row(ILMENITE,  0.030, 0.92, 0.85, 0.55);
-    row(PYRITE,    0.005, 0.85, 0.80, 0.50);
-    row(CALCITE,   0.015, 0.90, 0.85, 0.60);
-    row(QUARTZ,    0.700, 1.00, 1.00, 1.00);
-    return b.build();
-}
-
-static Substance black_sand_bar() {
-    ScoopBuilder b;
-    auto row = [&](int p, double frac, double lf, double ls, double lg) {
-        const double m[N_SIZE] = {2.0*frac*0.01, 2.0*frac*0.09, 2.0*frac*0.88, 2.0*frac*0.02};
-        const double l[N_SIZE] = {lf, lf, ls, lg};
-        b.put(p, m, l);
-    };
-    row(MAGNETITE, 0.220, 0.97, 0.95, 0.70);
-    row(ILMENITE,  0.060, 0.95, 0.92, 0.60);
-    row(HEMATITE,  0.020, 0.92, 0.88, 0.50);
-    row(FELDSPAR,  0.060, 0.95, 0.90, 0.75);
-    row(QUARTZ,    0.640, 1.00, 1.00, 1.00);
-    return b.build();
-}
-
-static Substance weathered_outcrop() {
-    ScoopBuilder b;
-    const double q[N_SIZE] = {0.008, 0.032, 0.30, 1.06}, ql[N_SIZE] = {1, 1, 1, 1};
-    const double f[N_SIZE] = {0.002, 0.008, 0.06, 0.20}, fl[N_SIZE] = {0.90, 0.90, 0.60, 0.30};
-    const double m[N_SIZE] = {0.0008, 0.0032, 0.03, 0.26}, ml[N_SIZE] = {0.85, 0.85, 0.35, 0.10};
-    const double h[N_SIZE] = {0.0004, 0.0016, 0.01, 0.024}, hl[N_SIZE] = {0.80, 0.80, 0.30, 0.10};
-    b.put(FELDSPAR, f, fl); b.put(MAGNETITE, m, ml); b.put(HEMATITE, h, hl); b.put(QUARTZ, q, ql);
-    return b.build();
-}
 
 // ---------------------------------------------------------------------------
 // Terminal.
@@ -328,44 +155,16 @@ static void nap(double seconds) {
 }
 
 // ---------------------------------------------------------------------------
-// The pan, drawn.
-//
-// This is the persistent display, and it is made of dirt rather than numbers.
-// The bottom of the pan fills with '#' as the black sand concentrates. That is a
-// live grade readout that never says a number, and it is the only one he gets.
+// The pan, drawn. The persistent display, made of dirt rather than numbers: the
+// bottom of the pan fills with '#' as the black sand concentrates -- a live grade
+// readout that never says a number. All state is read from the PanGame.
 
 static const int PAN_W = 30;
 static const int PANEL_COL = 42;
 
-// Which phases this scoop actually contains, heaviest first. Fixed at the moment
-// you dig, and never re-sorted -- a table whose rows swap places while you read
-// them is a table you cannot read. The order is information too: it is what the
-// ground gave you, and it does not change just because you washed it.
-struct Assay {
-    int order[N_PHASE];
-    int n = 0;
-};
-
-static Assay assay_of(const Substance& s) {
-    Assay a;
-    for (int p = 0; p < N_PHASE; ++p)
-        if (s.phase_mass(p) > 1e-6) a.order[a.n++] = p;
-    for (int i = 1; i < a.n; ++i) {
-        const int k = a.order[i];
-        int j = i - 1;
-        while (j >= 0 && s.phase_mass(a.order[j]) < s.phase_mass(k)) { a.order[j+1] = a.order[j]; --j; }
-        a.order[j+1] = k;
-    }
-    return a;
-}
-
 // Grade and recovery, side by side, one row per mineral. Neither column is a
-// score, because they move in opposite directions and you cannot have both. That
-// sentence is the design of the whole game and here it is as two columns of
-// printf.
-static void draw_assay(const Substance& pan, const Substance& origin,
-                       const Assay& a, const char* arrow) {
-    const double m = pan.total_mass();
+// score, because they move in opposite directions and you cannot have both.
+static void draw_assay(const PanGame& g) {
     int row = 2;
     auto line = [&](const char* fmt, ...) {
         std::printf("\033[%d;%dH", row++, PANEL_COL);
@@ -376,23 +175,16 @@ static void draw_assay(const Substance& pan, const Substance& origin,
     line("%-10s %6s %7s %6s", "", "grams", "grade", "kept");
     line("%s", "----------------------------------");
 
-    for (int i = 0; i < a.n; ++i) {
-        const int p = a.order[i];
-        const double mp = pan.phase_mass(p);
-        const double o  = origin.phase_mass(p);
-        if (mp * 1000.0 < 0.05 && o > 1e-6) {
-            line("%-10s %6s %7s %6s %c", PHASES[p].id, "-", "-", "gone", ' ');
-            continue;
-        }
-        line("%-10s %6.1f %6.1f%% %5.0f%% %c",
-             PHASES[p].id, mp * 1000.0,
-             m > 1e-9 ? 100.0 * mp / m : 0.0,
-             o > 1e-9 ? 100.0 * mp / o : 0.0,
-             arrow[p]);
+    for (const PanGame::AssayRow& r : g.assay_rows()) {
+        if (r.gone) { line("%-10s %6s %7s %6s %c", r.id, "-", "-", "gone", ' '); continue; }
+        line("%-10s %6.1f %6.1f%% %5.0f%% %c", r.id, r.grams, r.grade, r.kept, r.arrow);
     }
 
-    const double blk = black_mass(pan), blk0 = black_mass(origin);
-    const double lok = locked_black(pan);
+    const Substance& pan = g.pan();
+    const Substance& origin = g.origin();
+    const double m = pan.total_mass();
+    const double blk = pan_black_mass(pan), blk0 = pan_black_mass(origin);
+    const double lok = pan_locked_black(pan);
     line("%s", "----------------------------------");
     line("%-10s %6.1f %6.1f%% %5.0f%%", "black sand", blk * 1000.0,
          m > 1e-9 ? 100.0 * blk / m : 0.0,
@@ -402,57 +194,41 @@ static void draw_assay(const Substance& pan, const Substance& origin,
     line("  washed away: %.0f g", (origin.total_mass() - m) * 1000.0);
 }
 
-static const char* AMBIENT[] = {
-    "a bird you do not know the name of says the same thing four times",
-    "the water is very cold above the wrist and not cold at all below it",
-    "something moves in the willow behind you; you do not turn around",
-    "rain starts, stops, and starts again without committing to it",
-    "your knees have gone numb against the gravel",
-    "downstream, the river makes a noise like a page turning",
-    "the sun goes behind something and the sand stops glittering",
-    "a stick goes past, faster than you expect",
-    "the cold has reached the bone of your thumb",
-    "somewhere behind you the fire is going out",
-};
-static const int N_AMBIENT = (int)(sizeof(AMBIENT) / sizeof(AMBIENT[0]));
-
-struct Plume { double mass, black, fines; };
-
-static void draw(const Substance& pan, const Substance& origin, const Assay& assay,
-                 const char* arrow, double cut, double t,
-                 const Plume plume[], int plume_n, int plume_head,
-                 double tub_mass, double tub_bf,
-                 const char* ambient, const char* nag) {
+static void draw(const PanGame& g) {
     std::printf("\033[H\033[J");
 
+    const Substance& pan = g.pan();
     const double m  = pan.total_mass();
-    const double bf = black_frac(pan);
-    const double gr = m > 1e-9 ? bin_mass(pan, GRAVEL) / m : 0.0;
-    const double fn = m > 1e-9 ? mud_mass(pan) / m : 0.0;
+    const double bf = g.black_frac();
+    const double gr = m > 1e-9 ? pan_bin_mass(pan, GRAVEL) / m : 0.0;
+    const double fn = m > 1e-9 ? pan_mud_mass(pan) / m : 0.0;
+    const double t  = g.time_s();
 
-    std::printf("\n   %-46s  %2d:%02d\n\n", ambient ? ambient : "", (int)t / 60, (int)t % 60);
+    std::printf("\n   %-46s  %2d:%02d\n\n", g.ambient().c_str(), (int)t / 60, (int)t % 60);
 
     // the pan, in section. black sand lies under the pale, because it is heavier.
     const int fill  = (int)std::lround(PAN_W * std::fmin(1.0, m / 2.0));
     const int black = (int)std::lround(fill * bf);
 
     std::printf("   \\%s/\n", std::string(PAN_W + 2, '_').c_str());
-    for (int row = 0; row < 3; ++row) {
+    for (int r = 0; r < 3; ++r) {
         std::printf("    |");
         for (int i = 0; i < PAN_W; ++i) {
             const bool in = i >= (PAN_W - fill) / 2 && i < (PAN_W - fill) / 2 + fill;
             if (!in) { std::putchar(' '); continue; }
-            if (row == 2)                     std::putchar(i < (PAN_W - fill) / 2 + black ? '#' : '.');
-            else if (row == 1 && fill > 8)    std::putchar(i < (PAN_W - fill) / 2 + black / 2 ? '#' : '.');
-            else                              std::putchar(gr > 0.15 && (i % 5) == 0 ? 'o' : (fn > 0.20 ? '~' : ' '));
+            if (r == 2)                     std::putchar(i < (PAN_W - fill) / 2 + black ? '#' : '.');
+            else if (r == 1 && fill > 8)    std::putchar(i < (PAN_W - fill) / 2 + black / 2 ? '#' : '.');
+            else                            std::putchar(gr > 0.15 && (i % 5) == 0 ? 'o' : (fn > 0.20 ? '~' : ' '));
         }
         std::printf("|\n");
     }
     std::printf("    \\%s/\n\n", std::string(PAN_W, '_').c_str());
 
     // what is leaving, drifting right, this second and the last two.
+    const PanGame::Plume* plume = g.plume();
+    const int plume_head = g.plume_head();
     for (int k = 0; k < 3; ++k) {
-        const Plume& p = plume[(plume_head - k - 1 + plume_n) % plume_n];
+        const PanGame::Plume& p = plume[(plume_head - k - 1 + 3) % 3];
         std::printf("      ");
         if (p.mass < 1e-7) { std::printf("\n"); continue; }
         const int n = (int)std::lround(std::fmin(20.0, p.mass * 4000.0));
@@ -463,21 +239,21 @@ static void draw(const Substance& pan, const Substance& origin, const Assay& ass
     }
 
     std::printf("\n   the water: ");
-    const int bars = (int)std::lround(cut / MAX_CUT * 24.0);
+    const int bars = (int)std::lround(g.cut_fraction() * 24.0);
     for (int i = 0; i < 24; ++i) std::putchar(i < bars ? '=' : ' ');
-    if (cut < 0.002) std::printf("  still");
+    if (g.cut() < 0.002) std::printf("  still");
     std::printf("\n");
-    std::printf("   the pan:   %s\n", colour_word(bf));
-    std::printf("   the weight:%s%.0f g\n", " ", m * 1000.0);
+    std::printf("   the pan:   %s\n", g.colour());
+    std::printf("   the weight:%s%.0f g\n", " ", g.pan_mass_g());
     if (gr > 0.10) std::printf("   there are stones in it.\n");
-    if (tub_mass * 1000.0 > 0.5)
-        std::printf("   the tub:    %.0f g of tailings%s\n", tub_mass * 1000.0,
-                    tub_bf > 0.08 ? ", and it glitters" : "");
+    if (g.tub_mass_g() > 0.5)
+        std::printf("   the tub:    %.0f g of tailings%s\n", g.tub_mass_g(),
+                    g.tub_glitters() ? ", and it glitters" : "");
 
-    std::printf("\n   %s\n", nag ? nag : "");
+    std::printf("\n   %s\n", g.nag().c_str());
     std::printf("\n   [space] swirl  [p] pick a stone  [r] re-pan the tub  [k] keep it  [n] new pan  [q] quit\n");
 
-    draw_assay(pan, origin, assay, arrow);
+    draw_assay(g);
     std::printf("\033[23;1H");
     std::fflush(stdout);
 }
@@ -504,172 +280,41 @@ int main() {
     raw_tty();
     while (poll_key() < 0) nap(0.02);
 
-    Substance pan = river_sand(), origin = pan, kept, tailings;
-    double cut = 0.0, t = 0.0;
-    int deposit = 0;
+    PanGame game;
+    bool quit = false;
 
-    // Is this mineral's share of the pan rising or falling right now? Sampled on
-    // a slow clock, because an arrow that flickers is an arrow nobody reads.
-    Assay assay = assay_of(origin);
-    char arrow[N_PHASE] = {};
-    double grade_was[N_PHASE] = {}, arrow_t = 0.0;
-    for (int p = 0; p < N_PHASE; ++p) { arrow[p] = ' '; grade_was[p] = origin.grade(p); }
-
-    Plume plume[3] = {};
-    int plume_head = 0;
-    double plume_acc_m = 0, plume_acc_b = 0, plume_acc_f = 0, plume_t = 0;
-
-    const char* ambient = AMBIENT[0];
-    double ambient_t = 0;
-    std::string nag;
-    double nag_t = 0;
-
-    // The one thing the game must teach before anything else can be learned, and
-    // the one thing it silently failed to teach: a swirl is sustained. A terminal
-    // cannot see a held key, so the verb had to be encoded as an impulse, and the
-    // encoding lies about what the hand is doing. Until the input device can
-    // report a held gesture, the game says it out loud.
-    long strokes = 0;
-    bool taught = false;
-
-    bool running = true, quit = false;
-    while (running) {
+    while (game.running()) {
         // ---- input ---------------------------------------------------------
         for (int c; (c = poll_key()) >= 0; ) {
-            if (c == ' ')       { cut = std::fmin(MAX_CUT, cut + STROKE); ++strokes; }
-            else if (c == 'q')  { running = false; quit = true; }
-            else if (c == 'r') {
-                // Re-pan the tub. The sand you drove over the lip comes back to
-                // the pan; the mud you lost is not in the tub to begin with.
-                if (tailings.total_mass() < 1e-6) { nag = "The tub is empty. Nothing to re-pan."; nag_t = t + 3; }
-                else {
-                    pan.add(tailings);
-                    tailings = Substance();
-                    cut = 0;
-                    nag = "You tip the tub back into the pan. The mud you lost stays lost.";
-                    nag_t = t + 4;
-                }
-            }
-            else if (c == 'n')  {
-                deposit = (deposit + 1) % 3;
-                pan = deposit == 0 ? river_sand() : deposit == 1 ? black_sand_bar() : weathered_outcrop();
-                origin = pan; cut = 0; tailings = Substance();
-                assay = assay_of(origin);
-                for (int p = 0; p < N_PHASE; ++p) { arrow[p] = ' '; grade_was[p] = origin.grade(p); }
-                nag = deposit == 0 ? "You scoop up river sand."
-                    : deposit == 1 ? "You dig into the inside of the bend, where the sand is dark."
-                                   : "You break a lump off the outcrop and drop it in the pan.";
-                nag_t = t + 4;
-            }
-            else if (c == 'p') {
-                if (bin_mass(pan, GRAVEL) < 1e-5) { nag = "There is nothing in there big enough to pick up."; nag_t = t + 3; }
-                else {
-                    // Cobbing. You miss a lot of stones and you drop almost no
-                    // sand, so you will be doing this again in a minute.
-                    pan = screen(pan, HAND_COB).undersize;
-                    t += PICK_SECONDS;
-                    nag = "You pick out the stones you can see. There will be more.";
-                    nag_t = t + 4;
-                }
-            }
-            else if (c == 'k') {
-                if (pan.total_mass() < 1e-6) { nag = "There is nothing in the pan."; nag_t = t + 3; }
-                else { kept.add(pan); running = false; }
-            }
+            if (c == ' ')       game.swirl();
+            else if (c == 'q')  { quit = true; break; }
+            else if (c == 'r')  game.repan_tub();
+            else if (c == 'n')  game.new_deposit();
+            else if (c == 'p')  game.pick_stone();
+            else if (c == 'k')  game.keep();
         }
+        if (quit) break;
 
         // ---- the world -----------------------------------------------------
-        Substance lost;
-        wash_tick(pan, cut, lost);
-        // What went over the lip lands in the tub if it is big enough to settle
-        // there (sand and gravel); the mud stays in suspension and is gone. The
-        // split is the pan's own mud line -- no number of its own.
-        for (int p = 0; p < N_PHASE; ++p)
-            for (int s = 0; s < N_SIZE; ++s)
-                if (s != CLAY && s != SILT) {
-                    tailings.freegrain[p][s] += lost.freegrain[p][s];
-                    tailings.composite[p][s] += lost.composite[p][s];
-                }
-        cut *= std::exp(-DT / DRAG_TAU);
-        t += DT;
+        game.tick();
+        game.drain_feedback();   // the terminal reads nag()/ambient() live; drop the log
 
-        // accumulate the plume over a fifth of a second so it is visible
-        plume_acc_m += lost.total_mass();
-        plume_acc_b += black_mass(lost);
-        plume_acc_f += mud_mass(lost);
-        plume_t += DT;
-        if (plume_t >= 0.20) {
-            plume[plume_head] = {plume_acc_m,
-                                 plume_acc_m > 1e-9 ? plume_acc_b / plume_acc_m : 0.0,
-                                 plume_acc_m > 1e-9 ? plume_acc_f / plume_acc_m : 0.0};
-            plume_head = (plume_head + 1) % 3;
-            if (plume_acc_b > 0.20 * plume_acc_m && plume_acc_m > 1e-5 && t > nag_t) {
-                nag = "The cloud glitters. You are pouring it away."; nag_t = t + 2.5;
-            } else if (plume_acc_f > 0.6 * plume_acc_m && plume_acc_m > 1e-5 && t > nag_t) {
-                nag = "Whatever is in that mud is not coming back. It is too fine to catch."; nag_t = t + 4;
-            }
-            plume_acc_m = plume_acc_b = plume_acc_f = plume_t = 0;
-        }
-
-        if (strokes >= 12) taught = true;
-        if (!taught && t > 8.0 && cut < 0.004 && pan.total_mass() > 0.9 * origin.total_mass() && t > nag_t) {
-            nag = "The water has gone still, and a still pan separates nothing. Keep tapping.";
-            nag_t = t + 4;
-        }
-
-        // The tub has caught enough dark sand to be worth another wash. Said once
-        // in a while, not every tick -- an arrow that flickers is one nobody reads.
-        if (tailings.total_mass() > 5e-4 && black_frac(tailings) > 0.15 && t > nag_t) {
-            nag = "The tub at your knee has gone dark. You can [r] wash it again.";
-            nag_t = t + 8;
-        }
-
-        if (t >= arrow_t) {
-            for (int p = 0; p < N_PHASE; ++p) {
-                const double g = pan.grade(p), d = g - grade_was[p];
-                arrow[p] = d > 1e-4 ? '^' : d < -1e-4 ? 'v' : ' ';
-                grade_was[p] = g;
-            }
-            arrow_t = t + 0.5;
-        }
-
-        if (t > ambient_t) { ambient = AMBIENT[(int)(t / 37) % N_AMBIENT]; ambient_t = t + 37; }
-        if (t > nag_t) nag.clear();
-
-        draw(pan, origin, assay, arrow, cut, t, plume, 3, plume_head,
-             tailings.total_mass(), black_frac(tailings),
-             ambient, nag.empty() ? nullptr : nag.c_str());
-        nap(DT);
+        if (!game.running()) break;   // keep() ended the session
+        draw(game);
+        nap(PAN_DT);
     }
 
     restore_tty();
     std::printf("\033[H\033[J\n");
 
-    if (quit || kept.total_mass() < 1e-6) {
+    if (quit || game.kept().total_mass() < 1e-6) {
         std::printf("   You stand up. Your knees hurt. You are carrying nothing.\n\n");
         return 0;
     }
 
-    // The one place the game tells the truth, and only what a scale and an eye
-    // can tell him. He still cannot separate magnetite from hematite, and neither
-    // can any pan that has ever existed.
-    const double m = kept.total_mass(), blk = black_mass(kept), py = kept.phase_mass(PYRITE);
-    std::printf("   You tip the pan into the poke.\n\n");
-    std::printf("   In the poke: %.0f g.\n", m * 1000.0);
-    std::printf("   Of that, %.0f g is black sand — %.0f%% of what you kept.\n", blk * 1000.0, 100.0 * blk / m);
-    std::printf("   You started with %.0f g of it in the ground. You have %.0f%%.\n",
-                black_mass(origin) * 1000.0, 100.0 * blk / std::fmax(black_mass(origin), 1e-9));
-    if (py / m > 0.004)
-        std::printf("   There are brassy flecks in it that catch the light. They are pretty.\n");
-    std::printf("   The rest is pale sand — %.0f g — and the fire will not remove it.\n", (m - blk - py) * 1000.0);
-    if (bin_mass(kept, GRAVEL) / m > 0.20)
-        std::printf("   It is heavy for what it is. Most of it is stone you never picked out.\n");
-    if (black_mass(tailings) * 1000.0 > 0.5)
-        std::printf("   You leave a tub of tailings in the shallows. It still glitters;\n"
-                    "   there was %.0f g of black sand in it you could have washed again.\n",
-                    black_mass(tailings) * 1000.0);
-    std::printf("\n   Grade is what you kept. Recovery is what you did not lose.\n");
-    std::printf("   You cannot have both. Nobody can.\n\n");
-    std::printf("   It cost you %d minutes and %d seconds at the river.\n\n", (int)t / 60, (int)t % 60);
+    // The poke report -- computed by the shared core, printed here.
+    for (const std::string& l : game.endgame_lines())
+        std::printf("   %s\n", l.c_str());
+    std::printf("\n");
     return 0;
 }
