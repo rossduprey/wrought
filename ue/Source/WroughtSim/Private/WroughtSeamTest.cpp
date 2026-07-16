@@ -18,7 +18,7 @@
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
     FWroughtSeamTest,
     "Wrought.Seam",
-    EAutomationTestFlags::ApplicationContextMask | EAutomationTestFlags::EngineFilter)
+    EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::EngineFilter)
 
 namespace
 {

@@ -7,7 +7,14 @@
 
 #include "CoreMinimal.h"
 #include "Subsystems/WorldSubsystem.h"
+#include "Templates/PimplPtr.h"
 #include "WroughtSimSubsystem.generated.h"
+
+// The carried stock — the basket on the player's back. Its DEFINITION lives in the
+// .cpp because it holds real wrought::Substance grids, and this header stays pure
+// Unreal (no wrought type ever named here, so UHT never parses the namespace). This
+// is a plain Unreal-named PIMPL forward declaration, not a sim type.
+struct FWroughtBasket;
 
 // One phase's line on the assay panel: what came up, and in what state. FREE mass is
 // pan-ready at the face; LOCKED mass is still composite rock the breaker must crush
@@ -34,6 +41,70 @@ struct FWroughtBite
     UPROPERTY(BlueprintReadOnly, Category="Wrought") float TotalMassKg = 0.f;
     UPROPERTY(BlueprintReadOnly, Category="Wrought") FVector2D Place = FVector2D::ZeroVector; // meters
     UPROPERTY(BlueprintReadOnly, Category="Wrought") TArray<FWroughtPhaseReadout> Phases;
+};
+
+// The readout of one levigation pass, rendered for the belt. The clay you poured off
+// (liquor) and the tailings you left (sediment), plus the running basket totals. This
+// is the assay-row shape's cousin for a separation the player performs, not a bite.
+USTRUCT(BlueprintType)
+struct FWroughtDecant
+{
+    GENERATED_BODY()
+
+    UPROPERTY(BlueprintReadOnly, Category="Wrought") bool bDecanted = false;      // false when the basket held no dirt to pour
+    UPROPERTY(BlueprintReadOnly, Category="Wrought") float ClayKg = 0.f;          // liquor poured off THIS pass
+    UPROPERTY(BlueprintReadOnly, Category="Wrought") float ClayGrade = 0.f;       // kaolinite fraction of that liquor (0..1)
+    UPROPERTY(BlueprintReadOnly, Category="Wrought") float TailingsKg = 0.f;      // sediment left behind as dirt this pass
+    UPROPERTY(BlueprintReadOnly, Category="Wrought") float ClayTotalKg = 0.f;     // clay now in the basket (running)
+    UPROPERTY(BlueprintReadOnly, Category="Wrought") float DirtRemainingKg = 0.f; // dirt still in the basket (running)
+};
+
+// The live state of the vat station -- the interactive levigation session (core
+// vat_game.h) rendered for the HUD. The decision aid is the pour preview: what a
+// pour RIGHT NOW would carry out, and how much of it is clay. Stage narrates the
+// water (0 fresh stir .. 3 clay haze); Cloudiness drives a material/visual.
+USTRUCT(BlueprintType)
+struct FWroughtVatState
+{
+    GENERATED_BODY()
+
+    UPROPERTY(BlueprintReadOnly, Category="Wrought") bool bStirred = false;
+    UPROPERTY(BlueprintReadOnly, Category="Wrought") int32 Stage = 0;            // 0..3
+    UPROPERTY(BlueprintReadOnly, Category="Wrought") float Cloudiness = 0.f;     // 0..1
+    UPROPERTY(BlueprintReadOnly, Category="Wrought") float ChargeKg = 0.f;       // mud in the hollow
+    UPROPERTY(BlueprintReadOnly, Category="Wrought") float RoomKg = 0.f;         // fill space left
+    UPROPERTY(BlueprintReadOnly, Category="Wrought") float SettleSeconds = 0.f;  // true sim seconds
+    UPROPERTY(BlueprintReadOnly, Category="Wrought") float PreviewMassG = 0.f;   // a pour now: solids over the lip
+    UPROPERTY(BlueprintReadOnly, Category="Wrought") float PreviewClayG = 0.f;   // ... of which clay
+    UPROPERTY(BlueprintReadOnly, Category="Wrought") float ClayBankedKg = 0.f;   // basket clay heap, total
+    UPROPERTY(BlueprintReadOnly, Category="Wrought") float KaoliniteKg = 0.f;    // ... of which true kaolinite
+    UPROPERTY(BlueprintReadOnly, Category="Wrought") float DirtCarriedKg = 0.f;  // basket dirt heap
+    UPROPERTY(BlueprintReadOnly, Category="Wrought") bool bHasWashPan = false;
+    UPROPERTY(BlueprintReadOnly, Category="Wrought") bool bWashPanJustMade = false; // true on the pour that earned it
+};
+
+// One walk-up to a tree, rendered for the HUD: what the tree just gave into the
+// basket, what the basket now carries, and whether that armful finished the smolder
+// kit. Feedback lines ride along so the widget can chat them without a second call.
+USTRUCT(BlueprintType)
+struct FWroughtGatherState
+{
+    GENERATED_BODY()
+
+    UPROPERTY(BlueprintReadOnly, Category="Wrought") bool bAtTree = false;        // a TreeStand is in range this tick
+    UPROPERTY(BlueprintReadOnly, Category="Wrought") bool bGave = false;          // false: basket full or tree spent
+    UPROPERTY(BlueprintReadOnly, Category="Wrought") float SticksGivenG = 0.f;    // THIS armful
+    UPROPERTY(BlueprintReadOnly, Category="Wrought") float NeedlesGivenG = 0.f;   // THIS armful (tinder)
+    UPROPERTY(BlueprintReadOnly, Category="Wrought") float SticksCarriedKg = 0.f; // basket wood, running
+    UPROPERTY(BlueprintReadOnly, Category="Wrought") float TinderCarriedKg = 0.f;
+    UPROPERTY(BlueprintReadOnly, Category="Wrought") float WoodRoomKg = 0.f;      // basket space left for wood
+    UPROPERTY(BlueprintReadOnly, Category="Wrought") float TreeDeadwoodFrac = 0.f;// this stand's reachable share left, 0..1
+    UPROPERTY(BlueprintReadOnly, Category="Wrought") float TreeLitterFrac = 0.f;
+    UPROPERTY(BlueprintReadOnly, Category="Wrought") bool bTreeSpent = false;     // picked clean -- move on
+    UPROPERTY(BlueprintReadOnly, Category="Wrought") bool bHasSmolderKit = false;
+    UPROPERTY(BlueprintReadOnly, Category="Wrought") bool bSmolderKitJustMade = false; // true on the armful that earned it
+    UPROPERTY(BlueprintReadOnly, Category="Wrought") TArray<FString> Lines;       // narration for the chat panel
+    UPROPERTY(BlueprintReadOnly, Category="Wrought") FString Readout;             // the one-line panel string, composed here
 };
 
 // A WorldSubsystem so it is auto-instantiated per world and reachable from any
@@ -96,4 +167,132 @@ public:
 
     UFUNCTION(BlueprintCallable, Category="Wrought")
     void EquipSaplingPick();
+
+    // --- The basket. Carried stock is REAL Substance, held server-side. ---
+    // Every winning bite pours its full grain composition into the basket's dirt heap
+    // (BiteAt/DigColumnAt do this), not just a scalar mass. The belt only ever reads
+    // the kg getters; the grid stays in the sim, which is the only thing that can
+    // separate it.
+    UFUNCTION(BlueprintPure, Category="Wrought")
+    float CarriedDirtKg() const;
+
+    UFUNCTION(BlueprintPure, Category="Wrought")
+    float CarriedClayKg() const;
+
+    // Levigation — the second station. Stir the carried dirt into the authored HOLLOW
+    // vessel, wait `Seconds`, pour off the clear water above the sediment. The liquor
+    // IS clay: it accumulates in the basket's clay heap; the sediment stays as dirt.
+    // Patience buys grade, not recovery (levigate.h). Runs the core decant(); the sim
+    // is the process, this only hands it the basket and renders the result.
+    // SUPERSEDED by the interactive vat below for play; kept for tests/tools.
+    UFUNCTION(BlueprintCallable, Category="Wrought")
+    FWroughtDecant Levigate(float Seconds);
+
+    // --- The vat — the FIRST GATE, played. (core vat_game.h; the physics is
+    // levigate.h's decant, the tempo is the compression law's.) The loop:
+    // gather at the clay bank -> VatFill from the basket -> VatStir -> the water
+    // clears while VatAdvance ticks -> VatPour when YOU judge it -> clay banks ->
+    // enough kaolinite and the wash pan pops into the tool belt. The pan is
+    // EARNED by separation, never granted by proximity. ---
+
+    // Tip the carried dirt into the hollow (as much as it has room for).
+    UFUNCTION(BlueprintCallable, Category="Wrought") FWroughtVatState VatFill();
+    UFUNCTION(BlueprintCallable, Category="Wrought") FWroughtVatState VatStir();
+    UFUNCTION(BlueprintCallable, Category="Wrought") FWroughtVatState VatPour();
+    UFUNCTION(BlueprintCallable, Category="Wrought") FWroughtVatState VatDump();
+
+    // Advance the settle by real elapsed seconds (fixed-step underneath; call from
+    // a Tick while the player is at the station). Returns the live state.
+    UFUNCTION(BlueprintCallable, Category="Wrought")
+    FWroughtVatState VatAdvance(float DeltaSeconds);
+
+    UFUNCTION(BlueprintPure, Category="Wrought") FWroughtVatState VatState() const;
+
+    // Chat lines the vat produced since last drained (fill/stir/pour narration,
+    // the water's stage changes, the pan-made line). Bind to the chat panel.
+    UFUNCTION(BlueprintCallable, Category="Wrought")
+    TArray<FString> VatDrainFeedback();
+
+    // True kaolinite in the clay heap -- the mass that gates the pan. The heap's
+    // total (CarriedClayKg) also carries fine quartz that rode the pour; it goes
+    // into the pot as temper, but it is not what makes the pot possible.
+    UFUNCTION(BlueprintPure, Category="Wrought") float CarriedKaoliniteKg() const;
+
+    UFUNCTION(BlueprintPure, Category="Wrought") bool HasWashPan() const { return bHasWashPan; }
+
+    // Kaolinite that must be banked before the first pan pops into the belt.
+    // AUTHORED, UNVERIFIED (a pinch-pot pan's wet mass, roughly); v1 collapses
+    // pinch/dry/fire into this threshold -- the fire station un-collapses it later.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Wrought")
+    float WashPanClayKg = 2.f;
+
+    // --- The tree — the THIRD station, and its verb is arrival. (core gather.cpp's
+    // model; the tool is firekit.h's SmolderKit.) Walk up to a TreeStand and the
+    // tree gives one armful of what hands can win -- dead sticks and needle litter,
+    // never the standing timber (the felling wall stays) -- into the basket, capped
+    // by the back-basket's room. Each tree is its own thinning stand: revisits give
+    // less, a picked-clean tree gives nothing. Enough dry sticks and the smolder kit
+    // is carved and pops into the belt -- materials consumed, same law as the pan. ---
+
+    // One armful: gather at the tree nearest this world location (pass the tagged
+    // tree actor's location). Call ONCE per approach, not per tick.
+    UFUNCTION(BlueprintCallable, Category="Wrought")
+    FWroughtGatherState GatherAtTree(FVector TreeWorldLocation);
+
+    // The whole station driven from one per-tick call: finds the nearest TreeStand-
+    // tagged actor within TreeStationRangeCm of the pawn and latches it -- the armful
+    // happens ONCE on arrival (Lines carry the narration that tick only), revisits
+    // re-arm only after you leave. Returns bAtTree=false when no tree is near.
+    UFUNCTION(BlueprintCallable, Category="Wrought")
+    FWroughtGatherState GatherProximityTick(FVector PawnLocation);
+
+    // How close "walking up to a tree" is, cm. Same reach as the vat station.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Wrought")
+    float TreeStationRangeCm = 400.f;
+
+    // The carried-wood readout without gathering (belt/panel refresh).
+    UFUNCTION(BlueprintPure, Category="Wrought")
+    FWroughtGatherState GatherState() const;
+
+    UFUNCTION(BlueprintPure, Category="Wrought") bool HasSmolderKit() const { return bHasSmolderKit; }
+
+    // What the back-basket holds of wood, kg -- carry.cpp's CAP_BACK, the shouldered
+    // sack. Slice-local pacing (how much a trip hauls), not a sim constant.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Wrought")
+    float BasketWoodCapacityKg = 5.f;
+
+    // Dry sticks a bow-drill set is carved from, kg -- consumed on the make.
+    // AUTHORED, UNVERIFIED pacing; the dryness gate itself is fuel.h's
+    // TINDER_MOISTURE_MAX, read by the real make_smolder(), never restated here.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Wrought")
+    float SmolderKitSticksKg = 0.5f;
+
+private:
+    // The basket. Definition (two wrought::Substance heaps + the vat session) is in
+    // the .cpp — see the forward declaration above. TPimplPtr gives an out-of-line
+    // deleter for the incomplete type, so the header never needs the sim's definition.
+    TPimplPtr<FWroughtBasket> Basket;
+
+    // Earned state: set the moment the clay heap crosses WashPanClayKg on a pour.
+    // Persistent for the session; save-game persistence is the world's job later.
+    UPROPERTY(VisibleAnywhere, Category="Wrought")
+    bool bHasWashPan = false;
+
+    // Earned state, same law: set the armful the basket's dry sticks cross
+    // SmolderKitSticksKg (which are consumed carving it).
+    UPROPERTY(VisibleAnywhere, Category="Wrought")
+    bool bHasSmolderKit = false;
+
+    float VatAccumulator = 0.f;         // leftover real seconds not yet stepped
+    TArray<FString> StationFeedback;    // station-level lines (e.g. the pan-made line)
+
+    FWroughtBasket& GetBasket();        // lazily creates the pimpl
+    FWroughtVatState RenderVat(bool bJustMade = false) const;
+    void TryMakeWashPan();              // consumes clay, sets bHasWashPan, says so
+    FWroughtGatherState RenderGather(bool bJustMade = false) const;
+    bool TryMakeSmolderKit(TArray<FString>& OutLines); // consumes sticks, sets bHasSmolderKit
+
+    // The station latch: the tree the player is currently standing at. Weak -- the
+    // world owns its trees; a stale pointer just reads as "not at a tree".
+    TWeakObjectPtr<AActor> CurrentTree;
 };

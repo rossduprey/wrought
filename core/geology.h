@@ -151,7 +151,19 @@ inline constexpr int BARREN = -1;
 //     into the fraction a pan concentrates -- no composite, no breaker. This is the
 //     mechanical content of "cassiterite concentrates in placers under running
 //     water and was won by panning gravel" (phase_table.h). The tin creek.
-enum Origin { HARDROCK, PLACER };
+//   WEATHERED -- the RAIN already did the breaking, chemically. Rotted rock in
+//     place (a saprolite): feldspar hydrolysed to kaolinite where it stood, the
+//     resistant quartz left behind as loose sand, the whole bank soft enough to
+//     crumble by hand at any depth the rot reaches. The mineral comes up FREE --
+//     not because a blow parted it but because kaolinite IS the weathering
+//     product; it never was locked in anything -- and fine, because kaolinite
+//     crystallises at clay size. WEATHERED is to rain what PLACER is to the
+//     river: the ground already did the work, and the tool bootstrap is not
+//     needed to start. This is load-bearing: the clay bank is where the FIRST
+//     vessel is dug (levigate.h HOLLOW, "a hollow scraped in the bank") and the
+//     first pan is won, so it must yield to bare hands or the chain deadlocks
+//     on its own first rung. The clay bank.
+enum Origin { HARDROCK, PLACER, WEATHERED };
 
 struct Deposit {
     const char* id;
@@ -166,14 +178,24 @@ struct Deposit {
                                // pan-ready). Decides the size/liberation of the bite.
 };
 
-// The valley. Two bodies, placed far apart so the co-location gate is real: a
-// copper hill (oxide cap, leached middle, sulfide root) and, a few hundred meters
-// off, a tin creek (cassiterite, the same at every depth -- no sulfide column).
+// The valley. Three bodies, placed far apart so the co-location gate is real: a
+// copper hill (oxide cap, leached middle, sulfide root); a few hundred meters
+// off, a tin creek (cassiterite, the same at every depth -- no sulfide column);
+// and between them on the creek bank, the clay bank the player is GIVEN --
+// the ground the first vessel is scraped into and the first pan comes from.
 // This is the concrete form of DESIGN.md's "six hand-authored deposit
 // compositions"; more can be added the same way, no procedural generation.
 inline constexpr Deposit DEPOSITS[] = {
     {"copper-hill", 0.0,   0.0,  40.0, 0.45, {CUPRITE, BARREN, CHALCOCITE}, HARDROCK},
     {"tin-creek",   300.0, 120.0, 25.0, 0.45, {CASSITERITE, CASSITERITE, CASSITERITE}, PLACER},
+    // The clay bank -- the creek bank where the rot runs deep, partway down the
+    // valley toward the tin creek. Kaolinite through the weathered blanket; the
+    // DEEP tier is BARREN because weathering fades and fresh granite is country
+    // rock. This is the given first station: the HOLLOW is scraped here, the
+    // first wash pan is levigated from its ground. Peak grade 0.35 (saprolite
+    // kaolinite content; AUTHORED, UNVERIFIED -- placement and grade are #28
+    // valley-layout placeholders like every center/radius in this table).
+    {"clay-bank",   150.0, 60.0,  20.0, 0.35, {KAOLINITE, KAOLINITE, BARREN}, WEATHERED},
 };
 
 // The particle-size distribution of run-of-mine rock won by a pick blow. Breakage
@@ -216,6 +238,21 @@ inline constexpr double PLACER_ORE_PSD[N_SIZE]    = {0.02, 0.10, 0.78, 0.10};
 //     you screen off and throw back; that it is coarse is what LETS you screen the
 //     heavy sand out from under it.
 inline constexpr double PLACER_GANGUE_PSD[N_SIZE]  = {0.02, 0.06, 0.32, 0.60};
+
+// A WEATHERED body is neither fresh breakage nor a hydraulic sort -- it is rock
+// rotted IN PLACE, and its two sides part by HOW they weathered, not by a current:
+//   WEATHERED_ORE_PSD -- kaolinite crystallises at clay size (booklets under ~4 um;
+//     the same mineralogical fact that gives it its platelet aspect ratio,
+//     settling.h), so the ore is overwhelmingly in the CLAY bin, with a SILT tail
+//     of aggregates the stir does not fully slake. A grain-size fact, not a knob;
+//     the split within it is AUTHORED, UNVERIFIED. clay, silt, sand, gravel:
+inline constexpr double WEATHERED_ORE_PSD[N_SIZE]    = {0.70, 0.20, 0.08, 0.02};
+//   WEATHERED_GANGUE_PSD -- the residual quartz weathering could not touch, freed
+//     from its granite as loose sand and grit (saprolite texture: clayey sand).
+//     AUTHORED, UNVERIFIED; the finding it drives (a levigation of clay-bank dirt
+//     yields kaolinite, the sand stays in the sediment) is insensitive to the
+//     split, because the vat cuts on settling TIME and the bins are ~200x apart.
+inline constexpr double WEATHERED_GANGUE_PSD[N_SIZE] = {0.05, 0.15, 0.55, 0.25};
 
 // The coarsest size bin at which a mineral's grains come FREE of gangue when HARD
 // ROCK is broken -- its liberation size, set by how the mineral occurs in the rock.
@@ -281,6 +318,12 @@ inline constexpr double COMPETENCE_PLACER  = 0.000; // loose alluvium, already b
 // the way down.
 inline double rock_competence(Origin origin, int tier) {
     if (origin == PLACER) return COMPETENCE_PLACER;
+    // Rotted ground is friable as deep as the rot reaches -- the weathering that
+    // made the kaolinite also broke the rock's competence. Where the blanket ends
+    // (a BARREN tier), origin_at falls through to HARDROCK country and the wall
+    // returns. This is the same asymmetry as the placer's, from chemistry instead
+    // of a current -- and it is what lets the FIRST vessel be dug with bare hands.
+    if (origin == WEATHERED) return COMPETENCE_SURFACE;
     switch (tier) {
         case SURFACE: return COMPETENCE_SURFACE;
         case MIDDLE:  return COMPETENCE_MIDDLE;
@@ -353,6 +396,15 @@ inline Substance sample(Place at, int tier, double mass) {
             for (int b = 0; b < N_SIZE; ++b)
                 s.freegrain[mineral][b] += ore * PLACER_ORE_PSD[b];
             consumed += ore;
+        } else if (d.origin == WEATHERED) {
+            // Rotted in place: the mineral was MADE free by chemistry (kaolinite
+            // is the weathering product, never locked in anything) and comes up
+            // fine; the residual quartz rides with it as loose sand. Both free,
+            // no composite, no breaker -- the rain was the mill.
+            const double ore = mass * richness;
+            for (int b = 0; b < N_SIZE; ++b)
+                s.freegrain[mineral][b] += ore * WEATHERED_ORE_PSD[b];
+            consumed += ore;
         } else {
             // It takes richness/f of composite rock to carry `richness` of mineral;
             // the blow spreads that rock over the GGS PSD and liberation splits it.
@@ -379,7 +431,9 @@ inline Substance sample(Place at, int tier, double mass) {
     const double gangue = mass - consumed;
     for (int b = 0; b < N_SIZE; ++b)
         s.freegrain[QUARTZ][b] += gangue *
-            (barren_origin == PLACER ? PLACER_GANGUE_PSD[b] : psd_bin(b));
+            (barren_origin == PLACER    ? PLACER_GANGUE_PSD[b]
+           : barren_origin == WEATHERED ? WEATHERED_GANGUE_PSD[b]
+                                        : psd_bin(b));
     return s;
 }
 
