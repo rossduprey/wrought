@@ -6,14 +6,16 @@
 #include "geology.h"
 #include "haft.h"
 #include "levigate.h"   // decant(), HOLLOW, DecantResult -- the second separator
+#include "vat_game.h"   // the levigation session, played -- the first gate
 
-// The basket's real contents: two Substance heaps, the sim's own type. Defined here
-// (not the header) so no wrought type crosses into the reflected surface. TPimplPtr in
-// the header holds one of these; the belt sees only the kg getters below.
+// The basket's real contents: two Substance heaps plus the vat session, the sim's own
+// types. Defined here (not the header) so no wrought type crosses into the reflected
+// surface. TPimplPtr in the header holds one of these; the belt sees only the getters.
 struct FWroughtBasket
 {
     wrought::Substance dirt;   // raw dug stock, poured in bite by bite
     wrought::Substance clay;   // levigated liquor, accumulated pass by pass
+    wrought::VatGame   vat;    // the hollow scraped in the bank (world station state)
 };
 
 namespace
@@ -143,6 +145,148 @@ FWroughtDecant UWroughtSimSubsystem::Levigate(float Seconds)
     out.ClayTotalKg     = static_cast<float>(Basket->clay.total_mass());
     out.DirtRemainingKg = static_cast<float>(Basket->dirt.total_mass());
     return out;
+}
+
+FWroughtBasket& UWroughtSimSubsystem::GetBasket()
+{
+    if (!Basket) Basket = MakePimpl<FWroughtBasket>();
+    return *Basket;
+}
+
+FWroughtVatState UWroughtSimSubsystem::RenderVat(bool bJustMade) const
+{
+    using namespace wrought;
+    FWroughtVatState out;
+    if (!Basket) { out.bHasWashPan = bHasWashPan; return out; }
+
+    const VatGame& vat = Basket->vat;
+    out.bStirred      = vat.stirred();
+    out.Stage         = vat.stage_now();
+    out.Cloudiness    = static_cast<float>(vat.cloudiness());
+    out.ChargeKg      = static_cast<float>(vat.charge_kg());
+    out.RoomKg        = static_cast<float>(vat.charge_room_kg());
+    out.SettleSeconds = static_cast<float>(vat.settle_seconds());
+    double pm = 0.0, pc = 0.0;
+    vat.pour_preview(pm, pc);
+    out.PreviewMassG  = static_cast<float>(pm * 1000.0);
+    out.PreviewClayG  = static_cast<float>(pc * 1000.0);
+    out.ClayBankedKg  = static_cast<float>(Basket->clay.total_mass());
+    out.KaoliniteKg   = static_cast<float>(Basket->clay.phase_mass(KAOLINITE));
+    out.DirtCarriedKg = static_cast<float>(Basket->dirt.total_mass());
+    out.bHasWashPan   = bHasWashPan;
+    out.bWashPanJustMade = bJustMade;
+    return out;
+}
+
+void UWroughtSimSubsystem::TryMakeWashPan()
+{
+    using namespace wrought;
+    if (bHasWashPan || !Basket) return;
+    const double kao = Basket->clay.phase_mass(KAOLINITE);
+    if (kao < WashPanClayKg) return;
+
+    // Throw the pan from the heap AS IT IS: consume heap mass carrying WashPanClayKg
+    // of kaolinite; the fine quartz that rides along goes in as temper (which is what
+    // temper is). v1 collapses pinch/dry/fire into this moment -- the fire station
+    // will un-collapse it. Scale the heap down proportionally; mass is conserved
+    // into the pot, not destroyed.
+    const double heap = Basket->clay.total_mass();
+    const double consume = heap * (WashPanClayKg / kao);
+    const double f = (heap - consume) / heap;
+    for (int p = 0; p < N_PHASE; ++p)
+        for (int s = 0; s < N_SIZE; ++s)
+        {
+            Basket->clay.freegrain[p][s] *= f;
+            Basket->clay.composite[p][s] *= f;
+        }
+    bHasWashPan = true;
+    StationFeedback.Add(TEXT("There is enough. You pinch the clay up into a wide, shallow dish and set it to dry."));
+    StationFeedback.Add(TEXT("You have a pan. It is a bad one. It is yours."));
+}
+
+FWroughtVatState UWroughtSimSubsystem::VatFill()
+{
+    using namespace wrought;
+    FWroughtBasket& b = GetBasket();
+    const double before = b.dirt.total_mass();
+    const double took = b.vat.fill(b.dirt);
+    if (took > 0.0 && before > 0.0)
+    {
+        // The vat accepted `took` kg of the basket's mixture; remove exactly that,
+        // same proportions, from the carried dirt.
+        const double f = (before - took) / before;
+        for (int p = 0; p < N_PHASE; ++p)
+            for (int s = 0; s < N_SIZE; ++s)
+            {
+                b.dirt.freegrain[p][s] *= f;
+                b.dirt.composite[p][s] *= f;
+            }
+    }
+    return RenderVat();
+}
+
+FWroughtVatState UWroughtSimSubsystem::VatStir()
+{
+    GetBasket().vat.stir();
+    return RenderVat();
+}
+
+FWroughtVatState UWroughtSimSubsystem::VatPour()
+{
+    using namespace wrought;
+    FWroughtBasket& b = GetBasket();
+    const Substance liquor = b.vat.pour();
+    const bool hadPan = bHasWashPan;
+    if (liquor.total_mass() > 0.0)
+    {
+        AddInto(b.clay, liquor);
+        TryMakeWashPan();
+    }
+    return RenderVat(!hadPan && bHasWashPan);
+}
+
+FWroughtVatState UWroughtSimSubsystem::VatDump()
+{
+    GetBasket().vat.dump();
+    return RenderVat();
+}
+
+FWroughtVatState UWroughtSimSubsystem::VatAdvance(float DeltaSeconds)
+{
+    using namespace wrought;
+    FWroughtBasket& b = GetBasket();
+    // Fixed-step underneath, like the pan host: accumulate real seconds, take whole
+    // VAT_DT steps, never scale one step by a frame's dt. Guard a huge hitch.
+    VatAccumulator += FMath::Max(0.f, DeltaSeconds);
+    const float MaxCatchUp = static_cast<float>(VAT_DT) * 40.f;
+    if (VatAccumulator > MaxCatchUp) VatAccumulator = MaxCatchUp;
+    while (VatAccumulator >= static_cast<float>(VAT_DT))
+    {
+        b.vat.tick();
+        VatAccumulator -= static_cast<float>(VAT_DT);
+    }
+    return RenderVat();
+}
+
+FWroughtVatState UWroughtSimSubsystem::VatState() const
+{
+    return RenderVat();
+}
+
+TArray<FString> UWroughtSimSubsystem::VatDrainFeedback()
+{
+    TArray<FString> out;
+    if (Basket)
+        for (const std::string& l : Basket->vat.drain_feedback())
+            out.Add(FString(UTF8_TO_TCHAR(l.c_str())));
+    out.Append(StationFeedback);
+    StationFeedback.Reset();
+    return out;
+}
+
+float UWroughtSimSubsystem::CarriedKaoliniteKg() const
+{
+    return Basket ? static_cast<float>(Basket->clay.phase_mass(wrought::KAOLINITE)) : 0.f;
 }
 
 void UWroughtSimSubsystem::EquipBareHand()
