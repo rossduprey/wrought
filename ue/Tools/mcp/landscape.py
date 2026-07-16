@@ -10,6 +10,24 @@
 # frame: Place meters * 100 = UE cm (WroughtSimSubsystem: PlaneOrigin=0, UnitsPerMeter=100).
 # The two authored deposits (core/geology.h): copper-hill at Place(0,0) r=40m (a raised
 # hardrock mound); tin-creek at Place(300,120) r=25m (a placer, a water-cut channel).
+#
+# The river (2026-07-16): one continuous water-cut channel drains the valley west→east —
+# skirting the copper hill's north flank, past the clay bank at Place(150,60) (the WEATHERED
+# deposit sits ON the bank; the vat at its feet stays dry), through the tin placer at
+# Place(300,120) (a placer IS river-worked ground), and out the east edge. Routed as a
+# polyline; RIVER_WAYPOINTS_PLACE_M is the single source of truth — water actors are seated
+# along the same points.
+
+# Place-frame metres. Keep the vat/clay bank (150,60) >= ~1.5x half-width from the line.
+RIVER_WAYPOINTS_PLACE_M = [
+    (-80.0, 25.0),
+    (-15.0, 85.0),
+    (80.0, 92.0),
+    (150.0, 88.0),
+    (225.0, 100.0),
+    (300.0, 120.0),
+    (424.0, 150.0),
+]
 
 import base64
 import math
@@ -80,8 +98,10 @@ class LandscapeTools(unreal.ToolsetDefinition):
         The landscape's (0,0) corner is placed at UE (origin_x_m, origin_y_m) metres, so a
         vertex at local metre (lx, ly) sits at Place (origin_x_m+lx, origin_y_m+ly). Defaults
         span Place x in [-80, 424] m and y in [-80, 235] m, comfortably enclosing both
-        deposits. A copper-hill mound rises at Place(0,0); a tin-creek channel is cut through
-        Place(300,120); the rest is a gently undulating floor with fine noise.
+        deposits. A copper-hill mound rises at Place(0,0); a river channel is cut along
+        RIVER_WAYPOINTS_PLACE_M (west edge -> hill's north skirt -> past the clay bank at
+        Place(150,60) -> through the tin placer at Place(300,120) -> east edge); the rest
+        is a gently undulating floor with fine noise.
 
         Args:
             origin_x_m: Place-x (metres) of the landscape's (0,0) corner.
@@ -96,9 +116,9 @@ class LandscapeTools(unreal.ToolsetDefinition):
             floor_m: baseline valley-floor height in metres.
             hill_peak_m: peak height of the copper-hill mound above floor, metres.
             hill_radius_m: influence radius of the hill skirt, metres.
-            creek_depth_m: depth the tin-creek channel is cut below floor, metres.
-            creek_half_width_m: half-width of the creek channel cross-section, metres.
-            creek_run_m: length of the creek channel through the tin deposit, metres.
+            creek_depth_m: depth the river channel is cut below floor, metres.
+            creek_half_width_m: half-width of the river channel cross-section, metres.
+            creek_run_m: RETIRED (river is now the module-level polyline); ignored.
             undulation_amp_m: amplitude of long-wavelength ground undulation, metres.
             noise_amp_m: amplitude of fine per-vertex noise, metres.
             replace_existing: if true, destroy any prior 'WroughtValley' landscape first.
@@ -116,16 +136,11 @@ class LandscapeTools(unreal.ToolsetDefinition):
 
         # Deposit anchors in LOCAL metres (Place - origin).
         hill_lx, hill_ly = 0.0 - origin_x_m, 0.0 - origin_y_m
-        creek_lx, creek_ly = 300.0 - origin_x_m, 120.0 - origin_y_m
 
-        # Creek channel: a segment through the tin deposit, running roughly toward the
-        # copper hill (so it reads as drainage), clipped to a fixed run length.
-        bearing = math.atan2(hill_ly - creek_ly, hill_lx - creek_lx)
-        half = creek_run_m * 0.5
-        ax = creek_lx - math.cos(bearing) * half
-        ay = creek_ly - math.sin(bearing) * half
-        bx = creek_lx + math.cos(bearing) * half
-        by = creek_ly + math.sin(bearing) * half
+        # The river: a polyline in local metres (see RIVER_WAYPOINTS_PLACE_M).
+        # creek_run_m is retired (kept in the signature for schema stability).
+        pts = [(px - origin_x_m, py - origin_y_m) for px, py in RIVER_WAYPOINTS_PLACE_M]
+        segs = list(zip(pts[:-1], pts[1:]))
 
         # Height -> uint16. World Z(cm) = (h-32768) * z_scale/128, so
         # h = 32768 + Z_m * 100 * 128 / z_scale.
@@ -144,8 +159,9 @@ class LandscapeTools(unreal.ToolsetDefinition):
                 # Copper hill: raised cosine mound.
                 dh = math.hypot(lx - hill_lx, ly - hill_ly)
                 z += hill_peak_m * _smooth_bump(dh / hill_radius_m)
-                # Tin creek: cut a channel (cosine cross-section) along the segment.
-                dc = _point_seg_dist(lx, ly, ax, ay, bx, by)
+                # The river: cut a channel (cosine cross-section) along the polyline.
+                dc = min(_point_seg_dist(lx, ly, a[0], a[1], b[0], b[1])
+                         for a, b in segs)
                 z -= creek_depth_m * _smooth_bump(dc / creek_half_width_m)
                 # Long-wavelength undulation + fine noise for a natural floor.
                 z += undulation_amp_m * (
@@ -177,11 +193,13 @@ class LandscapeTools(unreal.ToolsetDefinition):
 
         zmin_m = (hmin - 32768) / h_per_m
         zmax_m = (hmax - 32768) / h_per_m
+        wp = ' -> '.join(f'({px:.0f},{py:.0f})' for px, py in RIVER_WAYPOINTS_PLACE_M)
         return (f'Sculpted {landscape.get_path_name()} — {size_x}x{size_y} verts, '
                 f'{comp_quads}-quad components, origin Place({origin_x_m},{origin_y_m}) m, '
                 f'height {zmin_m:.1f}..{zmax_m:.1f} m. '
-                f'Copper hill at local ({hill_lx:.0f},{hill_ly:.0f}) m, '
-                f'tin creek through ({creek_lx:.0f},{creek_ly:.0f}) m.')
+                f'Copper hill at local ({hill_lx:.0f},{hill_ly:.0f}) m. '
+                f'River (Place m): {wp}; depth {creek_depth_m} m, '
+                f'half-width {creek_half_width_m} m.')
 
     @staticmethod
     def _destroy_existing(label: str) -> None:
